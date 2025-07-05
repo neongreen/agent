@@ -2,5 +2,15 @@ default-base = "HEAD"
 
 [plan]
 judge-extra-prompt = """
-  If the plan proposes writing tests, you must reject the plan.
+  You must reject the plan if:
+    - The plan proposes writing tests.
+    - The plan proposes to run a linter, type checker, or formatter.
+    - The plan proposes to remove unused imports (unless they are *preventing compilation*, rather than just being unused).
+    - The plan proposes to run automatic tests or do testing manually, including "basic sanity checks" or "smoke testing".
+    - The plan proposes to run the agent tool itself (src/main.py).
+    - The plan proposes using `pip` or `poetry` (this project uses `uv`).
+    - The plan lists "ensure" as a step, without explaining which *actions* it will take to "ensure".
+        The actions could be reading files, executing commands, etc, but they must be specific and actionable.
+  
+  If rejecting the plan, you must explain in detail why you are rejecting it.
 """
