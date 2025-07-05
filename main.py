@@ -1,3 +1,4 @@
+import shlex
 import sys
 import os
 import re
@@ -81,7 +82,7 @@ def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = No
     return new_branch_name
 
 
-def log(message, quiet=None, message_type="default", indent_level=0) -> None:
+def log(message: str, message_human: Optional[str] = None, quiet=None, message_type="default", indent_level=0) -> None:
     """Simple logging function that respects quiet mode."""
     if quiet is None:
         quiet = QUIET_MODE
@@ -89,7 +90,7 @@ def log(message, quiet=None, message_type="default", indent_level=0) -> None:
     log_entry = {"timestamp": datetime.datetime.now().isoformat(), "message": message}
 
     if not quiet:
-        _print_formatted(message, message_type=message_type, indent_level=indent_level)
+        _print_formatted(message_human or message, message_type=message_type, indent_level=indent_level)
 
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_entry) + "\n")
@@ -102,13 +103,26 @@ class RunResult(TypedDict):
     success: bool
 
 
-def run(command: list[str], description=None, directory=None) -> RunResult:
-    """Run command and log it."""
+def run(command: list[str], description=None, command_human: Optional[list[str]] = None, directory=None) -> RunResult:
+    """
+    Run command and log it.
+
+    Args:
+        command: Command to run as a list of arguments.
+        description: Optional description of the command for logging.
+        directory: Optional working directory to run the command in.
+        command_human: If present, will be used in console output instead of the full command.
+    """
 
     if description:
         log(f"Executing: {description}", message_type="tool_code", indent_level=1)
 
-    log(f"Running command: {command}", message_type="tool_code", indent_level=1)
+    log(
+        f"Running command: {shlex.join(command)}",
+        message_human=f"Running command: {shlex.join(command_human or command)}",
+        message_type="tool_code",
+        indent_level=1,
+    )
 
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory)
@@ -138,8 +152,7 @@ def run_gemini(prompt) -> str | None:
     command = ["gemini", "-m", "gemini-2.5-flash", "-y", "-p", f"{escaped_prompt}"]
 
     log(f"Gemini prompt: {prompt}", message_type="thought", indent_level=1)
-
-    result = run(command, "Calling Gemini")
+    result = run(command, "Calling Gemini", command_human=command[:-1] + ["<prompt>"])
 
     if result["success"]:
         response = result["stdout"].strip()
