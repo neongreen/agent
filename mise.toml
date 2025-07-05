@@ -1,2 +1,6 @@
 [tools]
 python = "3.13.5"
+
+[tasks.run]
+run = "mise x -- python main.py"
+description = "Run the agent"
