@@ -110,8 +110,13 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
     return None
 
 
-def implementation_phase(task, plan, base_branch, cwd=None, config: Optional[AgentConfig] = None) -> bool:
-    """Iterative implementation phase with early bailout."""
+def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optional[AgentConfig] = None) -> bool:
+    """
+    Iterative implementation phase with early bailout.
+
+    Arguments:
+        base_commit: *commit* to switch to before starting the implementation.
+    """
     status_manager.update_status(f"Starting implementation phase for task: {task}")
     log(f"Starting implementation phase for task: {task}", message_type="thought", config=config)
 
@@ -166,7 +171,7 @@ def implementation_phase(task, plan, base_branch, cwd=None, config: Optional[Age
             "Here is the summary of the implementation:\n\n"
             f"{implementation_summary}\n\n"
             "Here is the diff of the changes made:\n\n"
-            f"{run(['git', 'diff', base_branch + '..HEAD'], directory=cwd)['stdout']}"
+            f"{run(['git', 'diff', base_commit + '..HEAD'], directory=cwd)['stdout']}"
         )
 
         if config and config.implement_judge_extra_prompt:
@@ -252,7 +257,7 @@ def implementation_phase(task, plan, base_branch, cwd=None, config: Optional[Age
 
 
 def process_task(
-    task: str, task_num: int, base_branch: str, cwd: Optional[str] = None, config: Optional[AgentConfig] = None
+    task: str, task_num: int, base_specifier: str, cwd: Optional[str] = None, config: Optional[AgentConfig] = None
 ) -> bool:
     """Process a single task through planning and implementation."""
     status_manager.update_status(f"Processing task {task_num}: {task}")
@@ -270,9 +275,9 @@ def process_task(
     # Set up branch
     if current_task_state() == TaskState.PLAN.value:
         # Resolve the base_branch to a commit SHA before setting up the task branch
-        resolved_base_commit_sha = resolve_commit_specifier(base_branch, cwd)
+        resolved_base_commit_sha = resolve_commit_specifier(base_specifier, cwd)
         if not resolved_base_commit_sha:
-            log(f"Failed to resolve base specifier: {base_branch}", message_type="tool_output_error")
+            log(f"Failed to resolve base specifier: {base_specifier}", message_type="tool_output_error")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
             return False
@@ -315,7 +320,7 @@ def process_task(
     # Implementation phase
     success = False
     if current_task_state() == TaskState.IMPLEMENT.value:
-        success = implementation_phase(task, plan, base_branch, cwd, config)
+        success = implementation_phase(task, plan, resolved_base_commit_sha, cwd, config)
         if success:
             if not has_tracked_diff(cwd):
                 log("No tracked changes after implementation, marking as DONE.", message_type="thought")
