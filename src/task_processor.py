@@ -6,10 +6,12 @@ from .config import AgentConfig
 from .git_utils import resolve_commit_specifier, has_tracked_diff, setup_task_branch
 from .gemini_agent import run_gemini
 from .state_manager import read_state, write_state
+from .ui import status_manager
 
 
 def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) -> Optional[str]:
     """Iterative planning phase with Gemini approval."""
+    status_manager.update_status(f"Starting planning phase for task: {task}")
     log(f"Starting planning phase for task: {task}", message_type="thought", config=config)
 
     max_planning_rounds = 5
@@ -19,6 +21,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
     previous_review: Optional[str] = None
 
     for round_num in range(1, max_planning_rounds + 1):
+        status_manager.update_status(f"Planning round {round_num}/{max_planning_rounds}")
         log(f"Planning round {round_num}", message_type="thought", config=config)
 
         # Ask Gemini to create/revise plan
@@ -40,8 +43,10 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
                 'Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.'
             ).strip()
 
+        status_manager.update_status(f"Getting plan from Gemini (round {round_num})...")
         current_plan = run_gemini(plan_prompt, yolo=True)
         if not current_plan:
+            status_manager.update_status("Failed to get plan from Gemini.", style="red")
             log("Failed to get plan from Gemini", message_type="tool_output_error")
             return None
 
@@ -55,12 +60,15 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
         if config and config.judge_extra_prompt:
             review_prompt += f"\n\n{config.judge_extra_prompt}"
 
+        status_manager.update_status(f"Reviewing plan (round {round_num})...")
         current_review = run_gemini(review_prompt, yolo=True)
         if not current_review:
+            status_manager.update_status("Failed to get plan review from Gemini.", style="red")
             log("Failed to get plan review from Gemini", message_type="tool_output_error")
             return None
 
         if current_review.upper().startswith("APPROVED"):
+            status_manager.update_status(f"Plan approved in round {round_num}.")
             log(f"Plan approved in round {round_num}", message_type="thought")
             plan = current_plan  # This is the approved plan
 
@@ -70,11 +78,13 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
                 f.write(f"# Plan for {task}\n\n{plan}")
 
             # Generate commit message
+            status_manager.update_status("Generating commit message for plan...")
             commit_msg_prompt = f"Generate a concise commit message (max 15 words) for approving this plan: {task}"
             commit_msg = run_gemini(commit_msg_prompt, yolo=False)
             if not commit_msg:
                 commit_msg = "Approved plan for task"
 
+            status_manager.update_status("Committing approved plan...")
             run(["git", "add", "."], "Adding plan files", directory=cwd)
             run(
                 ["git", "commit", "-m", f"[plan.md] {commit_msg[:100]}"],
@@ -84,6 +94,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
 
             return plan
         else:
+            status_manager.update_status(f"Plan rejected in round {round_num}. Reviewing feedback...")
             log(
                 f"Plan rejected in round {round_num}: {current_review}",
                 message_type="tool_output_error",
@@ -92,11 +103,13 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
             previous_review = current_review  # Store for next round's prompt
 
     log(f"Planning failed after {max_planning_rounds} rounds", message_type="tool_output_error")
+    status_manager.update_status("Planning failed.", style="red")
     return None
 
 
 def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = None) -> bool:
     """Iterative implementation phase with early bailout."""
+    status_manager.update_status(f"Starting implementation phase for task: {task}")
     log(f"Starting implementation phase for task: {task}", message_type="thought", config=config)
 
     max_implementation_attempts = 10
@@ -105,6 +118,7 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
     commits_made = 0
 
     for attempt in range(1, max_implementation_attempts + 1):
+        status_manager.update_status(f"Implementation attempt {attempt}/{max_implementation_attempts}")
         log(f"Implementation attempt {attempt}", message_type="thought")
 
         # Ask Gemini to implement next step
@@ -117,8 +131,10 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             "Your response will help the reviewer of your implementation understand the changes made.\n"
         ).strip()
 
+        status_manager.update_status(f"Getting implementation from Gemini (attempt {attempt})...")
         implementation_summary = run_gemini(impl_prompt, yolo=True)
         if not implementation_summary:
+            status_manager.update_status("Failed to get implementation from Gemini.", style="red")
             log("Failed to get implementation summary from Gemini", message_type="tool_output_error")
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
@@ -142,8 +158,10 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             f"{run(['git', 'diff'], directory=cwd)['stdout']}"
         )
 
+        status_manager.update_status(f"Evaluating implementation (attempt {attempt})...")
         evaluation = run_gemini(eval_prompt, yolo=True)
         if not evaluation:
+            status_manager.update_status("Failed to get evaluation from Gemini.", style="red")
             log("Failed to get evaluation from Gemini", message_type="tool_output_error")
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
@@ -152,11 +170,13 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             continue
 
         if evaluation.upper().startswith("SUCCESS"):
+            status_manager.update_status(f"Implementation successful (attempt {attempt}).")
             log(f"Implementation successful in attempt {attempt}", message_type="thought")
             consecutive_failures = 0
             commits_made += 1
 
             # Generate commit message and commit
+            status_manager.update_status("Generating commit message for implementation...")
             commit_msg_prompt = (
                 f"Generate a concise commit message (max 15 words) for this implementation step: {repr(task)}"
             )
@@ -164,6 +184,7 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             if not commit_msg:
                 commit_msg = "Implementation step for task"
 
+            status_manager.update_status("Committing implementation...")
             run(["git", "add", "."], "Adding implementation files", directory=cwd)
             run(
                 ["git", "commit", "-m", f"{commit_msg[:100]}"],
@@ -172,6 +193,7 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             )
 
             # Check if task is complete
+            status_manager.update_status("Checking if task is complete...")
             completion_prompt = (
                 f"Is the task {repr(task)} now complete based on the work done?"
                 "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done."
@@ -183,12 +205,15 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             completion_check = run_gemini(completion_prompt, yolo=True)
 
             if completion_check and completion_check.upper().startswith("COMPLETE"):
+                status_manager.update_status("Task marked as complete.")
                 log("Task marked as complete", message_type="thought")
                 return True
 
         elif evaluation.upper().startswith("PARTIAL"):
+            status_manager.update_status(f"Partial progress (attempt {attempt}).")
             log(f"Partial progress in attempt {attempt}", message_type="thought")
         else:
+            status_manager.update_status(f"Implementation failed (attempt {attempt}).", style="red")
             log(f"Implementation failed in attempt {attempt}", message_type="tool_output_error")
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
@@ -204,6 +229,7 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
         f"Implementation incomplete after {max_implementation_attempts} attempts",
         message_type="tool_output_error",
     )
+    status_manager.update_status("Implementation incomplete.", style="red")
     return False
 
 
@@ -211,6 +237,7 @@ def process_task(
     task: str, task_num: int, base_branch: str, cwd: Optional[str] = None, config: Optional[AgentConfig] = None
 ) -> bool:
     """Process a single task through planning and implementation."""
+    status_manager.update_status(f"Processing task {task_num}: {task}")
     log(f"Processing task {task_num}: {task}", message_type="thought", config=config)
 
     task_id = f"task_{task_num}"
@@ -220,6 +247,7 @@ def process_task(
         return state.get(task_id, TaskState.PLAN.value)
 
     log(f"Current state for {task_id}: {current_task_state()}", message_type="thought")
+    status_manager.update_status(f"Current task state: {current_task_state()}")
 
     # Set up branch
     if current_task_state() == TaskState.PLAN.value:
@@ -233,6 +261,7 @@ def process_task(
 
         if not setup_task_branch(task, task_num, resolved_base_commit_sha, cwd):
             log("Failed to set up task branch", message_type="tool_output_error")
+            status_manager.update_status("Failed to set up task branch.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
             return False
@@ -244,6 +273,7 @@ def process_task(
         plan = planning_phase(task, cwd, config)
         if not plan:
             log("Planning phase failed", config=config)
+            status_manager.update_status("Planning phase failed.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
             return False
@@ -256,8 +286,10 @@ def process_task(
             with open(plan_path, "r") as f:
                 plan = f.read()
             log("Resuming from existing plan.md", message_type="thought")
+            status_manager.update_status("Resuming from existing plan.")
         else:
             log("No plan.md found for resuming, aborting task.", message_type="tool_output_error")
+            status_manager.update_status("No plan found for resuming.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
             return False
@@ -285,14 +317,18 @@ def process_task(
 
     if success:
         log(f"Task {task_num} completed successfully")
+        status_manager.update_status(f"Task {task_num} completed successfully.")
         # Remove the agent state file after a task is done
         try:
             if STATE_FILE.exists():
                 STATE_FILE.unlink()
                 log("Agent state file removed.", message_type="thought")
+                status_manager.update_status("Agent state file removed.")
         except OSError as e:
             log(f"Error removing agent state file: {e}", message_type="tool_output_error")
+            status_manager.update_status("Error removing agent state file.", style="red")
     else:
         log(f"Task {task_num} failed or incomplete")
+        status_manager.update_status(f"Task {task_num} failed or incomplete.", style="red")
 
     return success

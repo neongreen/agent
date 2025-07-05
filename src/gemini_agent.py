@@ -2,6 +2,7 @@ import os
 import re
 from typing import Optional
 from .utils import log, _print_formatted, run
+from .ui import status_manager
 
 
 def run_gemini(prompt: str, yolo: bool) -> Optional[str]:
@@ -9,10 +10,12 @@ def run_gemini(prompt: str, yolo: bool) -> Optional[str]:
     command = ["gemini", "-m", "gemini-2.5-flash", *(["--yolo"] if yolo else []), "-p", prompt]
 
     log(f"Gemini prompt: {prompt}", message_type="thought")
+    status_manager.update_status(f"Calling Gemini with prompt: {prompt[:50]}...")
     result = run(command, "Calling Gemini", command_human=command[:-1] + ["<prompt>"])
 
     if result["success"]:
         response = result["stdout"].strip()
+        status_manager.update_status("Gemini call successful.")
         log(f"Gemini response: {response}", message_type="thought")
         return response
     else:
@@ -22,6 +25,7 @@ def run_gemini(prompt: str, yolo: bool) -> Optional[str]:
 
 def discover_tasks(prompt_text, cwd=None):
     """Use Gemini to discover tasks from the given prompt."""
+    status_manager.update_status("Discovering tasks...")
     log("Discovering tasks from prompt", message_type="thought")
 
     # Check if prompt_text is a file path
@@ -71,6 +75,7 @@ def choose_tasks(tasks):
     _print_formatted("Discovered tasks:")
     for i, task in enumerate(tasks, 1):
         _print_formatted(f"{i}. {task}")
+    status_manager.update_status("Awaiting task selection...")
 
     while True:
         try:
