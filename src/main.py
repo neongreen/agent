@@ -82,11 +82,11 @@ def main() -> None:
 
     try:
         status_manager.init_status_bar()
-        status_manager.update_status("Agent initialized.")
+        status_manager.set_phase("Agent initialized")
 
         if args.multi:
             # Find tasks
-            status_manager.update_status("Discovering tasks...")
+            status_manager.set_phase("Discovering tasks")
             log("Treating prompt as an instruction to discover tasks", message_type="thought", config=config)
             tasks = discover_tasks(args.prompt, cwd)
             if not tasks:
@@ -107,7 +107,7 @@ def main() -> None:
                 log(f"Error processing task {i}: {e}", message_type="tool_output_error", config=config)
 
         log("Agentic loop completed", config=config)
-        status_manager.update_status("Agentic loop completed.")
+        status_manager.set_phase("Agentic loop completed")
 
     finally:
         status_manager.cleanup_status_bar()

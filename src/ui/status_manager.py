@@ -12,10 +12,17 @@ _last_message: Optional[str] = None
 def _update_display() -> None:
     global live_display, _current_phase, _last_message
     if live_display is not None:
+        display_text = ""
         if _current_phase:
-            live_display.update(Text(f"\n\n>>> {_current_phase} <<<\n\n", style="bold black on grey23"))
-        elif _last_message:
-            live_display.update(Text(f"\n\n>>> {_last_message} <<<\n\n", style="bold black on grey23"))
+            display_text += f"{_current_phase}"
+        if _last_message:
+            if display_text:
+                display_text += f": {_last_message}"
+            else:
+                display_text += f"{_last_message}"
+
+        if display_text:
+            live_display.update(Text(f">>> {display_text} <<<", style="bold black on grey23"))
 
 
 def init_status_bar() -> None:
@@ -30,9 +37,8 @@ def init_status_bar() -> None:
 
 
 def update_status(message: str, style: str = "dim") -> None:
-    global _last_message, _current_phase
+    global _last_message
     _last_message = message
-    _current_phase = None  # Clear phase when a new status message comes in
     _update_display()
 
 
