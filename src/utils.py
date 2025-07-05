@@ -56,11 +56,12 @@ class RunResult(TypedDict):
 
 
 def run(
-    command: list[str],
+    command: str | list[str],
     description=None,
     command_human: Optional[list[str]] = None,
     directory=None,
     config: Optional[AgentConfig] = None,
+    shell: bool = False,
 ) -> RunResult:
     """Run command and log it.
 
@@ -83,7 +84,7 @@ def run(
     )
 
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory)
+        result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory, shell=shell)
 
         if result.returncode != 0:
             log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error", config=config)
