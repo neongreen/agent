@@ -409,7 +409,7 @@ Here is the diff of the changes made:
             )
 
             # Check if task is complete
-            completion_prompt = f"Is the task {repr(task)} now complete based on the work done? Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed. If 'CONTINUE', provide specific next steps to take, or objections to address."
+            completion_prompt = f"Is the task {repr(task)} now complete based on the work done? Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed. You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done. You should also use the tools to inspect git log and diffs of commits to inform your decision. If 'CONTINUE', provide specific next steps to take, or objections to address."
             completion_check = run_gemini(completion_prompt, yolo=True)
 
             if completion_check and completion_check.upper().startswith("COMPLETE"):
