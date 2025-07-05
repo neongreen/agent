@@ -1,15 +1,16 @@
 import os
 from typing import Optional
 from .utils import log, run
-from .constants import TaskState, JUDGE_EXTRA_PROMPT, STATE_FILE
+from .constants import TaskState, STATE_FILE
+from .config import AgentConfig
 from .git_utils import resolve_commit_specifier, has_tracked_diff, setup_task_branch
 from .gemini_agent import run_gemini
 from .state_manager import read_state, write_state
 
 
-def planning_phase(task: str, cwd=None) -> Optional[str]:
+def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) -> Optional[str]:
     """Iterative planning phase with Gemini approval."""
-    log(f"Starting planning phase for task: {task}", message_type="thought")
+    log(f"Starting planning phase for task: {task}", message_type="thought", config=config)
 
     max_planning_rounds = 5
 
@@ -18,7 +19,7 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
     previous_review: Optional[str] = None
 
     for round_num in range(1, max_planning_rounds + 1):
-        log(f"Planning round {round_num}", message_type="thought")
+        log(f"Planning round {round_num}", message_type="thought", config=config)
 
         # Ask Gemini to create/revise plan
         if round_num == 1:
@@ -54,8 +55,8 @@ Output "PLAN_TEXT_END" after the plan. You may not output anything after that ma
 
 Respond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."""
 
-        if JUDGE_EXTRA_PROMPT:
-            review_prompt += f"\n\n{JUDGE_EXTRA_PROMPT}"
+        if config and config.judge_extra_prompt:
+            review_prompt += f"\n\n{config.judge_extra_prompt}"
 
         current_review = run_gemini(review_prompt, yolo=True)
         if not current_review:
@@ -97,9 +98,9 @@ Respond with either 'APPROVED' if the plan is good enough to implement (even if 
     return None
 
 
-def implementation_phase(task, plan, cwd=None) -> bool:
+def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = None) -> bool:
     """Iterative implementation phase with early bailout."""
-    log(f"Starting implementation phase for task: {task}", message_type="thought")
+    log(f"Starting implementation phase for task: {task}", message_type="thought", config=config)
 
     max_implementation_attempts = 10
     max_consecutive_failures = 3
@@ -207,9 +208,11 @@ Here is the diff of the changes made:
     return False
 
 
-def process_task(task: str, task_num: int, base_branch: str, cwd: Optional[str] = None) -> bool:
+def process_task(
+    task: str, task_num: int, base_branch: str, cwd: Optional[str] = None, config: Optional[AgentConfig] = None
+) -> bool:
     """Process a single task through planning and implementation."""
-    log(f"Processing task {task_num}: {task}", message_type="thought")
+    log(f"Processing task {task_num}: {task}", message_type="thought", config=config)
 
     task_id = f"task_{task_num}"
     state = read_state()
@@ -239,9 +242,9 @@ def process_task(task: str, task_num: int, base_branch: str, cwd: Optional[str] 
     # Planning phase
     plan = None
     if current_task_state() == TaskState.PLAN.value:
-        plan = planning_phase(task, cwd)
+        plan = planning_phase(task, cwd, config)
         if not plan:
-            log("Planning phase failed")
+            log("Planning phase failed", config=config)
             state[task_id] = TaskState.ABORT.value
             write_state(state)
             return False
@@ -263,7 +266,7 @@ def process_task(task: str, task_num: int, base_branch: str, cwd: Optional[str] 
     # Implementation phase
     success = False
     if current_task_state() == TaskState.IMPLEMENT.value:
-        success = implementation_phase(task, plan, cwd)
+        success = implementation_phase(task, plan, cwd, config)
         if success:
             if not has_tracked_diff(cwd):
                 log("No tracked changes after implementation, marking as DONE.", message_type="thought")
