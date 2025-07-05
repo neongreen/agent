@@ -11,7 +11,6 @@ def run_gemini(prompt: str, yolo: bool) -> Optional[str]:
 
     log(f"Gemini prompt: {prompt}", message_type="thought")
     status_manager.set_phase("Calling Gemini")
-    status_manager.update_status(f"Prompt: {prompt[:50]}...")
     result = run(command, "Calling Gemini", command_human=command[:-1] + ["<prompt>"])
 
     if result["success"]:
@@ -27,7 +26,6 @@ def run_gemini(prompt: str, yolo: bool) -> Optional[str]:
 def discover_tasks(prompt_text, cwd=None):
     """Use Gemini to discover tasks from the given prompt."""
     status_manager.set_phase("Discovering tasks")
-    status_manager.update_status("From prompt")
     log("Discovering tasks from prompt", message_type="thought")
 
     # Check if prompt_text is a file path

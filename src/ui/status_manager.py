@@ -6,15 +6,21 @@ from typing import Optional
 console = Console()
 live_display: Optional[Live] = None
 _current_phase: Optional[str] = None
+_current_attempt_info: Optional[str] = None
 _last_message: Optional[str] = None
 
 
 def _update_display() -> None:
-    global live_display, _current_phase, _last_message
+    global live_display, _current_phase, _current_attempt_info, _last_message
     if live_display is not None:
         display_text = ""
         if _current_phase:
             display_text += f"{_current_phase}"
+        if _current_attempt_info:
+            if display_text:
+                display_text += f": attempt {_current_attempt_info}"
+            else:
+                display_text += f"attempt {_current_attempt_info}"
         if _last_message:
             if display_text:
                 display_text += f": {_last_message}"
@@ -42,9 +48,10 @@ def update_status(message: str, style: str = "dim") -> None:
     _update_display()
 
 
-def set_phase(phase: str) -> None:
-    global _current_phase, _last_message
+def set_phase(phase: str, attempt_info: Optional[str] = None) -> None:
+    global _current_phase, _current_attempt_info, _last_message
     _current_phase = phase
+    _current_attempt_info = attempt_info
     _last_message = None  # Clear last message when a new phase comes in
     _update_display()
 
