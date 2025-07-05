@@ -10,6 +10,32 @@ from typing import TypedDict
 from typing import Optional
 
 
+# ANSI escape codes for colors
+COLOR_RESET = "\033[0m"
+COLOR_GRAY = "\033[90m"
+COLOR_CYAN = "\033[96m"
+COLOR_GREEN = "\033[92m"
+COLOR_RED = "\033[91m"
+COLOR_YELLOW = "\033[93m"
+
+
+def _print_formatted(message, message_type="default", indent_level=0) -> None:
+    indent = "  " * indent_level
+    color = ""
+    if message_type == "thought":
+        color = COLOR_GRAY
+    elif message_type == "tool_code":
+        color = COLOR_CYAN
+    elif message_type == "tool_output_stdout":
+        color = COLOR_GREEN
+    elif message_type == "tool_output_stderr" or message_type == "tool_output_error":
+        color = COLOR_RED
+    elif message_type == "file_path":
+        color = COLOR_YELLOW
+
+    print(f"{indent}{color}{message}{COLOR_RESET}")
+
+
 # Global variables
 LOG_FILE = ".agentic-log"
 QUIET_MODE = False
@@ -19,7 +45,7 @@ def generate_unique_branch_name(base_name, cwd=None):
     """Generates a unique branch name by appending a numerical suffix if necessary."""
     existing_branches_result = run(["git", "branch", "--list"], "Listing existing branches", directory=cwd)
     if not existing_branches_result["success"]:
-        log("Failed to list existing branches.")
+        log("Failed to list existing branches.", message_type="tool_output_error", indent_level=2)
         return None
 
     existing_branches = [
@@ -34,7 +60,7 @@ def generate_unique_branch_name(base_name, cwd=None):
     return new_branch_name
 
 
-def log(message, quiet=None) -> None:
+def log(message, quiet=None, message_type="default", indent_level=0) -> None:
     """Simple logging function that respects quiet mode."""
     if quiet is None:
         quiet = QUIET_MODE
@@ -42,7 +68,7 @@ def log(message, quiet=None) -> None:
     log_entry = {"timestamp": datetime.datetime.now().isoformat(), "message": message}
 
     if not quiet:
-        print(message)
+        _print_formatted(message, message_type=message_type, indent_level=indent_level)
 
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_entry) + "\n")
@@ -59,19 +85,19 @@ def run(command: list[str], description=None, directory=None) -> RunResult:
     """Run command and log it."""
 
     if description:
-        log(f"Executing: {description}")
+        log(f"Executing: {description}", message_type="tool_code", indent_level=1)
 
-    log(f"Running command: {command}")
+    log(f"Running command: {command}", message_type="tool_code", indent_level=1)
 
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory)
 
         if result.returncode != 0:
-            log(f"Command failed with exit code {result.returncode}")
-            log(f"Stderr: {result.stderr}")
+            log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error", indent_level=2)
+            log(f"Stderr: {result.stderr}", message_type="tool_output_stderr", indent_level=2)
 
-        log(f"Stdout: {result.stdout}")
-        log(f"Stderr: {result.stderr}")
+        log(f"Stdout: {result.stdout}", message_type="tool_output_stdout", indent_level=2)
+        log(f"Stderr: {result.stderr}", message_type="tool_output_stderr", indent_level=2)
 
         return {
             "exit_code": result.returncode,
@@ -81,7 +107,7 @@ def run(command: list[str], description=None, directory=None) -> RunResult:
         }
 
     except Exception as e:
-        log(f"Error running command: {e}")
+        log(f"Error running command: {e}", message_type="tool_output_error", indent_level=2)
         return {"exit_code": -1, "stdout": "", "stderr": str(e), "success": False}
 
 
@@ -90,22 +116,22 @@ def run_gemini(prompt) -> str | None:
     escaped_prompt = prompt.replace('"', '\\"')
     command = ["gemini", "-m", "gemini-2.5-flash", "-y", "-p", f"{escaped_prompt}"]
 
-    log(f"Gemini prompt: {prompt}")
+    log(f"Gemini prompt: {prompt}", message_type="thought", indent_level=1)
 
     result = run(command, "Calling Gemini")
 
     if result["success"]:
         response = result["stdout"].strip()
-        log(f"Gemini response: {response}")
+        log(f"Gemini response: {response}", message_type="thought", indent_level=1)
         return response
     else:
-        log(f"Gemini call failed: {result['stderr']}")
+        log(f"Gemini call failed: {result['stderr']}", message_type="tool_output_error", indent_level=1)
         return None
 
 
 def discover_tasks(prompt_text, cwd=None):
     """Use Gemini to discover tasks from the given prompt."""
-    log("Discovering tasks from prompt")
+    log("Discovering tasks from prompt", message_type="thought", indent_level=1)
 
     # Check if prompt_text is a file path
     if os.path.exists(prompt_text) and os.path.isfile(prompt_text):
@@ -114,7 +140,7 @@ def discover_tasks(prompt_text, cwd=None):
                 file_content = f.read()
             gemini_prompt = f"Extract distinct independent tasks from this file content: {file_content}. Each task should be a complete, standalone objective - NOT a breakdown or plan. If it's asking for multiple things, list each as a separate task. If it's one thing, return one task. Return as a numbered list."
         except Exception as e:
-            log(f"Error reading file {prompt_text}: {e}")
+            log(f"Error reading file {prompt_text}: {e}", message_type="tool_output_error", indent_level=2)
             return []
     else:
         gemini_prompt = f"""Analyze this instruction and identify distinct independent tasks: {prompt_text}
@@ -150,12 +176,12 @@ Return as a numbered list with clear task descriptions."""
 def choose_tasks(tasks):
     """Present tasks to user and get their selection."""
     if not tasks:
-        log("No tasks discovered.")
+        log("No tasks discovered.", message_type="thought", indent_level=1)
         return []
 
-    print("Discovered tasks:")
+    _print_formatted("Discovered tasks:")
     for i, task in enumerate(tasks, 1):
-        print(f"{i}. {task}")
+        _print_formatted(f"{i}. {task}")
 
     while True:
         try:
@@ -172,11 +198,11 @@ def choose_tasks(tasks):
                     if 1 <= num <= len(tasks):
                         selected_tasks.append(tasks[num - 1])
                     else:
-                        print(f"Task number '{num}' not found. Try again.")
+                        _print_formatted(f"Task number '{num}' not found. Try again.", message_type="tool_output_error")
                         selected_tasks = []
                         break
                 except ValueError:
-                    print(f"Invalid number '{num_str}'. Try again.")
+                    _print_formatted(f"Invalid number '{num_str}'. Try again.", message_type="tool_output_error")
                     selected_tasks = []
                     break
 
@@ -189,12 +215,12 @@ def choose_tasks(tasks):
 
 def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
     """Set up git branch for task."""
-    log(f"Setting up branch for task {task_num}: {task}")
+    log(f"Setting up branch for task {task_num}: {task}", message_type="thought", indent_level=1)
 
     # Switch to base branch first
     result = run(["git", "switch", base_branch], f"Switching to {base_branch} branch", directory=cwd)
     if not result["success"]:
-        log("Failed to switch to main branch")
+        log("Failed to switch to main branch", message_type="tool_output_error", indent_level=2)
         return False
 
     # Create and switch to task branch
@@ -205,7 +231,7 @@ def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
     result = run(["git", "switch", "-c", branch_name], f"Creating task branch {branch_name}", directory=cwd)
 
     if not result["success"]:
-        log(f"Failed to create branch {branch_name}")
+        log(f"Failed to create branch {branch_name}", message_type="tool_output_error", indent_level=2)
         return False
 
     # Write task metadata
@@ -215,20 +241,20 @@ def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
     with open(task_meta_path, "w") as f:
         json.dump(task_meta, f, indent=2)
 
-    log(f"Created task branch and metadata for task {task_num}")
+    log(f"Created task branch and metadata for task {task_num}", message_type="thought", indent_level=1)
     return True
 
 
 def planning_phase(task: str, cwd=None) -> Optional[str]:
     """Iterative planning phase with Gemini approval."""
-    log(f"Starting planning phase for task: {task}")
+    log(f"Starting planning phase for task: {task}", message_type="thought", indent_level=1)
 
     max_planning_rounds = 5
 
     plan: Optional[str] = None
 
     for round_num in range(1, max_planning_rounds + 1):
-        log(f"Planning round {round_num}")
+        log(f"Planning round {round_num}", message_type="thought", indent_level=1)
 
         # Ask Gemini to create/revise plan
         if round_num == 1:
@@ -238,7 +264,7 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
 
         plan = run_gemini(plan_prompt)
         if not plan:
-            log("Failed to get plan from Gemini")
+            log("Failed to get plan from Gemini", message_type="tool_output_error", indent_level=2)
             return None
 
         # Ask Gemini to review the plan
@@ -246,11 +272,11 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
 
         review = run_gemini(review_prompt)
         if not review:
-            log("Failed to get plan review from Gemini")
+            log("Failed to get plan review from Gemini", message_type="tool_output_error", indent_level=2)
             return None
 
         if review.upper().startswith("APPROVED"):
-            log(f"Plan approved in round {round_num}")
+            log(f"Plan approved in round {round_num}", message_type="thought", indent_level=2)
 
             # Commit the approved plan
             plan_path = os.path.join(cwd, "plan.md") if cwd else "plan.md"
@@ -272,15 +298,15 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
 
             return plan
         else:
-            log(f"Plan rejected in round {round_num}: {review}")
+            log(f"Plan rejected in round {round_num}: {review}", message_type="tool_output_error", indent_level=2)
 
-    log(f"Planning failed after {max_planning_rounds} rounds")
+    log(f"Planning failed after {max_planning_rounds} rounds", message_type="tool_output_error", indent_level=1)
     return None
 
 
 def implementation_phase(task, plan, cwd=None) -> bool:
     """Iterative implementation phase with early bailout."""
-    log(f"Starting implementation phase for task: {task}")
+    log(f"Starting implementation phase for task: {task}", message_type="thought", indent_level=1)
 
     max_implementation_attempts = 10
     max_consecutive_failures = 3
@@ -288,37 +314,37 @@ def implementation_phase(task, plan, cwd=None) -> bool:
     commits_made = 0
 
     for attempt in range(1, max_implementation_attempts + 1):
-        log(f"Implementation attempt {attempt}")
+        log(f"Implementation attempt {attempt}", message_type="thought", indent_level=1)
 
         # Ask Gemini to implement next step
         impl_prompt = f"Based on this plan:\n\n{plan}\n\nImplement the next step for task '{task}'. Provide specific code, commands, or files to create. Be concrete and actionable."
 
         implementation = run_gemini(impl_prompt)
         if not implementation:
-            log("Failed to get implementation from Gemini")
+            log("Failed to get implementation from Gemini", message_type="tool_output_error", indent_level=2)
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
-                log("Too many consecutive failures, giving up")
+                log("Too many consecutive failures, giving up", message_type="tool_output_error", indent_level=1)
                 return False
             continue
 
         # Try to execute the implementation
-        log(f"Attempting to execute implementation: {implementation}")
+        log(f"Attempting to execute implementation: {implementation}", message_type="thought", indent_level=2)
 
         # Evaluate if it seems reasonable
         eval_prompt = f"Evaluate if this implementation makes progress on the task '{task}':\n\n{implementation}\n\nRespond with 'SUCCESS' if it's a good step forward, 'PARTIAL' if it's somewhat helpful, or 'FAILURE' if it's not useful."
 
         evaluation = run_gemini(eval_prompt)
         if not evaluation:
-            log("Failed to get evaluation from Gemini")
+            log("Failed to get evaluation from Gemini", message_type="tool_output_error", indent_level=2)
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
-                log("Too many consecutive failures, giving up")
+                log("Too many consecutive failures, giving up", message_type="tool_output_error", indent_level=1)
                 return False
             continue
 
         if evaluation.upper().startswith("SUCCESS"):
-            log(f"Implementation successful in attempt {attempt}")
+            log(f"Implementation successful in attempt {attempt}", message_type="thought", indent_level=2)
             consecutive_failures = 0
             commits_made += 1
 
@@ -340,35 +366,38 @@ def implementation_phase(task, plan, cwd=None) -> bool:
             completion_check = run_gemini(completion_prompt)
 
             if completion_check and completion_check.upper().startswith("COMPLETE"):
-                log("Task marked as complete")
+                log("Task marked as complete", message_type="thought", indent_level=2)
                 return True
 
         elif evaluation.upper().startswith("PARTIAL"):
-            log(f"Partial progress in attempt {attempt}")
-            consecutive_failures = 0
+            log(f"Partial progress in attempt {attempt}", message_type="thought", indent_level=2)
         else:
-            log(f"Implementation failed in attempt {attempt}")
+            log(f"Implementation failed in attempt {attempt}", message_type="tool_output_error", indent_level=2)
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
-                log("Too many consecutive failures, giving up")
+                log("Too many consecutive failures, giving up", message_type="tool_output_error", indent_level=1)
                 return False
 
         # Check if we've made no commits recently
         if attempt >= 5 and commits_made == 0:
-            log("No commits made in 5 attempts, giving up")
+            log("No commits made in 5 attempts, giving up", message_type="tool_output_error", indent_level=1)
             return False
 
-    log(f"Implementation incomplete after {max_implementation_attempts} attempts")
+    log(
+        f"Implementation incomplete after {max_implementation_attempts} attempts",
+        message_type="tool_output_error",
+        indent_level=1,
+    )
     return False
 
 
 def process_task(task: str, task_num: int, base_branch: str, cwd: Optional[str] = None) -> bool:
     """Process a single task through planning and implementation."""
-    log(f"Processing task {task_num}: {task}")
+    log(f"Processing task {task_num}: {task}", message_type="thought")
 
     # Set up branch
     if not setup_task_branch(task, task_num, base_branch, cwd):
-        log("Failed to set up task branch")
+        log("Failed to set up task branch", message_type="tool_output_error", indent_level=1)
         return False
 
     # Planning phase
@@ -407,26 +436,26 @@ def main() -> None:
     cwd = args.cwd
     if cwd:
         if not os.path.exists(cwd):
-            print(f"Error: Working directory '{cwd}' does not exist")
+            _print_formatted(f"Error: Working directory '{cwd}' does not exist", message_type="tool_output_error")
             sys.exit(1)
         if not os.path.isdir(cwd):
-            print(f"Error: '{cwd}' is not a directory")
+            _print_formatted(f"Error: '{cwd}' is not a directory", message_type="tool_output_error")
             sys.exit(1)
         cwd = os.path.abspath(cwd)
-        log(f"Using working directory: {cwd}")
+        log(f"Using working directory: {cwd}", message_type="thought", indent_level=1)
 
-    log("Starting agentic loop")
+    log("Starting agentic loop", message_type="thought")
 
     # Discover tasks
     tasks = discover_tasks(args.prompt, cwd)
     if not tasks:
-        log("No tasks discovered")
+        log("No tasks discovered", message_type="thought")
         sys.exit(1)
 
     # Let user choose tasks
     selected_tasks = choose_tasks(tasks)
     if not selected_tasks:
-        log("No tasks selected")
+        log("No tasks selected", message_type="thought")
         sys.exit(0)
 
     # Process each selected task
@@ -434,7 +463,7 @@ def main() -> None:
         try:
             process_task(task, i, args.base, cwd)
         except Exception as e:
-            log(f"Error processing task {i}: {e}")
+            log(f"Error processing task {i}: {e}", message_type="tool_output_error")
 
     log("Agentic loop completed")
 
