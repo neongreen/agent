@@ -1,1 +1,6 @@
 default-base = "HEAD"
+
+[plan]
+judge-extra-prompt = """
+  If the plan proposes writing tests, you must reject the plan.
+"""
