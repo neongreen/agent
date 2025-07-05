@@ -3,5 +3,18 @@ python = "3.13.5"
 uv = "0.7.18"
 
 [tasks.run]
-run = "uv run python -m src.main"
 description = "Run the agent"
+run = "uv run python -m src.main"
+
+[tasks.add-types]
+description = "Auto-add types to the Python files"
+run = [
+  'jj x fd .py -x uv run --with=autotyping --isolated python -m autotyping {} --safe',
+]
+
+[tasks.cleanup]
+run = [
+  "jj x rm -f .agent_state.json plan.md orchestrator.md",
+  "jj x 'ruff check --fix; ruff format'",
+  "jj abandon 'mutable() & empty()'",
+]
