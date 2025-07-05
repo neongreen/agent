@@ -65,6 +65,15 @@ To suppress informational output from the agent, use the `--quiet` flag:
 uv run python -m src.main "Optimize image loading" --quiet
 ```
 
+### Choosing LLM CLI
+
+By default, the agent uses the Gemini CLI for language model calls.
+To use the Claude Code CLI instead, pass the `--claude` flag:
+
+```bash
+uv run python -m src.main --claude "Implement feature X"
+```
+
 ## Configuration
 
 The agent can be configured using a `.agent.toml` file in the project root directory.
