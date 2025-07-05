@@ -7,6 +7,8 @@ import datetime
 import subprocess
 import argparse
 from typing import TypedDict
+from enum import Enum
+from pathlib import Path
 from typing import Optional
 
 
@@ -17,6 +19,13 @@ COLOR_CYAN = "\033[96m"
 COLOR_GREEN = "\033[92m"
 COLOR_RED = "\033[91m"
 COLOR_YELLOW = "\033[93m"
+
+
+class TaskState(Enum):
+    PLAN = "PLAN"
+    IMPLEMENT = "IMPLEMENT"
+    DONE = "DONE"
+    ABORT = "ABORT"
 
 
 def _print_formatted(message, message_type="default", indent_level=0) -> None:
@@ -34,6 +43,21 @@ def _print_formatted(message, message_type="default", indent_level=0) -> None:
         color = COLOR_YELLOW
 
     print(f"{indent}{color}{message}{COLOR_RESET}")
+
+
+STATE_FILE = Path(".agent_state.json")
+
+
+def read_state() -> dict:
+    if STATE_FILE.exists():
+        with open(STATE_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+
+def write_state(state: dict) -> None:
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
 
 
 # Global variables
@@ -144,6 +168,15 @@ def run(command: list[str], description=None, command_human: Optional[list[str]]
     except Exception as e:
         log(f"Error running command: {e}", message_type="tool_output_error", indent_level=2)
         return {"exit_code": -1, "stdout": "", "stderr": str(e), "success": False}
+
+
+def has_tracked_diff(cwd=None) -> bool:
+    """Checks if there are any tracked changes in the repository."""
+    result = run(["git", "status", "--porcelain"], "Checking for tracked changes", directory=cwd)
+    if not result["success"]:
+        log("Failed to check git status.", message_type="tool_output_error", indent_level=2)
+        return False
+    return bool(result["stdout"].strip())
 
 
 def run_gemini(prompt: str, yolo: bool) -> str | None:
@@ -459,19 +492,69 @@ def process_task(task: str, task_num: int, base_branch: str, cwd: Optional[str] 
     """Process a single task through planning and implementation."""
     log(f"Processing task {task_num}: {task}", message_type="thought")
 
+    task_id = f"task_{task_num}"
+    state = read_state()
+
+    def current_task_state() -> TaskState:
+        return state.get(task_id, TaskState.PLAN.value)
+
+    log(f"Current state for {task_id}: {current_task_state()}", message_type="thought", indent_level=1)
+
     # Set up branch
-    if not setup_task_branch(task, task_num, base_branch, cwd):
-        log("Failed to set up task branch", message_type="tool_output_error", indent_level=1)
-        return False
+    if current_task_state() == TaskState.PLAN.value:
+        if not setup_task_branch(task, task_num, base_branch, cwd):
+            log("Failed to set up task branch", message_type="tool_output_error", indent_level=1)
+            state[task_id] = TaskState.ABORT.value
+            write_state(state)
+            return False
+        state[task_id] = TaskState.PLAN.value
+        write_state(state)
 
     # Planning phase
-    plan = planning_phase(task, cwd)
-    if not plan:
-        log("Planning phase failed")
-        return False
+    plan = None
+    if current_task_state() == TaskState.PLAN.value:
+        plan = planning_phase(task, cwd)
+        if not plan:
+            log("Planning phase failed")
+            state[task_id] = TaskState.ABORT.value
+            write_state(state)
+            return False
+        state[task_id] = TaskState.IMPLEMENT.value
+        write_state(state)
+    elif current_task_state() == TaskState.IMPLEMENT.value or current_task_state() == TaskState.DONE.value:
+        # If already in IMPLEMENT or DONE, try to read the plan from file
+        plan_path = os.path.join(cwd, "plan.md") if cwd else "plan.md"
+        if os.path.exists(plan_path):
+            with open(plan_path, "r") as f:
+                plan = f.read()
+            log("Resuming from existing plan.md", message_type="thought", indent_level=1)
+        else:
+            log("No plan.md found for resuming, aborting task.", message_type="tool_output_error", indent_level=1)
+            state[task_id] = TaskState.ABORT.value
+            write_state(state)
+            return False
 
     # Implementation phase
-    success = implementation_phase(task, plan, cwd)
+    success = False
+    if current_task_state() == TaskState.IMPLEMENT.value:
+        success = implementation_phase(task, plan, cwd)
+        if success:
+            if not has_tracked_diff(cwd):
+                log("No tracked changes after implementation, marking as DONE.", message_type="thought", indent_level=1)
+                state[task_id] = TaskState.DONE.value
+            else:
+                log(
+                    "Tracked changes remain after implementation, keeping in IMPLEMENT state.",
+                    message_type="thought",
+                    indent_level=1,
+                )
+                state[task_id] = TaskState.IMPLEMENT.value  # Keep in IMPLEMENT if changes exist
+        else:
+            state[task_id] = TaskState.ABORT.value
+        write_state(state)
+    elif current_task_state() == TaskState.DONE.value:
+        log(f"Task {task_num} already marked as DONE, skipping implementation.", message_type="thought", indent_level=1)
+        success = True
 
     if success:
         log(f"Task {task_num} completed successfully")
@@ -498,6 +581,10 @@ def main() -> None:
     args = parser.parse_args()
 
     QUIET_MODE = args.quiet
+
+    # Initialize state file if it doesn't exist
+    if not STATE_FILE.exists():
+        write_state({})
 
     # Validate working directory
     cwd = args.cwd
