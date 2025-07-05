@@ -24,6 +24,7 @@ class TomlConfig(BaseModel):
     quiet_mode: Optional[bool] = Field(None, alias="quiet-mode")
     plan: Optional[PlanConfig] = None
     implement: Optional[ImplementConfig] = None
+    post_implementation_hook_command: Optional[str] = Field(None, alias="post-implementation-hook-command")
 
 
 @dataclass
@@ -37,6 +38,8 @@ class AgentConfig:
     implement_extra_prompt: str = ""
     implement_judge_extra_prompt: str = ""
     implement_completion_judge_extra_prompt: str = ""
+    # Command to execute after each implementation phase.
+    post_implementation_hook_command: Optional[str] = None
 
     def update_from_toml(self, config: TomlConfig) -> None:
         """Update the agent configuration from a TOML config object."""
@@ -58,3 +61,5 @@ class AgentConfig:
             and config.implement.completion.judge_extra_prompt is not None
         ):
             self.implement_completion_judge_extra_prompt = config.implement.completion.judge_extra_prompt
+        if config.post_implementation_hook_command is not None:
+            self.post_implementation_hook_command = config.post_implementation_hook_command
