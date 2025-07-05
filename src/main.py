@@ -2,7 +2,7 @@ import sys
 import os
 import argparse
 
-from .constants import STATE_FILE
+from .constants import AGENT_TEMP_DIR, STATE_FILE
 from .state_manager import write_state
 from .gemini_agent import discover_tasks, choose_tasks
 from .task_orchestrator import process_task
@@ -43,6 +43,11 @@ def main() -> None:
     # Determine effective working directory
     effective_cwd = args.cwd if args.cwd else os.getcwd()
     effective_cwd = os.path.abspath(effective_cwd)
+
+    # Ensure the .agent directory exists
+    if not AGENT_TEMP_DIR.exists():
+        log(f"Creating agent directory at {AGENT_TEMP_DIR}", message_type="thought", config=config)
+        AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
     # Initialize state file if it doesn't exist
     if not STATE_FILE.exists():

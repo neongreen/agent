@@ -3,6 +3,7 @@ from .utils import log, run
 from .config import AgentConfig
 from .gemini_agent import run_gemini
 from .ui import status_manager
+from .constants import PLAN_FILE
 
 
 def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optional[AgentConfig] = None) -> bool:
@@ -73,9 +74,9 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
             "Here is the summary of the implementation:\n\n"
             f"{implementation_summary}\n\n"
             "Here are the uncommitted changes:\n\n"
-            f"{run(['git', 'diff', '--', ':!plan.md'], directory=cwd)['stdout']}\n\n"
+            f"{run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}\n\n"
             "Here is the diff of the changes made in previous commits:\n\n"
-            f"{run(['git', 'diff', base_commit + '..HEAD', '--', ':!plan.md'], directory=cwd)['stdout']}"
+            f"{run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}"
         )
 
         if config and config.implement_judge_extra_prompt:
@@ -124,9 +125,9 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
                 "Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed.\n"
                 "If 'CONTINUE', provide specific next steps to take, or objections to address.\n"
                 "Here are the uncommitted changes:\n\n"
-                f"{run(['git', 'diff', '--', ':!plan.md'], directory=cwd)['stdout']}\n\n"
+                f"{run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}\n\n"
                 "Here is the diff of the changes made in previous commits:\n\n"
-                f"{run(['git', 'diff', base_commit + '..HEAD', '--', ':!plan.md'], directory=cwd)['stdout']}"
+                f"{run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}"
             )
 
             if config and config.implement_completion_judge_extra_prompt:

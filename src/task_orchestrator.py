@@ -1,7 +1,6 @@
-import os
 from typing import Optional
 from .utils import log
-from .constants import TaskState, STATE_FILE
+from .constants import TaskState, STATE_FILE, PLAN_FILE
 from .config import AgentConfig
 from .git_utils import resolve_commit_specifier, has_tracked_diff, setup_task_branch
 from .state_manager import read_state, write_state
@@ -57,13 +56,12 @@ def process_task(
         write_state(state)
     elif current_task_state() == TaskState.IMPLEMENT.value or current_task_state() == TaskState.DONE.value:
         # If already in IMPLEMENT or DONE, try to read the plan from file
-        plan_path = os.path.join(cwd, "plan.md") if cwd else "plan.md"
-        if os.path.exists(plan_path):
-            with open(plan_path, "r") as f:
+        if PLAN_FILE.exists():
+            with open(PLAN_FILE, "r") as f:
                 plan = f.read()
-            log("Resuming from existing plan.md", message_type="thought")
+            log(f"Resuming from existing {PLAN_FILE.name}", message_type="thought")
         else:
-            log("No plan.md found for resuming, aborting task.", message_type="tool_output_error")
+            log(f"No {PLAN_FILE.name} found for resuming, aborting task.", message_type="tool_output_error")
             status_manager.update_status("No plan found for resuming.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)

@@ -1,3 +1,4 @@
+.agent/
 .agentic-log
 .agent_state.json
 .task-meta

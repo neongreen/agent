@@ -25,7 +25,7 @@ run = """
 
 [tasks.cleanup]
 run = [
-  "jj x rm -f .agent_state.json plan.md orchestrator.md",
+  "jj x rm -rf .agent_state.json .agent/ plan.md",
   "jj x 'ruff check --fix; ruff format'",
   "jj abandon 'mutable() & empty()'",
 ]
