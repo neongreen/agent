@@ -613,6 +613,13 @@ def process_task(task: str, task_num: int, base_branch: str, cwd: Optional[str] 
 
     if success:
         log(f"Task {task_num} completed successfully")
+        # Remove the agent state file after a task is done
+        try:
+            if STATE_FILE.exists():
+                STATE_FILE.unlink()
+                log("Agent state file removed.", message_type="thought", indent_level=1)
+        except OSError as e:
+            log(f"Error removing agent state file: {e}", message_type="tool_output_error", indent_level=1)
     else:
         log(f"Task {task_num} failed or incomplete")
 
