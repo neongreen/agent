@@ -3,6 +3,7 @@ from rich.text import Text
 from rich.console import Console
 from typing import Optional
 
+
 console = Console()
 live_display: Optional[Live] = None
 _current_phase: Optional[str] = None

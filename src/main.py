@@ -5,7 +5,7 @@ import argparse
 from .constants import STATE_FILE
 from .state_manager import write_state
 from .gemini_agent import discover_tasks, choose_tasks
-from .task_processor import process_task
+from .task_orchestrator import process_task
 from .utils import log
 from .config import AgentConfig, TomlConfig
 from pydantic import ValidationError
