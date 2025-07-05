@@ -392,6 +392,9 @@ Output "PLAN_TEXT_END" after the plan. You may not output anything after that ma
         # Ask Gemini to review the plan
         review_prompt = f"""Review this plan for task {repr(task)}:\n\n{current_plan}\n\nRespond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."""
 
+        if JUDGE_EXTRA_PROMPT:
+            review_prompt += f"\n\n{JUDGE_EXTRA_PROMPT}"
+
         current_review = run_gemini(review_prompt, yolo=True)
         if not current_review:
             log("Failed to get plan review from Gemini", message_type="tool_output_error", indent_level=2)
@@ -477,9 +480,6 @@ For 'FAILURE', list specific reasons why the implementation is inadequate.
 Here is the summary of the implementation:\n\n{implementation_summary}\n
 Here is the diff of the changes made:\n\n{run(["git", "diff"], directory=cwd)["stdout"]}
 """
-
-        if JUDGE_EXTRA_PROMPT:
-            eval_prompt += f"\n\n{JUDGE_EXTRA_PROMPT}"
 
         evaluation = run_gemini(eval_prompt, yolo=True)
         if not evaluation:
