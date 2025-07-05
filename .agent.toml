@@ -1,3 +1,5 @@
+# Partial config, see full documentation in the README.md
+
 default-base = "HEAD"
 
 [plan]

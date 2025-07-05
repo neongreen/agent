@@ -36,7 +36,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Create configuration object
-    agent_config = AgentConfig(quiet_mode=args.quiet)
+    config = AgentConfig(quiet_mode=args.quiet)
 
     # Determine effective working directory
     effective_cwd = args.cwd if args.cwd else os.getcwd()
@@ -48,42 +48,32 @@ def main() -> None:
 
     # Use the effective working directory
     cwd = effective_cwd
-    log(f"Using working directory: {cwd}", message_type="thought", config=agent_config)
+    log(f"Using working directory: {cwd}", message_type="thought", config=config)
 
-    # Update default_base_from_toml from .agent.toml if it exists in the effective_cwd
+    # Read the config
+    # (todo: should we read from .agent.toml in the currently checked out commit, or in base?)
+    # (and if base -- well, how do we determine the base? it's in the config)
     agent_toml_path = Path(effective_cwd) / ".agent.toml"
     if agent_toml_path.exists():
         try:
             with open(agent_toml_path, "rb") as f:
-                config = tomllib.load(f)
-            if "default-base" in config:
-                default_base_from_toml = config["default-base"]
-                log(
-                    f"Using default-base from .agent.toml: {default_base_from_toml}",
-                    message_type="thought",
-                    config=agent_config,
-                )
-            if "plan" in config and "judge-extra-prompt" in config["plan"]:
-                judge_extra_prompt_from_toml = config["plan"]["judge-extra-prompt"]
-                log(
-                    f"Using plan.judge-extra-prompt from .agent.toml: {judge_extra_prompt_from_toml}",
-                    message_type="thought",
-                    config=agent_config,
-                )
-            else:
-                judge_extra_prompt_from_toml = ""
+                config_toml = tomllib.load(f)
+            config.update_from_toml(config_toml)
+            # Print the config values
+            log(f"Loaded agent configuration from {agent_toml_path}", message_type="thought", config=config)
+            import pprint
+
+            log("Configuration resolved to:\n" + pprint.pformat(vars(config)), message_type="thought", config=config)
         except Exception as e:
-            log(f"Error reading or parsing .agent.toml: {e}", message_type="tool_output_error", config=agent_config)
+            log(f"Error reading or parsing .agent.toml: {e}", message_type="tool_output_error", config=config)
 
     # Re-set the default for --base argument if it was not explicitly provided by the user
-    # and a value was found in .agent.toml
+    # and a value was found in .agent.toml.
+    # TODO: don't detect default like this!
     if "base" not in args or args.base == "main":  # Check if --base was not provided or is still default 'main'
-        args.base = default_base_from_toml
+        args.base = config.default_base or "main"
 
-    # Update agent config with judge extra prompt
-    agent_config.judge_extra_prompt = judge_extra_prompt_from_toml
-
-    log("Starting agentic loop", message_type="thought", config=agent_config)
+    log("Starting agentic loop", message_type="thought", config=config)
 
     try:
         status_manager.init_status_bar()
@@ -92,14 +82,14 @@ def main() -> None:
         if args.multi:
             # Find tasks
             status_manager.update_status("Discovering tasks...")
-            log("Treating prompt as an instruction to discover tasks", message_type="thought", config=agent_config)
+            log("Treating prompt as an instruction to discover tasks", message_type="thought", config=config)
             tasks = discover_tasks(args.prompt, cwd)
             if not tasks:
-                log("No tasks discovered", message_type="thought", config=agent_config)
+                log("No tasks discovered", message_type="thought", config=config)
                 sys.exit(1)
             selected_tasks = choose_tasks(tasks)
             if not selected_tasks:
-                log("No tasks selected", message_type="thought", config=agent_config)
+                log("No tasks selected", message_type="thought", config=config)
                 sys.exit(0)
         else:
             selected_tasks = [args.prompt]
@@ -107,11 +97,11 @@ def main() -> None:
         # Process each selected task
         for i, task in enumerate(selected_tasks, 1):
             try:
-                process_task(task, i, args.base, cwd, agent_config)
+                process_task(task, i, args.base, cwd, config)
             except Exception as e:
-                log(f"Error processing task {i}: {e}", message_type="tool_output_error", config=agent_config)
+                log(f"Error processing task {i}: {e}", message_type="tool_output_error", config=config)
 
-        log("Agentic loop completed", config=agent_config)
+        log("Agentic loop completed", config=config)
         status_manager.update_status("Agentic loop completed.")
 
     finally:
