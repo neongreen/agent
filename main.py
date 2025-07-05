@@ -6,7 +6,6 @@ import datetime
 import subprocess
 import argparse
 from typing import TypedDict
-
 from typing import Optional
 
 
@@ -41,8 +40,18 @@ LOG_FILE = ".agentic-log"
 QUIET_MODE = False
 
 
-def generate_unique_branch_name(base_name, cwd=None):
-    """Generates a unique branch name by appending a numerical suffix if necessary."""
+def sanitize_branch_name(name: str) -> str:
+    """Sanitizes a string to be a valid git branch name."""
+    name = name.lower()
+    name = re.sub(r"[^a-z0-9/.]+", "-", name)  # Replace invalid characters with a single hyphen
+    name = name.strip("-")  # Remove leading/trailing hyphens
+    if len(name) > 100:  # Truncate to a reasonable length
+        name = name[:100]
+    return name
+
+
+def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = None, cwd=None):
+    """Generates a unique branch name by trying suggestions first, then appending a numerical suffix if necessary."""
     existing_branches_result = run(["git", "branch", "--list"], "Listing existing branches", directory=cwd)
     if not existing_branches_result["success"]:
         log("Failed to list existing branches.", message_type="tool_output_error", indent_level=2)
@@ -52,10 +61,22 @@ def generate_unique_branch_name(base_name, cwd=None):
         line.strip().replace("* ", "") for line in existing_branches_result["stdout"].split("\n") if line.strip()
     ]
 
-    new_branch_name = base_name
+    # Try suggested names first
+    if suggestions:
+        for suggestion in suggestions:
+            sanitized_suggestion = sanitize_branch_name(suggestion)
+            if sanitized_suggestion and sanitized_suggestion not in existing_branches:
+                return sanitized_suggestion
+
+    # Fallback to numerical suffix
+    sanitized_base_name = sanitize_branch_name(base_name)
+    if not sanitized_base_name:  # Ensure base_name is not empty after sanitization
+        sanitized_base_name = "task-branch"  # Default if sanitization results in empty string
+
+    new_branch_name = sanitized_base_name
     counter = 1
     while new_branch_name in existing_branches:
-        new_branch_name = f"{base_name}-{counter}"
+        new_branch_name = f"{sanitized_base_name}-{counter}"
         counter += 1
     return new_branch_name
 
@@ -231,7 +252,15 @@ def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
 
     # Create and switch to task branch
     base_branch_name = f"task-{task_num}"
-    branch_name = generate_unique_branch_name(base_branch_name, cwd)
+
+    # Get branch name suggestions from Gemini
+    branch_prompt = f"Generate 5 short, descriptive, and valid git branch names for the task: '{task}'. The names should be lowercase, use hyphens instead of spaces, and avoid special characters. Example: 'feature/add-login', 'bugfix/fix-auth-flow'. Return as a comma-separated list."
+    suggestions_response = run_gemini(branch_prompt)
+    suggestions = []
+    if suggestions_response:
+        suggestions = [s.strip() for s in suggestions_response.split(",") if s.strip()]
+
+    branch_name = generate_unique_branch_name(base_branch_name, suggestions, cwd)
     if not branch_name:
         return False
     result = run(["git", "switch", "-c", branch_name], f"Creating task branch {branch_name}", directory=cwd)
