@@ -12,6 +12,12 @@ run = [
   'jj x fd .py -x uv run --with=autotyping --isolated python -m autotyping {} --safe',
 ]
 
+[tasks.autoimport]
+description = "Add missing imports to the Python files"
+run = """
+  jj x 'fd .py | xargs uvx --isolated autoimport'
+"""
+
 [tasks.cleanup]
 run = [
   "jj x rm -f .agent_state.json plan.md orchestrator.md",
