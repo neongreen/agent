@@ -5,5 +5,8 @@ description = "Agentic loop"
 dependencies = ["rich"]
 requires-python = ">=3.13"
 
+[project.scripts]
+agent = "src.main:main"
+
 [dependency-groups]
 dev = ["ruff>=0.12.2"]
