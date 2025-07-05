@@ -76,9 +76,19 @@ def run(
     if description:
         log(f"Executing: {description}", message_type="tool_code", config=config)
 
+    if isinstance(command, str):
+        command_display = command
+    else:
+        command_display = shlex.join(command)
+
+    if command_human is None:
+        command_human_display = command_display
+    else:
+        command_human_display = shlex.join(command_human)
+
     log(
-        f"Running command: {shlex.join(command)}",
-        message_human=f"Running command: {shlex.join(command_human or command)}",
+        f"Running command: {command_display}",
+        message_human=f"Running command: {command_human_display}",
         message_type="tool_code",
         config=config,
     )
