@@ -82,7 +82,11 @@ def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
     base_branch_name = f"task-{task_num}"
 
     # Get branch name suggestions from Gemini
-    branch_prompt = f"Generate 5 short, descriptive, and valid git branch names for the task: '{task}'. The names should be lowercase, use hyphens instead of spaces, and avoid special characters. Example: 'feature/add-login', 'bugfix/fix-auth-flow'. Return as a comma-separated list."
+    branch_prompt = (
+        f"Generate 5 short, descriptive, and valid git branch names for the task: '{task}'. "
+        "The names should be lowercase, use hyphens instead of spaces, and avoid special characters. "
+        "Example: 'feature/add-login', 'bugfix/fix-auth-flow'. Return as a comma-separated list."
+    )
     suggestions_response = run_gemini(branch_prompt, yolo=False)
     suggestions = []
     if suggestions_response:

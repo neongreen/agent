@@ -62,8 +62,7 @@ def run(
     directory=None,
     config: Optional[AgentConfig] = None,
 ) -> RunResult:
-    """
-    Run command and log it.
+    """Run command and log it.
 
     Args:
         command: Command to run as a list of arguments.
