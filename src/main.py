@@ -1,46 +1,17 @@
-import shlex
+from datetime import datetime
+from pathlib import Path
 import sys
 import os
 import re
 import json
-import datetime
-import subprocess
 import argparse
-from enum import Enum
-from pathlib import Path
-from typing import Optional, TypedDict
-from rich.console import Console
+from typing import Optional
+
+from .constants import TaskState, STATE_FILE, JUDGE_EXTRA_PROMPT
+from .utils import log, run, _print_formatted
+
 
 import tomllib
-
-
-console = Console()
-
-
-class TaskState(Enum):
-    PLAN = "PLAN"
-    IMPLEMENT = "IMPLEMENT"
-    DONE = "DONE"
-    ABORT = "ABORT"
-
-
-def _print_formatted(message, message_type="default") -> None:
-    style = ""
-    if message_type == "thought":
-        style = "dim"
-    elif message_type == "tool_code":
-        style = "cyan"
-    elif message_type == "tool_output_stdout":
-        style = "green"
-    elif message_type == "tool_output_stderr" or message_type == "tool_output_error":
-        style = "red"
-    elif message_type == "file_path":
-        style = "yellow"
-
-    console.print(message, style=style)
-
-
-STATE_FILE = Path(".agent_state.json")
 
 
 def read_state() -> dict:
@@ -53,12 +24,6 @@ def read_state() -> dict:
 def write_state(state: dict) -> None:
     with open(STATE_FILE, "w") as f:
         json.dump(state, f, indent=2)
-
-
-# Global variables
-LOG_FILE = ".agentic-log"
-QUIET_MODE = False
-JUDGE_EXTRA_PROMPT = ""
 
 
 def sanitize_branch_name(name: str) -> str:
@@ -100,69 +65,6 @@ def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = No
         new_branch_name = f"{sanitized_base_name}-{counter}"
         counter += 1
     return new_branch_name
-
-
-def log(message: str, message_human: Optional[str] = None, quiet=None, message_type="default") -> None:
-    """Simple logging function that respects quiet mode."""
-    if quiet is None:
-        quiet = QUIET_MODE
-
-    log_entry = {"timestamp": datetime.datetime.now().isoformat(), "message": message}
-
-    if not quiet:
-        _print_formatted(message_human or message, message_type=message_type)
-
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(log_entry) + "\n")
-
-
-class RunResult(TypedDict):
-    exit_code: int
-    stdout: str
-    stderr: str
-    success: bool
-
-
-def run(command: list[str], description=None, command_human: Optional[list[str]] = None, directory=None) -> RunResult:
-    """
-    Run command and log it.
-
-    Args:
-        command: Command to run as a list of arguments.
-        description: Optional description of the command for logging.
-        directory: Optional working directory to run the command in.
-        command_human: If present, will be used in console output instead of the full command.
-    """
-
-    if description:
-        log(f"Executing: {description}", message_type="tool_code")
-
-    log(
-        f"Running command: {shlex.join(command)}",
-        message_human=f"Running command: {shlex.join(command_human or command)}",
-        message_type="tool_code",
-    )
-
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory)
-
-        if result.returncode != 0:
-            log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error")
-            log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
-
-        log(f"Stdout: {result.stdout}", message_type="tool_output_stdout")
-        log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
-
-        return {
-            "exit_code": result.returncode,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "success": result.returncode == 0,
-        }
-
-    except Exception as e:
-        log(f"Error running command: {e}", message_type="tool_output_error")
-        return {"exit_code": -1, "stdout": "", "stderr": str(e), "success": False}
 
 
 def has_tracked_diff(cwd=None) -> bool:
@@ -325,7 +227,7 @@ def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
         return False
 
     # Write task metadata
-    task_meta = {"number": task_num, "title": task, "timestamp": datetime.datetime.now().isoformat()}
+    task_meta = {"number": task_num, "title": task, "timestamp": datetime.now().isoformat()}
 
     task_meta_path = os.path.join(cwd, ".task-meta") if cwd else ".task-meta"
     with open(task_meta_path, "w") as f:
@@ -376,7 +278,11 @@ Output "PLAN_TEXT_END" after the plan. You may not output anything after that ma
             return None
 
         # Ask Gemini to review the plan
-        review_prompt = f"""Review this plan for task {repr(task)}:\n\n{current_plan}\n\nRespond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."""
+        review_prompt = f"""Review this plan for task {repr(task)}:
+
+{current_plan}
+
+Respond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."""
 
         if JUDGE_EXTRA_PROMPT:
             review_prompt += f"\n\n{JUDGE_EXTRA_PROMPT}"
@@ -435,7 +341,10 @@ def implementation_phase(task, plan, cwd=None) -> bool:
 
         # Ask Gemini to implement next step
         impl_prompt = f"""
-Execution phase. Based on this plan:\n\n{plan}\n
+Execution phase. Based on this plan:
+
+{plan}
+
 Implement the next step for task {repr(task)}.
 Create files, run commands, and/or write code as needed.
 When done, provide a concise summary of what you did.
@@ -461,8 +370,13 @@ Evaluate if this implementation makes progress on the task {repr(task)}.
 Respond with 'SUCCESS' if it's a good step forward, 'PARTIAL' if it's somewhat helpful, or 'FAILURE' if it's not useful.
 For 'PARTIAL', provide specific feedback on what could be improved or what remains to be done.
 For 'FAILURE', list specific reasons why the implementation is inadequate.
-Here is the summary of the implementation:\n\n{implementation_summary}\n
-Here is the diff of the changes made:\n\n{run(["git", "diff"], directory=cwd)["stdout"]}
+Here is the summary of the implementation:
+
+{implementation_summary}
+
+Here is the diff of the changes made:
+
+{run(["git", "diff"], directory=cwd)["stdout"]}
 """
 
         evaluation = run_gemini(eval_prompt, yolo=True)
