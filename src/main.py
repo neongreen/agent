@@ -6,10 +6,9 @@ import json
 import datetime
 import subprocess
 import argparse
-from typing import TypedDict
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypedDict
 
 
 # ANSI escape codes for colors
@@ -179,7 +178,25 @@ def has_tracked_diff(cwd=None) -> bool:
     return bool(result["stdout"].strip())
 
 
-def run_gemini(prompt: str, yolo: bool) -> str | None:
+def resolve_commit_specifier(specifier: str, cwd=None) -> Optional[str]:
+    """Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA."""
+    log(f"Resolving commit specifier: {specifier}", message_type="thought", indent_level=1)
+    command = ["git", "rev-parse", "--verify", specifier]
+    result = run(command, f"Resolving {specifier} to commit SHA", directory=cwd)
+
+    if result["success"] and result["stdout"].strip():
+        log(f"Resolved {specifier} to {result['stdout'].strip()}", message_type="thought", indent_level=2)
+        return result["stdout"].strip()
+    else:
+        log(
+            f"Failed to resolve commit specifier: {specifier}. Stderr: {result['stderr']}",
+            message_type="tool_output_error",
+            indent_level=2,
+        )
+        return None
+
+
+def run_gemini(prompt: str, yolo: bool) -> Optional[str]:
     """Run gemini CLI and return the response."""
     command = ["gemini", "-m", "gemini-2.5-flash", *(["--yolo"] if yolo else []), "-p", prompt]
 
@@ -285,15 +302,9 @@ def choose_tasks(tasks):
             return []
 
 
-def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
+def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
     """Set up git branch for task."""
     log(f"Setting up branch for task {task_num}: {task}", message_type="thought", indent_level=1)
-
-    # Switch to base branch first
-    result = run(["git", "switch", base_branch], f"Switching to {base_branch} branch", directory=cwd)
-    if not result["success"]:
-        log("Failed to switch to main branch", message_type="tool_output_error", indent_level=2)
-        return False
 
     # Create and switch to task branch
     base_branch_name = f"task-{task_num}"
@@ -308,7 +319,11 @@ def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
     branch_name = generate_unique_branch_name(base_branch_name, suggestions, cwd)
     if not branch_name:
         return False
-    result = run(["git", "switch", "-c", branch_name], f"Creating task branch {branch_name}", directory=cwd)
+    result = run(
+        ["git", "switch", "-c", branch_name, base],
+        f"Creating task branch {branch_name}",
+        directory=cwd,
+    )
 
     if not result["success"]:
         log(f"Failed to create branch {branch_name}", message_type="tool_output_error", indent_level=2)
@@ -527,7 +542,15 @@ def process_task(task: str, task_num: int, base_branch: str, cwd: Optional[str] 
 
     # Set up branch
     if current_task_state() == TaskState.PLAN.value:
-        if not setup_task_branch(task, task_num, base_branch, cwd):
+        # Resolve the base_branch to a commit SHA before setting up the task branch
+        resolved_base_commit_sha = resolve_commit_specifier(base_branch, cwd)
+        if not resolved_base_commit_sha:
+            log(f"Failed to resolve base specifier: {base_branch}", message_type="tool_output_error", indent_level=1)
+            state[task_id] = TaskState.ABORT.value
+            write_state(state)
+            return False
+
+        if not setup_task_branch(task, task_num, resolved_base_commit_sha, cwd):
             log("Failed to set up task branch", message_type="tool_output_error", indent_level=1)
             state[task_id] = TaskState.ABORT.value
             write_state(state)
@@ -597,7 +620,9 @@ def main() -> None:
     parser.add_argument("--quiet", action="store_true", help="Suppress informational output")
     parser.add_argument("--cwd", help="Working directory for task execution")
     parser.add_argument(
-        "--base", default="main", help="Base branch to switch to before creating a task branch (default: main)"
+        "--base",
+        default="main",
+        help="Base branch, commit, or git specifier to switch to before creating a task branch (default: main)",
     )
     parser.add_argument(
         "--multi", action="store_true", help="Treat prompt as an instruction to find task, rather than a single task"
