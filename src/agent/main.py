@@ -32,6 +32,10 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # Create the agent dir before even doing any logging
+    if not AGENT_TEMP_DIR.exists():
+        AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
     # TODO: --quiet should be handled before here, also with Pydantic
     if args.show_config:
         rich.print(config.model_dump_json(indent=2))
