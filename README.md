@@ -13,8 +13,13 @@ This tool provides an agentic loop for processing tasks.
 
 ## Installation
 
-1. **Install `uv`**
-2. **Run:** `uv run python -m src.main`
+Install `uv`.
+
+Then run:
+
+```sh
+uvx git+https://github.com/neongreen/agent
+```
 
 ## Usage
 
@@ -59,6 +64,28 @@ To use the Claude Code CLI instead, pass the `--claude` flag:
 ```bash
 uv run python -m src.main --claude "Implement feature X"
 ```
+### Run from GitHub via uv
+
+You can run the agent directly from a remote GitHub repository without cloning it locally using the `--project` option.
+
+```bash
+uv run --project https://github.com/<ORG>/<REPO>.git[@<ref>] [--directory <subdirectory>] -- python -m <ENTRYPOINT>
+```
+
+- `@<ref>` (optional) can be a branch name, tag, or commit SHA. Defaults to `main` if omitted.
+- `--directory <subdirectory>` (optional) specifies a subdirectory within the repository containing the project. Defaults to the repository root.
+- The `--` separates uv options from the command to run.
+
+For example, to run this agent directly from GitHub's `main` branch:
+
+```bash
+uv run --project https://github.com/your-org/agent.git -- python -m src.main
+```
+
+> **Prerequisites:**
+>
+- You must have `uv` (version >= 0.7.x) installed.
+- The first run will download the repository and may take a few moments.
 
 ## Configuration
 
