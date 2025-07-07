@@ -1,10 +1,13 @@
 import argparse
 import os
+import pprint
 import sys
 import tomllib
 from pathlib import Path
 
-from .config import AgentConfig
+from pydantic import ValidationError
+
+from .config import AgentConfig, TomlConfig
 from .constants import STATE_FILE
 from .gemini_agent import choose_tasks, discover_tasks
 from .state_manager import write_state
@@ -55,18 +58,21 @@ def main() -> None:
     if agent_toml_path.exists():
         try:
             with open(agent_toml_path, "rb") as f:
-                config_toml = tomllib.load(f)
-            config.update_from_toml(config_toml)
-            # Print the config values
-            log(f"Loaded agent configuration from {agent_toml_path}", message_type="thought", config=config)
-            import pprint
+                config_toml_raw = tomllib.load(f)
+            try:
+                config_toml = TomlConfig.model_validate(config_toml_raw)
+                config.update_from_toml(config_toml)
+                # Print the config values
+                log(f"Loaded agent configuration from {agent_toml_path}", message_type="thought", config=config)
 
-            log("Configuration resolved to:\n" + pprint.pformat(vars(config)), message_type="thought", config=config)
+                log(
+                    "Configuration resolved to:\n" + pprint.pformat(vars(config)), message_type="thought", config=config
+                )
+            except ValidationError as e:
+                log(f"Error validating .agent.toml: {e}", message_type="tool_output_error", config=config)
         except Exception as e:
             log(f"Error reading or parsing .agent.toml: {e}", message_type="tool_output_error", config=config)
 
-    # Re-set the default for --base argument if it was not explicitly provided by the user
-    # and a value was found in .agent.toml.
     # TODO: don't detect default like this!
     if "base" not in args or args.base == "main":  # Check if --base was not provided or is still default 'main'
         args.base = config.default_base or "main"
