@@ -19,7 +19,7 @@ def sanitize_branch_name(name: str) -> str:
     return name
 
 
-def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = None, cwd=None):
+def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = None, cwd: str = ".") -> Optional[str]:
     """Generates a unique branch name by trying suggestions first, then appending a numerical suffix if necessary."""
     existing_branches_result = run(["git", "branch", "--list"], "Listing existing branches", directory=cwd)
     if not existing_branches_result["success"]:
@@ -50,7 +50,7 @@ def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = No
     return new_branch_name
 
 
-def has_tracked_diff(cwd=None) -> bool:
+def has_tracked_diff(cwd: str = ".") -> bool:
     """Checks if there are any tracked changes in the repository."""
     result = run(["git", "status", "--porcelain"], "Checking for tracked changes", directory=cwd)
     if not result["success"]:
@@ -59,7 +59,7 @@ def has_tracked_diff(cwd=None) -> bool:
     return bool(result["stdout"].strip())
 
 
-def resolve_commit_specifier(specifier: str, cwd=None) -> Optional[str]:
+def resolve_commit_specifier(specifier: str, cwd: str = ".") -> Optional[str]:
     """Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA."""
     log(f"Resolving commit specifier: {specifier}", message_type="thought")
     command = ["git", "rev-parse", "--verify", specifier]
@@ -76,8 +76,16 @@ def resolve_commit_specifier(specifier: str, cwd=None) -> Optional[str]:
         return None
 
 
-def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
-    """Set up git branch for task."""
+def setup_task_branch(task, task_num, base_rev: str, cwd: str = ".") -> bool:
+    """
+    Set up git branch for task.
+
+    Arguments:
+        task: Task description.
+        task_num: Task number (always 1 for now)
+        base_rev: Base branch, commit, or git specifier to base the task branch on.
+        cwd: Optional working directory (defaults to current directory).
+    """
     log(f"Setting up branch for task {task_num}: {task}", message_type="thought")
 
     # Create and switch to task branch
@@ -100,7 +108,7 @@ def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
     if not branch_name:
         return False
     result = run(
-        ["git", "switch", "-c", branch_name, base],
+        ["git", "switch", "-c", branch_name, base_rev],
         f"Creating task branch {branch_name}",
         directory=cwd,
     )
@@ -113,10 +121,7 @@ def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
     task_meta = {"number": task_num, "title": task, "timestamp": datetime.now().isoformat()}
 
     # Ensure the task_meta directory exists
-    if cwd:
-        full_task_meta_dir = Path(cwd) / TASK_META_DIR
-    else:
-        full_task_meta_dir = TASK_META_DIR
+    full_task_meta_dir = Path(cwd) / TASK_META_DIR
     full_task_meta_dir.mkdir(parents=True, exist_ok=True)
 
     task_meta_path = full_task_meta_dir / f"task-{task_num}.json"
@@ -125,3 +130,39 @@ def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
 
     log(f"Created task branch and metadata for task {task_num}", message_type="thought")
     return True
+
+
+def get_current_branch(cwd: str = ".") -> Optional[str]:
+    """Gets the current active Git branch name."""
+    result = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], "Getting current branch", directory=cwd)
+    if result["success"]:
+        return result["stdout"].strip()
+    else:
+        log(f"Failed to get current branch. Stderr: {result['stderr']}", message_type="tool_output_error")
+        return None
+
+
+def add_worktree(path: str, rev: str, cwd: str = ".") -> bool:
+    """Adds a new git worktree at the specified path, based on the given revision."""
+    log(f"Adding worktree at {path} for revision {rev}", message_type="thought")
+    command = ["git", "worktree", "add", path, rev]
+    result = run(command, f"Adding worktree {path}", directory=cwd)
+    if result["success"]:
+        log(f"Successfully added worktree at {path}", message_type="thought")
+        return True
+    else:
+        log(f"Failed to add worktree at {path}. Stderr: {result['stderr']}", message_type="tool_output_error")
+        return False
+
+
+def remove_worktree(path: str, cwd: str = ".") -> bool:
+    """Removes a git worktree at the specified path."""
+    log(f"Removing worktree at {path}", message_type="thought")
+    command = ["git", "worktree", "remove", "--force", path]
+    result = run(command, f"Removing worktree {path}", directory=cwd)
+    if result["success"]:
+        log(f"Successfully removed worktree at {path}", message_type="thought")
+        return True
+    else:
+        log(f"Failed to remove worktree at {path}. Stderr: {result['stderr']}", message_type="tool_output_error")
+        return False

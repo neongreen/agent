@@ -1,8 +1,11 @@
 import argparse
 import os
+import shutil
+import tempfile
 
 import rich
 
+from . import git_utils
 from .config import AGENT_SETTINGS as config
 from .constants import AGENT_TEMP_DIR
 from .gemini_agent import set_llm_engine
@@ -28,6 +31,11 @@ def main() -> None:
         "--show-config",
         action="store_true",
         help="Show the current configuration and exit",
+    )
+    parser.add_argument(
+        "--worktree",
+        action="store_true",
+        help="Create a git worktree in a temporary folder and perform work there.",
     )
     parser.add_argument("prompt", nargs="?", default="", help="Task to do")
 
@@ -63,8 +71,8 @@ def main() -> None:
     else:
         set_llm_engine("gemini")
 
-    # Determine effective working directory
-    effective_cwd = args.cwd if args.cwd else os.getcwd()
+    # Determine effective working directory (where we will be looking for the repo, etc)
+    effective_cwd = str(args.cwd) if args.cwd else os.getcwd()
     effective_cwd = os.path.abspath(effective_cwd)
 
     # Ensure the .agent directory exists
@@ -77,13 +85,25 @@ def main() -> None:
     # if not STATE_FILE.exists():
     write_state({})
 
-    # Use the effective working directory
-    cwd = effective_cwd
-    log(f"Using working directory: {cwd}", message_type="thought")
-
     # Determine base branch from args or config
     if args.base is None:
         args.base = config.default_base or "main"
+
+    if args.worktree:
+        log("Temporary worktree mode enabled. Will create a git worktree for the task.", message_type="thought")
+        worktree_path = tempfile.mkdtemp(prefix="agent_worktree_")
+        log(f"Temporary worktree path: {worktree_path}", message_type="thought")
+        try:
+            git_utils.add_worktree(worktree_path, rev=args.base, cwd=effective_cwd)
+            log(f"Temporary worktree created at {worktree_path}", message_type="thought")
+            work_dir = worktree_path
+        except Exception as e:
+            log(f"Failed to create temporary worktree: {e}", message_type="tool_output_error")
+            exit(1)
+    else:
+        work_dir = effective_cwd
+
+    log(f"Using working directory: {work_dir}", message_type="thought")
 
     log("Starting agentic loop", message_type="thought")
 
@@ -96,7 +116,7 @@ def main() -> None:
         # Process each selected task
         for i, task in enumerate(selected_tasks, 1):
             try:
-                process_task(task, i, args.base, cwd=cwd)
+                process_task(task, i, args.base, cwd=work_dir)
             except Exception as e:
                 log(f"Error processing task {i}: {e}", message_type="tool_output_error")
 
@@ -105,6 +125,14 @@ def main() -> None:
 
     finally:
         status_manager.cleanup_status_bar()
+        if worktree_path:
+            log(f"Cleaning up temporary worktree at {worktree_path}", message_type="thought")
+            try:
+                git_utils.remove_worktree(worktree_path)
+                shutil.rmtree(worktree_path)
+                log("Temporary worktree cleaned up successfully.", message_type="thought")
+            except Exception as e:
+                log(f"Error cleaning up temporary worktree: {e}", message_type="tool_output_error")
 
 
 if __name__ == "__main__":

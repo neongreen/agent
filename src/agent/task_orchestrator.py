@@ -1,5 +1,3 @@
-from typing import Optional
-
 from .constants import PLAN_FILE, STATE_FILE, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
 from .state_manager import read_state, write_state
@@ -13,7 +11,7 @@ def process_task(
     task: str,
     task_num: int,
     base_specifier: str,
-    cwd: Optional[str] = None,
+    cwd: str = ".",
 ) -> bool:
     """Process a single task through planning and implementation."""
     status_manager.set_phase(f"Task {task_num}")
