@@ -95,7 +95,7 @@ def run(
     command_human: Optional[list[str]] = None,
     status_message: Optional[str] = None,
     *,
-    directory: str,
+    directory: Path,
     shell: bool = False,
     log_stdout: bool = True,
 ) -> RunResult:
@@ -105,7 +105,7 @@ def run(
     Args:
         command: Command to run as a list of arguments.
         description: Optional description of the command for logging.
-        directory: Optional working directory to run the command in.
+        directory: Optional working directory to run the command in as a Path.
         command_human: If present, will be used in console output instead of the full command.
         config: Agent configuration for logging settings.
     """
@@ -126,16 +126,16 @@ def run(
     else:
         command_human_display = shlex.join(command_human)
 
-    directory = abspath(directory)
+    abs_directory = abspath(str(directory))
 
     log(
-        f"Running command: {command_display} in {directory}",
-        message_human=f"Running command: {command_human_display} in {directory}",
+        f"Running command: {command_display} in {abs_directory}",
+        message_human=f"Running command: {command_human_display} in {abs_directory}",
         message_type="tool_code",
     )
 
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory, shell=shell)
+        result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=abs_directory, shell=shell)
 
         if result.returncode != 0:
             log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error")

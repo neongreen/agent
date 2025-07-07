@@ -1,5 +1,6 @@
 """Handles the planning phase of the agent's execution, including iterative plan generation and review."""
 
+from pathlib import Path
 from typing import Optional
 
 from .config import AGENT_SETTINGS as config
@@ -10,8 +11,17 @@ from .ui import status_manager
 from .utils import log
 
 
-def planning_phase(task: str, *, cwd: str) -> Optional[str]:
-    """Iterative planning phase with Gemini approval."""
+def planning_phase(task: str, *, cwd: Path) -> Optional[str]:
+    """
+    Iterative planning phase with Gemini approval.
+
+    Args:
+        task: The task description.
+        cwd: The current working directory as a Path.
+
+    Returns:
+        The approved plan as a string, or None if planning failed.
+    """
     status_manager.set_phase("Planning")
     print_formatted_message(
         format_llm_thought(f"Starting planning phase for task: {task}"), message_type=LLMOutputType.THOUGHT

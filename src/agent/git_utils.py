@@ -31,7 +31,7 @@ def sanitize_branch_name(name: str) -> str:
     return name
 
 
-def get_existing_branch_names(*, cwd: str) -> list[str]:
+def get_existing_branch_names(*, cwd: Path) -> list[str]:
     """
     Gets a list of all local Git branch names.
 
@@ -48,7 +48,7 @@ def get_existing_branch_names(*, cwd: str) -> list[str]:
     return [line.strip().replace("* ", "") for line in result["stdout"].split("\n") if line.strip()]
 
 
-def generate_branch_name(suggestions: list[str], *, cwd: str) -> str:
+def generate_branch_name(suggestions: list[str], *, cwd: Path) -> str:
     """
     Generates a unique branch name by trying suggestions first.
     If all of the suggestions are taken (branch already exists), it appends a numerical suffix to the first suggestion.
@@ -81,7 +81,7 @@ def generate_branch_name(suggestions: list[str], *, cwd: str) -> str:
     return new_branch_name
 
 
-def has_tracked_diff(*, cwd: str) -> bool:
+def has_tracked_diff(*, cwd: Path) -> bool:
     """
     Checks if there are any tracked changes in the repository.
 
@@ -98,7 +98,7 @@ def has_tracked_diff(*, cwd: str) -> bool:
     return bool(result["stdout"].strip())
 
 
-def resolve_commit_specifier(specifier: str, *, cwd: str) -> Optional[str]:
+def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
     """
     Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA.
 
@@ -124,7 +124,7 @@ def resolve_commit_specifier(specifier: str, *, cwd: str) -> Optional[str]:
         return None
 
 
-def setup_task_branch(task, task_num, *, base_rev: str, cwd: str) -> bool:
+def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path) -> bool:
     """
     Set up git branch for task.
 
@@ -193,7 +193,7 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: str) -> bool:
     }
 
     # Ensure the task_meta directory exists
-    full_task_meta_dir = Path(cwd) / TASK_META_DIR
+    full_task_meta_dir = cwd / TASK_META_DIR
     full_task_meta_dir.mkdir(parents=True, exist_ok=True)
 
     task_meta_path = full_task_meta_dir / f"task-{task_num}.json"
@@ -204,7 +204,7 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: str) -> bool:
     return True
 
 
-def get_current_branch(*, cwd: str) -> Optional[str]:
+def get_current_branch(*, cwd: Path) -> Optional[str]:
     """
     Gets the current active Git branch name.
 
@@ -222,7 +222,7 @@ def get_current_branch(*, cwd: str) -> Optional[str]:
         return None
 
 
-def get_current_commit_hash(*, cwd: str) -> Optional[str]:
+def get_current_commit_hash(*, cwd: Path) -> Optional[str]:
     """
     Gets the current commit hash.
 
@@ -240,7 +240,7 @@ def get_current_commit_hash(*, cwd: str) -> Optional[str]:
         return None
 
 
-def add_worktree(path: str, *, rev: str, cwd: str) -> bool:
+def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
     """
     Adds a new git worktree at the specified path, based on the given revision.
 
@@ -253,7 +253,7 @@ def add_worktree(path: str, *, rev: str, cwd: str) -> bool:
         True if the worktree was added successfully, False otherwise.
     """
     log(f"Adding worktree at {path} for revision {rev}", message_type="thought")
-    command = ["git", "worktree", "add", path, rev]
+    command = ["git", "worktree", "add", str(path), rev]
     result = run(command, f"Adding worktree {path}", directory=cwd)
     if result["success"]:
         log(f"Successfully added worktree at {path}", message_type="thought")
@@ -263,7 +263,7 @@ def add_worktree(path: str, *, rev: str, cwd: str) -> bool:
         return False
 
 
-def remove_worktree(path: str, *, cwd: str) -> bool:
+def remove_worktree(path: Path, *, cwd: Path) -> bool:
     """
     Removes a git worktree at the specified path.
 
@@ -275,7 +275,7 @@ def remove_worktree(path: str, *, cwd: str) -> bool:
         True if the worktree was removed successfully, False otherwise.
     """
     log(f"Removing worktree at {path}", message_type="thought")
-    command = ["git", "worktree", "remove", "--force", path]
+    command = ["git", "worktree", "remove", "--force", str(path)]
     result = run(command, f"Removing worktree {path}", directory=cwd)
     if result["success"]:
         log(f"Successfully removed worktree at {path}", message_type="thought")

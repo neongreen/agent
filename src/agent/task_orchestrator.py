@@ -1,5 +1,7 @@
 """Orchestrates the execution of tasks, managing their planning and implementation phases."""
 
+from pathlib import Path
+
 from .constants import PLAN_FILE, STATE_FILE, LLMOutputType, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
 from .output_formatter import format_llm_thought, print_formatted_message
@@ -15,7 +17,7 @@ def process_task(
     task_num: int,
     *,
     base_rev: str,
-    cwd: str,
+    cwd: Path,
 ) -> dict:
     """
     Processes a single task through its planning and implementation phases.
@@ -24,7 +26,7 @@ def process_task(
         task: The description of the task to process.
         task_num: The sequential number of the task.
         base_rev: The base Git revision (branch, commit, or tag) to start from.
-        cwd: The current working directory for task execution.
+        cwd: The current working directory for task execution as a Path.
 
     Returns:
         True if the task is successfully completed, False otherwise.

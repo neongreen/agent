@@ -1,5 +1,6 @@
 """Manages the iterative implementation phase of a task, including code generation, execution, and evaluation."""
 
+from pathlib import Path
 from typing import Optional
 
 from .config import AGENT_SETTINGS as config
@@ -15,7 +16,7 @@ def implementation_phase(
     task: str,
     plan: str,
     base_commit: str,
-    cwd: str,
+    cwd: Path,
 ) -> dict:
     """
     Manages the iterative implementation phase of a task.
@@ -28,7 +29,7 @@ def implementation_phase(
         task: The description of the task being implemented.
         plan: The implementation plan generated in the planning phase.
         base_commit: The Git commit SHA to base the implementation branch on.
-        cwd: The current working directory for task execution.
+        cwd: The current working directory for task execution as a Path.
 
     Returns:
         A dictionary containing the status of the implementation and any feedback.

@@ -7,6 +7,7 @@ Claude, Codex, OpenRouter, and Gemini CLIs.
 
 import os
 import tempfile
+from pathlib import Path
 from typing import Literal, Optional
 
 from .constants import AGENT_TEMP_DIR
@@ -41,14 +42,14 @@ def set_llm_engine(engine: Literal["gemini", "claude", "codex", "openrouter"], m
     LLM_MODEL = model
 
 
-def run_claude(prompt: str, yolo: bool, *, cwd: str, phase: Optional[str] = None) -> Optional[str]:
+def run_claude(prompt: str, yolo: bool, *, cwd: Path, phase: Optional[str] = None) -> Optional[str]:
     """
     Runs the Claude Code CLI with the given prompt.
 
     Args:
         prompt: The prompt to send to Claude.
         yolo: If True, bypasses permissions and sandbox.
-        cwd: The current working directory for the command.
+        cwd: The current working directory for the command as a Path.
 
     Returns:
         The response from Claude, or None if the call fails.
@@ -84,7 +85,7 @@ def run_codex(
     # For custom providers like OpenRouter
     provider_url: Optional[str] = None,
     provider_env_key: Optional[str] = None,
-    cwd: str,
+    cwd: Path,
     phase: Optional[str] = None,
 ) -> Optional[str]:
     """
@@ -147,7 +148,7 @@ def run_codex(
             return None
 
 
-def run_openrouter(prompt: str, yolo: bool, model: str, *, cwd: str, phase: Optional[str] = None) -> Optional[str]:
+def run_openrouter(prompt: str, yolo: bool, model: str, *, cwd: Path, phase: Optional[str] = None) -> Optional[str]:
     """
     Runs OpenRouter via the Codex CLI with the given prompt.
 
@@ -155,7 +156,7 @@ def run_openrouter(prompt: str, yolo: bool, model: str, *, cwd: str, phase: Opti
         prompt: The prompt to send to OpenRouter.
         yolo: If True, bypasses approvals and sandbox.
         model: The specific model to use with OpenRouter.
-        cwd: The current working directory for the command.
+        cwd: The current working directory for the command as a Path.
 
     Returns:
         The response from OpenRouter, or None if the call fails.
@@ -168,7 +169,7 @@ def run_openrouter(prompt: str, yolo: bool, model: str, *, cwd: str, phase: Opti
 
 
 def run_gemini(
-    prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: str, phase: Optional[str] = None
+    prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: Path, phase: Optional[str] = None
 ) -> Optional[str]:
     """
     Runs the Gemini CLI with the given prompt.
@@ -177,7 +178,7 @@ def run_gemini(
         prompt: The prompt to send to Gemini.
         yolo: If True, bypasses approvals and sandbox.
         model: The specific Gemini model to use (defaults to 'gemini-2.5-flash').
-        cwd: The current working directory for the command.
+        cwd: The current working directory for the command as a Path.
 
     Returns:
         The response from Gemini, or None if the call fails.
@@ -205,8 +206,19 @@ def run_gemini(
         return None
 
 
-def run_llm(prompt: str, yolo: bool, *, cwd: str, phase: Optional[str] = None) -> Optional[str]:
-    """Run selected LLM CLI and return the response."""
+def run_llm(prompt: str, yolo: bool, *, cwd: Path, phase: Optional[str] = None) -> Optional[str]:
+    """
+    Run selected LLM CLI and return the response.
+
+    Args:
+        prompt: The prompt to send to the LLM.
+        yolo: If True, bypasses approvals and sandbox.
+        cwd: The current working directory for the command as a Path.
+        phase: Optional phase description.
+
+    Returns:
+        The response from the selected LLM, or None if the call fails.
+    """
     # Dispatch to the selected engine
     if LLM_ENGINE == "claude":
         return run_claude(prompt, yolo, cwd=cwd, phase=phase)

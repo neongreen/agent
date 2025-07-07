@@ -8,6 +8,7 @@ and orchestration of the agent's task processing.
 import argparse
 import os
 import tempfile
+from pathlib import Path
 
 import rich
 
@@ -99,7 +100,7 @@ def main() -> None:
     else:
         set_llm_engine("gemini")
 
-    effective_cwd = os.path.abspath(str(args.cwd) if args.cwd else os.getcwd())
+    effective_cwd = Path(os.path.abspath(str(args.cwd) if args.cwd else os.getcwd()))
 
     # Ensure the .agent directory exists
     if not AGENT_TEMP_DIR.exists():
@@ -119,7 +120,7 @@ def main() -> None:
     # Worktree is enabled by default unless --no-worktree is specified
     if not args.no_worktree:
         log("Temporary worktree mode enabled. Will create a git worktree for the task.", message_type="thought")
-        worktree_path = tempfile.mkdtemp(prefix="agent_worktree_")
+        worktree_path = Path(tempfile.mkdtemp(prefix="agent_worktree_"))
         try:
             git_utils.add_worktree(worktree_path, rev=args.base, cwd=effective_cwd)
             work_dir = worktree_path
@@ -142,14 +143,14 @@ def main() -> None:
 
         for i, task_prompt in enumerate(selected_tasks, 1):
             log(f"Processing task {i}/{len(selected_tasks)}: '{task_prompt}'", message_type="thought")
-            current_worktree_path = None
+            current_worktree_path: Path | None = None
             task_status = "Failed"
             task_commit_hash = "N/A"
             task_error = None
 
             try:
                 # Create a new worktree for each task
-                current_worktree_path = tempfile.mkdtemp(prefix=f"agent_task_{i}_")
+                current_worktree_path = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
                 git_utils.add_worktree(current_worktree_path, rev=args.base, cwd=effective_cwd)
 
                 # Change to the new worktree directory
@@ -167,13 +168,13 @@ def main() -> None:
                     {
                         "prompt": task_prompt,
                         "status": task_status,
-                        "worktree": current_worktree_path,
+                        "worktree": str(current_worktree_path) if current_worktree_path else None,
                         "commit_hash": task_commit_hash,
                         "error": task_error,
                     }
                 )
                 # Clean up worktree and return to original directory
-                if current_worktree_path and os.path.exists(current_worktree_path):
+                if current_worktree_path and current_worktree_path.exists():
                     try:
                         # Change back to the original working directory before removing worktree
                         os.chdir(effective_cwd)
