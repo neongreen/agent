@@ -38,12 +38,13 @@ def main() -> None:
     parser.add_argument("--quiet", action="store_true", help="Suppress informational output")
     parser.add_argument("--cwd", type=str, default=None, help="Working directory for task execution")
     parser.add_argument("--base", type=str, default=None, help="Base branch, commit, or git specifier")
-    parser.add_argument("--claude", action="store_true", help="Use Claude Code CLI instead of Gemini for LLM calls")
-    parser.add_argument("--codex", action="store_true", help="Use Codex CLI instead of Gemini for LLM calls")
+    parser.add_argument("--claude", action="store_true", help="Use Claude Code CLI for LLM calls")
+    parser.add_argument("--codex", action="store_true", help="Use Codex CLI for LLM calls")
+    parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter (via Codex CLI) for LLM calls")
+    parser.add_argument("--opencode", action="store_true", help="Use Opencode CLI for LLM calls")
     parser.add_argument(
-        "--openrouter", type=str, default=None, help="Use OpenRouter (via Codex); specify the model name"
+        "--model", type=str, default=None, help="Specify the model name for gemini, claude, codex, or opencode"
     )
-    parser.add_argument("--opencode", action="store_true", help="Use Opencode CLI instead of Gemini for LLM calls")
     parser.add_argument("--show-config", action="store_true", help="Show the current configuration and exit")
     parser.add_argument(
         "--no-worktree",
@@ -75,22 +76,22 @@ def main() -> None:
         LLMOutputType.STATUS,
     )
 
-    if [cli_settings.claude, cli_settings.codex, cli_settings.openrouter is not None].count(True) > 1:
+    if [cli_settings.claude, cli_settings.codex, cli_settings.openrouter, cli_settings.opencode].count(True) > 1:
         raise ValueError(
             "Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, --openrouter, or --opencode."
         )
 
     # This is the only place where LLM() should be instantiated.
     if cli_settings.claude:
-        llm = LLM(engine="claude", model=None)
+        llm = LLM(engine="claude", model=cli_settings.model)
     elif cli_settings.codex:
-        llm = LLM(engine="codex", model=None)
-    elif cli_settings.openrouter is not None:
-        llm = LLM(engine="openrouter", model=cli_settings.openrouter)
+        llm = LLM(engine="codex", model=cli_settings.model)
+    elif cli_settings.openrouter:
+        llm = LLM(engine="openrouter", model=cli_settings.model)
     elif cli_settings.opencode:
-        llm = LLM(engine="opencode", model=None)
+        llm = LLM(engine="opencode", model=cli_settings.model)
     else:
-        llm = LLM(engine="gemini", model=None)
+        llm = LLM(engine="gemini", model=cli_settings.model)
 
     effective_cwd = Path(os.path.abspath(str(cli_settings.cwd) if cli_settings.cwd else os.getcwd()))
 

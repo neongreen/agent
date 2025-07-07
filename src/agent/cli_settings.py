@@ -22,22 +22,22 @@ class CLISettings(BaseSettings):
     )
     claude: bool = Field(
         default=False,
-        description="Use Claude Code CLI instead of Gemini for LLM calls",
+        description="Use Claude Code CLI for LLM calls",
         alias="claude",
     )
     codex: bool = Field(
         default=False,
-        description="Use Codex CLI instead of Gemini for LLM calls",
+        description="Use Codex CLI for LLM calls",
         alias="codex",
     )
-    openrouter: Optional[str] = Field(
-        default=None,
-        description="Use OpenRouter (via Codex); specify the model name",
+    openrouter: bool = Field(
+        default=False,
+        description="Use OpenRouter (via Codex CLI) for LLM calls",
         alias="openrouter",
     )
     opencode: bool = Field(
         default=False,
-        description="Use Opencode CLI instead of Gemini for LLM calls",
+        description="Use Opencode CLI for LLM calls",
         alias="opencode",
     )
     show_config: bool = Field(
@@ -49,6 +49,11 @@ class CLISettings(BaseSettings):
         default=False,
         description="Work directly in the target directory rather than in a temporary Git worktree.",
         alias="no-worktree",
+    )
+    model: Optional[str] = Field(
+        default=None,
+        description="Specify the model to use for LLM (some have defaults and some don't)",
+        alias="model",
     )
     prompt: Optional[list[str]] = Field(
         default=None,
