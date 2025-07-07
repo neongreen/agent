@@ -4,7 +4,10 @@
 
 default-base = "HEAD"
 
-post-implementation-hook-command = "ruff format || true"
+post-implementation-hook-command = """
+  ruff format || true;
+  fd .py | xargs uvx --isolated autoimport;
+  """
 
 [plan]
 judge-extra-prompt = """
