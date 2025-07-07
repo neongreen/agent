@@ -19,7 +19,7 @@ def sanitize_branch_name(name: str) -> str:
     return name
 
 
-def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = None, cwd: str = ".") -> Optional[str]:
+def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = None, *, cwd: str) -> Optional[str]:
     """Generates a unique branch name by trying suggestions first, then appending a numerical suffix if necessary."""
     existing_branches_result = run(["git", "branch", "--list"], "Listing existing branches", directory=cwd)
     if not existing_branches_result["success"]:
@@ -50,7 +50,7 @@ def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = No
     return new_branch_name
 
 
-def has_tracked_diff(cwd: str = ".") -> bool:
+def has_tracked_diff(*, cwd: str) -> bool:
     """Checks if there are any tracked changes in the repository."""
     result = run(["git", "status", "--porcelain"], "Checking for tracked changes", directory=cwd)
     if not result["success"]:
@@ -59,7 +59,7 @@ def has_tracked_diff(cwd: str = ".") -> bool:
     return bool(result["stdout"].strip())
 
 
-def resolve_commit_specifier(specifier: str, cwd: str = ".") -> Optional[str]:
+def resolve_commit_specifier(specifier: str, *, cwd: str) -> Optional[str]:
     """Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA."""
     log(f"Resolving commit specifier: {specifier}", message_type="thought")
     command = ["git", "rev-parse", "--verify", specifier]
@@ -76,7 +76,7 @@ def resolve_commit_specifier(specifier: str, cwd: str = ".") -> Optional[str]:
         return None
 
 
-def setup_task_branch(task, task_num, base_rev: str, cwd: str = ".") -> bool:
+def setup_task_branch(task, task_num, *, base_rev: str, cwd: str) -> bool:
     """
     Set up git branch for task.
 
@@ -99,12 +99,12 @@ def setup_task_branch(task, task_num, base_rev: str, cwd: str = ".") -> bool:
         "You *may not* include anything else in the response. Do not include Markdown, code blocks, or any other formatting.\n"
         "You may only output a single line."
     )
-    suggestions_response = run_llm(branch_prompt, yolo=False)
+    suggestions_response = run_llm(branch_prompt, yolo=False, cwd=cwd)
     suggestions = []
     if suggestions_response:
         suggestions = [s.strip() for s in suggestions_response.split(",") if s.strip()]
 
-    branch_name = generate_unique_branch_name(base_branch_name, suggestions, cwd)
+    branch_name = generate_unique_branch_name(base_branch_name, suggestions, cwd=cwd)
     if not branch_name:
         return False
     result = run(
@@ -132,7 +132,7 @@ def setup_task_branch(task, task_num, base_rev: str, cwd: str = ".") -> bool:
     return True
 
 
-def get_current_branch(cwd: str = ".") -> Optional[str]:
+def get_current_branch(*, cwd: str) -> Optional[str]:
     """Gets the current active Git branch name."""
     result = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], "Getting current branch", directory=cwd)
     if result["success"]:
@@ -142,7 +142,7 @@ def get_current_branch(cwd: str = ".") -> Optional[str]:
         return None
 
 
-def add_worktree(path: str, rev: str, cwd: str = ".") -> bool:
+def add_worktree(path: str, *, rev: str, cwd: str) -> bool:
     """Adds a new git worktree at the specified path, based on the given revision."""
     log(f"Adding worktree at {path} for revision {rev}", message_type="thought")
     command = ["git", "worktree", "add", path, rev]
@@ -155,7 +155,7 @@ def add_worktree(path: str, rev: str, cwd: str = ".") -> bool:
         return False
 
 
-def remove_worktree(path: str, cwd: str = ".") -> bool:
+def remove_worktree(path: str, *, cwd: str) -> bool:
     """Removes a git worktree at the specified path."""
     log(f"Removing worktree at {path}", message_type="thought")
     command = ["git", "worktree", "remove", "--force", path]

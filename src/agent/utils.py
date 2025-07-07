@@ -62,7 +62,8 @@ def run(
     command: str | list[str],
     description=None,
     command_human: Optional[list[str]] = None,
-    directory=None,
+    *,
+    directory: str,
     shell: bool = False,
 ) -> RunResult:
     """
@@ -89,8 +90,6 @@ def run(
     else:
         command_human_display = shlex.join(command_human)
 
-    if directory is None:
-        directory = "."
     directory = abspath(directory)
 
     log(

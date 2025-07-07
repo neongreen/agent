@@ -7,7 +7,7 @@ from .ui import status_manager
 from .utils import log
 
 
-def planning_phase(task: str, cwd=None) -> Optional[str]:
+def planning_phase(task: str, *, cwd: str) -> Optional[str]:
     """Iterative planning phase with Gemini approval."""
     status_manager.set_phase("Planning")
     log(f"Starting planning phase for task: {task}", message_type="thought")
@@ -45,7 +45,7 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
             plan_prompt += f"\n\n{config.plan.planner_extra_prompt}"
 
         status_manager.update_status("Getting plan from Gemini")
-        current_plan = run_llm(plan_prompt, yolo=True)
+        current_plan = run_llm(plan_prompt, yolo=True, cwd=cwd)
         if not current_plan:
             status_manager.update_status("Failed to get plan from Gemini.", style="red")
             log("Failed to get plan from Gemini", message_type="tool_output_error")
@@ -62,7 +62,7 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
             review_prompt += f"\n\n{config.plan.judge_extra_prompt}"
 
         status_manager.update_status("Reviewing plan")
-        current_review = run_llm(review_prompt, yolo=True)
+        current_review = run_llm(review_prompt, yolo=True, cwd=cwd)
         if not current_review:
             status_manager.update_status("Failed to get plan review from Gemini.", style="red")
             log("Failed to get plan review from Gemini", message_type="tool_output_error")

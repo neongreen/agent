@@ -10,8 +10,9 @@ from .utils import log
 def process_task(
     task: str,
     task_num: int,
-    base_specifier: str,
-    cwd: str = ".",
+    *,
+    base_rev: str,
+    cwd: str,
 ) -> bool:
     """Process a single task through planning and implementation."""
     status_manager.set_phase(f"Task {task_num}")
@@ -28,14 +29,14 @@ def process_task(
     # Set up branch
     if current_task_state() == TaskState.PLAN.value:
         # Resolve the base_branch to a commit SHA before setting up the task branch
-        resolved_base_commit_sha = resolve_commit_specifier(base_specifier, cwd)
+        resolved_base_commit_sha = resolve_commit_specifier(base_rev, cwd=cwd)
         if not resolved_base_commit_sha:
-            log(f"Failed to resolve base specifier: {base_specifier}", message_type="tool_output_error")
+            log(f"Failed to resolve base specifier: {base_rev}", message_type="tool_output_error")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
             return False
 
-        if not setup_task_branch(task, task_num, resolved_base_commit_sha, cwd):
+        if not setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd):
             log("Failed to set up task branch", message_type="tool_output_error")
             status_manager.update_status("Failed to set up task branch.", style="red")
             state[task_id] = TaskState.ABORT.value
@@ -46,7 +47,7 @@ def process_task(
     # Planning phase
     plan = None
     if current_task_state() == TaskState.PLAN.value:
-        plan = planning_phase(task, cwd)
+        plan = planning_phase(task, cwd=cwd)
         if not plan:
             log("Planning phase failed")
             status_manager.update_status("Failed.", style="red")
@@ -73,7 +74,7 @@ def process_task(
     if current_task_state() == TaskState.IMPLEMENT.value:
         success = implementation_phase(task, plan, resolved_base_commit_sha, cwd=cwd)
         if success:
-            if not has_tracked_diff(cwd):
+            if not has_tracked_diff(cwd=cwd):
                 log("No tracked changes after implementation, marking as DONE.", message_type="thought")
                 state[task_id] = TaskState.DONE.value
             else:

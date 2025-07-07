@@ -116,7 +116,7 @@ def main() -> None:
         # Process each selected task
         for i, task in enumerate(selected_tasks, 1):
             try:
-                process_task(task, i, args.base, cwd=work_dir)
+                process_task(task, i, base_rev=args.base, cwd=work_dir)
             except Exception as e:
                 log(f"Error processing task {i}: {e}", message_type="tool_output_error")
 
@@ -128,7 +128,7 @@ def main() -> None:
         if worktree_path:
             log(f"Cleaning up temporary worktree at {worktree_path}", message_type="thought")
             try:
-                git_utils.remove_worktree(worktree_path)
+                git_utils.remove_worktree(worktree_path, cwd=work_dir)
                 shutil.rmtree(worktree_path)
                 log("Temporary worktree cleaned up successfully.", message_type="thought")
             except Exception as e:

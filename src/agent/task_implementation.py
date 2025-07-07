@@ -11,7 +11,7 @@ def implementation_phase(
     task,
     plan,
     base_commit: str,
-    cwd=None,
+    cwd: str,
 ) -> bool:
     """
     Iterative implementation phase with early bailout.
@@ -51,7 +51,7 @@ def implementation_phase(
             impl_prompt += f"\n\n{config.implement.extra_prompt}"
 
         status_manager.update_status("Getting implementation from Gemini")
-        implementation_summary = run_llm(impl_prompt, yolo=True)
+        implementation_summary = run_llm(impl_prompt, yolo=True, cwd=cwd)
 
         if not implementation_summary:
             status_manager.update_status("Failed to get implementation from Gemini.", style="red")
@@ -94,7 +94,7 @@ def implementation_phase(
             eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
 
         status_manager.update_status("Evaluating implementation")
-        evaluation = run_llm(eval_prompt, yolo=True)
+        evaluation = run_llm(eval_prompt, yolo=True, cwd=cwd)
         if not evaluation:
             status_manager.update_status("Failed to get evaluation from Gemini.", style="red")
             log("Failed to get evaluation from Gemini", message_type="tool_output_error")
@@ -119,7 +119,7 @@ def implementation_phase(
                 "You *may not* output Markdown, code blocks, or any other formatting.\n"
                 "You may only output a single line.\n"
             )
-            commit_msg = run_llm(commit_msg_prompt, yolo=False)
+            commit_msg = run_llm(commit_msg_prompt, yolo=False, cwd=cwd)
             if not commit_msg:
                 commit_msg = "Implementation step for task"
 
@@ -148,7 +148,7 @@ def implementation_phase(
             if config.implement.completion.judge_extra_prompt:
                 completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
 
-            completion_check = run_llm(completion_prompt, yolo=True)
+            completion_check = run_llm(completion_prompt, yolo=True, cwd=cwd)
 
             if completion_check and completion_check.upper().startswith("COMPLETE"):
                 status_manager.update_status("Task marked as complete.")
