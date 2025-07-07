@@ -190,6 +190,24 @@ def get_current_branch(*, cwd: str) -> Optional[str]:
         return None
 
 
+def get_current_commit_hash(*, cwd: str) -> Optional[str]:
+    """
+    Gets the current commit hash.
+
+    Args:
+        cwd: The current working directory.
+
+    Returns:
+        The current commit hash, or None if not found.
+    """
+    result = run(["git", "rev-parse", "HEAD"], "Getting current commit hash", directory=cwd)
+    if result["success"]:
+        return result["stdout"].strip()
+    else:
+        log(f"Failed to get current commit hash. Stderr: {result['stderr']}", message_type="tool_output_error")
+        return None
+
+
 def add_worktree(path: str, *, rev: str, cwd: str) -> bool:
     """
     Adds a new git worktree at the specified path, based on the given revision.

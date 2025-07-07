@@ -37,8 +37,7 @@ class ImplementCompletionConfig(BaseModel):
 
     judge_extra_prompt: str = Field(
         default="",
-        # TODO: what is 'complete' really? what is the completion phase?
-        description="Additional instructions for *evaluating* whether the implementation is complete.",
+        description="Additional instructions for *evaluating* whether the implementation is complete. This phase determines if the agent has successfully implemented the task.",
     )
 
     model_config = SettingsConfigDict(
@@ -115,7 +114,7 @@ class AgentSettings(BaseSettings):
         1. TOML file ('.agent.toml')
         2. Default values
         """
-        return TomlConfigSettingsSource(settings_cls), init_settings
+        return env_settings, TomlConfigSettingsSource(settings_cls), init_settings
 
 
 # Instantiate once and reuse everywhere

@@ -16,7 +16,7 @@ def process_task(
     *,
     base_rev: str,
     cwd: str,
-) -> bool:
+) -> dict:
     """
     Processes a single task through its planning and implementation phases.
 
@@ -52,14 +52,14 @@ def process_task(
             print_formatted_message(f"Failed to resolve base specifier: {base_rev}", message_type="tool_output_error")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return False
+            return {"status": "failed", "feedback": "Failed to resolve base specifier"}
 
         if not setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd):
             print_formatted_message("Failed to set up task branch", message_type="tool_output_error")
             status_manager.update_status("Failed to set up task branch.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return False
+            return {"status": "failed", "feedback": "Failed to set up task branch"}
         state[task_id] = TaskState.PLAN.value
         write_state(state)
     elif current_task_state() == TaskState.IMPLEMENT.value or current_task_state() == TaskState.DONE.value:
@@ -70,7 +70,7 @@ def process_task(
             )
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return False
+            return {"status": "failed", "feedback": f"Failed to resolve base specifier: {base_rev} for resuming task"}
     # Planning phase
     plan = None
     if current_task_state() == TaskState.PLAN.value:
@@ -80,7 +80,7 @@ def process_task(
             status_manager.update_status("Failed.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return False
+            return {"status": "failed", "feedback": "Planning phase failed"}
         state[task_id] = TaskState.IMPLEMENT.value
         write_state(state)
     elif current_task_state() == TaskState.IMPLEMENT.value or current_task_state() == TaskState.DONE.value:
@@ -98,15 +98,17 @@ def process_task(
             status_manager.update_status("No plan found for resuming.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return False
+            return {"status": "failed", "feedback": "No plan found for resuming"}
 
     # Implementation phase
     assert plan is not None, "Plan should not be None at this point"
-    success = False
+    implementation_result = {"status": "failed", "feedback": "Implementation not attempted"}
     if current_task_state() == TaskState.IMPLEMENT.value:
         assert resolved_base_commit_sha is not None, "resolved_base_commit_sha should not be None at this point"
-        success = implementation_phase(task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd)
-        if success:
+        implementation_result = implementation_phase(
+            task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd
+        )
+        if implementation_result["status"] == "completed":
             if not has_tracked_diff(cwd=cwd):
                 print_formatted_message(
                     format_llm_thought("No tracked changes after implementation, marking as DONE."),
@@ -127,9 +129,9 @@ def process_task(
             format_llm_thought(f"Task {task_num} already marked as DONE, skipping implementation."),
             message_type="thought",
         )
-        success = True
+        implementation_result = {"status": "completed", "feedback": "Task already marked as DONE"}
 
-    if success:
+    if implementation_result["status"] == "completed":
         print_formatted_message(format_llm_thought(f"Task {task_num} completed successfully"), message_type="thought")
         # Remove the agent state file after a task is done
         try:
@@ -144,4 +146,4 @@ def process_task(
         log(f"Task {task_num} failed or incomplete")
         status_manager.update_status(f"Task {task_num} failed or incomplete.", style="red")
 
-    return success
+    return implementation_result

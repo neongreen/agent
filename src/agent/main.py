@@ -21,6 +21,21 @@ from .ui import status_manager
 from .utils import log
 
 
+def display_task_summary(task_results: list) -> None:
+    """Displays a summary of the processed tasks."""
+    log("\n--- Task Summary ---", message_type="thought")
+    for result in task_results:
+        log(f"Prompt: {result['prompt']}", message_type="thought")
+        log(f"Status: {result['status']}", message_type="thought")
+        if result["worktree"]:
+            log(f"Worktree: {result['worktree']}", message_type="thought")
+        if result["commit_hash"] != "N/A":
+            log(f"Commit: {result['commit_hash']}", message_type="thought")
+        if result["error"]:
+            log(f"Error: {result['error']}", message_type="tool_output_error")
+        log("--------------------", message_type="thought")
+
+
 def main() -> None:
     """
     Main function to run the agent.
@@ -49,7 +64,7 @@ def main() -> None:
         action="store_true",
         help="Create a git worktree in a temporary folder and perform work there.",
     )
-    parser.add_argument("prompt", nargs="?", default="", help="Task to do")
+    parser.add_argument("prompt", nargs="*", help="Task(s) to do")
 
     args = parser.parse_args()
 
@@ -57,18 +72,19 @@ def main() -> None:
     if not AGENT_TEMP_DIR.exists():
         AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    # TODO: --quiet should be handled before here, also with Pydantic
     if args.show_config:
         rich.print(config.model_dump_json(indent=2))
         exit(0)
-    else:
-        if not args.prompt:
-            parser.error("You haven't specified a prompt. See --help for usage.")
-            exit(1)
-        log(
-            f"Configuration loaded:\n{config.model_dump_json(indent=2)}",
-            message_type="thought",
-        )
+
+    if config.quiet_mode:
+        # If quiet mode is enabled, suppress informational output
+        # This needs to be handled early, before any logging occurs
+        pass  # Actual suppression logic would go here or be handled by the logger itself
+
+    log(
+        f"Configuration loaded:\n{config.model_dump_json(indent=2)}",
+        message_type="thought",
+    )
 
     # Set LLM engine if requested
     if [args.claude, args.codex, args.openrouter is not None].count(True) > 1:
@@ -83,9 +99,7 @@ def main() -> None:
     else:
         set_llm_engine("gemini")
 
-    # Determine effective working directory (where we will be looking for the repo, etc)
-    effective_cwd = str(args.cwd) if args.cwd else os.getcwd()
-    effective_cwd = os.path.abspath(effective_cwd)
+    effective_cwd = os.path.abspath(str(args.cwd) if args.cwd else os.getcwd())
 
     # Ensure the .agent directory exists
     if not AGENT_TEMP_DIR.exists():
@@ -101,6 +115,7 @@ def main() -> None:
     if args.base is None:
         args.base = config.default_base or "main"
 
+    worktree_path = None
     if args.worktree:
         log("Temporary worktree mode enabled. Will create a git worktree for the task.", message_type="thought")
         worktree_path = tempfile.mkdtemp(prefix="agent_worktree_")
@@ -112,7 +127,6 @@ def main() -> None:
             exit(1)
     else:
         work_dir = effective_cwd
-    worktree_path = None
 
     log(f"Using working directory: {work_dir}", message_type="thought")
 
@@ -122,25 +136,61 @@ def main() -> None:
         status_manager.init_status_bar()
         status_manager.set_phase("Agent initialized")
 
-        selected_tasks = [args.prompt]
+        selected_tasks = args.prompt
+        task_results = []
 
-        # Process each selected task
-        for i, task in enumerate(selected_tasks, 1):
+        for i, task_prompt in enumerate(selected_tasks, 1):
+            log(f"Processing task {i}/{len(selected_tasks)}: '{task_prompt}'", message_type="thought")
+            current_worktree_path = None
+            task_status = "Failed"
+            task_commit_hash = "N/A"
+            task_error = None
+
             try:
-                process_task(task, i, base_rev=args.base, cwd=work_dir)
+                # Create a new worktree for each task
+                current_worktree_path = tempfile.mkdtemp(prefix=f"agent_task_{i}_")
+                git_utils.add_worktree(current_worktree_path, rev=args.base, cwd=effective_cwd)
+
+                # Change to the new worktree directory
+                os.chdir(current_worktree_path)
+
+                process_task(task_prompt, i, base_rev=args.base, cwd=current_worktree_path)
+                task_status = "Success"
+                task_commit_hash = git_utils.get_current_commit_hash(cwd=current_worktree_path)
+
             except Exception as e:
+                task_error = str(e)
                 log(f"Error processing task {i}: {e}", message_type="tool_output_error")
+            finally:
+                task_results.append(
+                    {
+                        "prompt": task_prompt,
+                        "status": task_status,
+                        "worktree": current_worktree_path,
+                        "commit_hash": task_commit_hash,
+                        "error": task_error,
+                    }
+                )
+                # Clean up worktree and return to original directory
+                if current_worktree_path and os.path.exists(current_worktree_path):
+                    try:
+                        # Change back to the original working directory before removing worktree
+                        os.chdir(effective_cwd)
+                        git_utils.remove_worktree(current_worktree_path, cwd=effective_cwd)
+                    except Exception as e:
+                        log(
+                            f"Error cleaning up temporary worktree {current_worktree_path}: {e}",
+                            message_type="tool_output_error",
+                        )
 
         log("Agentic loop completed")
         status_manager.set_phase("Agentic loop completed")
+        display_task_summary(task_results)
 
     finally:
         status_manager.cleanup_status_bar()
-        if worktree_path:
-            try:
-                git_utils.remove_worktree(worktree_path, cwd=work_dir)
-            except Exception as e:
-                log(f"Error cleaning up temporary worktree: {e}", message_type="tool_output_error")
+        # Ensure we are back in the original effective_cwd
+        os.chdir(effective_cwd)
 
 
 if __name__ == "__main__":

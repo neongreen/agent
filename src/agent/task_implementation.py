@@ -10,15 +10,13 @@ from .ui import status_manager
 from .utils import log, run
 
 
-# TODO: return feedback instead of bool.
-# We forget to use this feedback for the next iteration of the implementation phase, I think.
 def implementation_phase(
     *,
     task: str,
     plan: str,
     base_commit: str,
     cwd: str,
-) -> bool:
+) -> dict:
     """
     Manages the iterative implementation phase of a task.
 
@@ -33,7 +31,7 @@ def implementation_phase(
         cwd: The current working directory for task execution.
 
     Returns:
-        True if the implementation phase is successfully completed, False otherwise.
+        A dictionary containing the status of the implementation and any feedback.
     """
     status_manager.set_phase("Implementation")
     print_formatted_message(f"Starting implementation phase for task: {task}", message_type="thought")
@@ -77,7 +75,10 @@ def implementation_phase(
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
                 log("Too many consecutive failures, giving up", message_type="tool_output_error")
-                return False
+                return {
+                    "status": "failed",
+                    "feedback": "Too many consecutive failures to get implementation from Gemini",
+                }
             continue
 
         if config.post_implementation_hook_command:
@@ -119,7 +120,7 @@ def implementation_phase(
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
                 log("Too many consecutive failures, giving up", message_type="tool_output_error")
-                return False
+                return {"status": "failed", "feedback": "Too many consecutive failures to get evaluation from Gemini"}
             continue
 
         feedback = evaluation  # Store feedback for next iteration
@@ -171,7 +172,7 @@ def implementation_phase(
             if completion_check and completion_check.upper().startswith("COMPLETE"):
                 status_manager.update_status("Task marked as complete.")
                 log("Task marked as complete", message_type="thought")
-                return True
+                return {"status": "completed", "feedback": completion_check}
 
         elif evaluation.upper().startswith("PARTIAL"):
             status_manager.update_status(f"Partial progress (attempt {attempt}).")
@@ -182,16 +183,16 @@ def implementation_phase(
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
                 log("Too many consecutive failures, giving up", message_type="tool_output_error")
-                return False
+                return {"status": "failed", "feedback": "Too many consecutive failures in implementation"}
 
         # Check if we've made no commits recently
         if attempt >= 5 and commits_made == 0:
             log("No commits made in 5 attempts, giving up", message_type="tool_output_error")
-            return False
+            return {"status": "failed", "feedback": "No commits made in 5 attempts"}
 
     log(
         f"Implementation incomplete after {max_implementation_attempts} attempts",
         message_type="tool_output_error",
     )
     status_manager.update_status("Incomplete.", style="red")
-    return False
+    return {"status": "incomplete", "feedback": "Implementation incomplete after maximum attempts"}
