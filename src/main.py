@@ -30,13 +30,18 @@ def main() -> None:
         help="Base branch, commit, or git specifier to switch to before creating a task branch (default: main or from .agent.toml)",
     )
     parser.add_argument("--claude", action="store_true", help="Use Claude Code CLI instead of Gemini for LLM calls")
+    parser.add_argument("--codex", action="store_true", help="Use Codex CLI instead of Gemini for LLM calls")
 
     args = parser.parse_args()
 
     # Set LLM engine if requested
+    if args.claude and args.codex:
+        parser.error("Cannot specify both --claude and --codex")
 
     if args.claude:
         set_llm_engine("claude")
+    elif args.codex:
+        set_llm_engine("codex")
 
     # Create configuration object
     config = AgentConfig(quiet_mode=args.quiet)

@@ -18,6 +18,7 @@ judge-extra-prompt = """
     - The plan proposes to run automatic tests or do testing manually, including "basic sanity checks" or "smoke testing".
     - The plan proposes to run the agent tool itself (src/main.py).
     - The plan proposes using `pip` or `poetry` (this project uses `uv`).
+    - The plan proposes pushing commits or creating pull requests.
   
   If rejecting the plan, you must explain in detail why you are rejecting it.
   You must also give the planner the entire rejection criteria from the above, so that it will adhere to all of them in the next planning round.

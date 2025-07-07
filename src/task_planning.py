@@ -2,7 +2,7 @@ from typing import Optional
 
 from .config import AgentConfig
 from .constants import PLAN_FILE
-from .gemini_agent import run_gemini
+from .gemini_agent import run_llm
 from .ui import status_manager
 from .utils import log
 
@@ -45,7 +45,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
             plan_prompt += f"\n\n{config.plan_planner_extra_prompt}"
 
         status_manager.update_status("Getting plan from Gemini")
-        current_plan = run_gemini(plan_prompt, yolo=True)
+        current_plan = run_llm(plan_prompt, yolo=True)
         if not current_plan:
             status_manager.update_status("Failed to get plan from Gemini.", style="red")
             log("Failed to get plan from Gemini", message_type="tool_output_error")
@@ -62,7 +62,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
             review_prompt += f"\n\n{config.plan_judge_extra_prompt}"
 
         status_manager.update_status("Reviewing plan")
-        current_review = run_gemini(review_prompt, yolo=True)
+        current_review = run_llm(review_prompt, yolo=True)
         if not current_review:
             status_manager.update_status("Failed to get plan review from Gemini.", style="red")
             log("Failed to get plan review from Gemini", message_type="tool_output_error")

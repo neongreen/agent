@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from .constants import TASK_META_DIR
-from .gemini_agent import run_gemini
+from .gemini_agent import run_llm
 from .utils import log, run
 
 
@@ -85,11 +85,13 @@ def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
 
     # Get branch name suggestions from Gemini
     branch_prompt = (
-        f"Generate 5 short, descriptive, and valid git branch names for the task: '{task}'. "
-        "The names should be lowercase, use hyphens instead of spaces, and avoid special characters. "
-        "Example: 'feature/add-login', 'bugfix/fix-auth-flow'. Return as a comma-separated list."
+        f"Generate 5 short, descriptive, and valid git branch names for the task: '{task}'.\n"
+        "The names should be lowercase, use hyphens instead of spaces, and avoid special characters.\n"
+        "Example: 'feature/add-login', 'bugfix/fix-auth-flow'. Return as a comma-separated list.\n"
+        "You *may not* include anything else in the response. Do not include Markdown, code blocks, or any other formatting.\n"
+        "You may only output a single line."
     )
-    suggestions_response = run_gemini(branch_prompt, yolo=False)
+    suggestions_response = run_llm(branch_prompt, yolo=False)
     suggestions = []
     if suggestions_response:
         suggestions = [s.strip() for s in suggestions_response.split(",") if s.strip()]
