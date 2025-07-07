@@ -179,9 +179,9 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
             "Here is the summary of the implementation:\n\n"
             f"{implementation_summary}\n\n"
             "Here are the uncommitted changes:\n\n"
-            f"{run(['git', 'diff'], directory=cwd)['stdout']}\n\n"
+            f"{run(['git', 'diff', '--', ':!plan.md'], directory=cwd)['stdout']}\n\n"
             "Here is the diff of the changes made in previous commits:\n\n"
-            f"{run(['git', 'diff', base_commit + '..HEAD'], directory=cwd)['stdout']}"
+            f"{run(['git', 'diff', base_commit + '..HEAD', '--', ':!plan.md'], directory=cwd)['stdout']}"
         )
 
         if config and config.implement_judge_extra_prompt:
