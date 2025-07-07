@@ -336,7 +336,13 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
 
         # Ask Gemini to create/revise plan
         if round_num == 1:
-            plan_prompt = f"Create a detailed implementation plan for this task: {repr(task)}. Break it down into specific, actionable steps."
+            plan_prompt = f"""
+Create a detailed implementation plan for this task: {repr(task)}. Break it down into specific, actionable steps.
+You are granted access to tools, commands, and code execution for the *sole purpose* of gaining knowledge.
+You *may not* use these tools to directly implement the task.
+Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.
+""".strip()
+
         else:
             plan_prompt = f"Revise the plan for task {repr(task)} addressing the previous feedback. Create a better implementation plan."
 
