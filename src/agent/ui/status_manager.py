@@ -55,6 +55,14 @@ def _update_display() -> None:
 def init_status_bar() -> None:
     global live_display
     if live_display is None:
+        # FIXME: this wrecks the panel output, e.g
+        #
+        # ```
+        # Starting agentic loop
+        # Initializing...╭─ LLM Thought ─────────────────────────────────────────────────────────────────╮
+        # │ Processing task 1: text etc etc etc
+        # ```
+        #
         status_text = Text("Initializing...", style="dim")
         # Use screen=False to allow normal logging above the status
         live_display = Live(status_text, console=console, screen=False, refresh_per_second=4)
