@@ -1,3 +1,10 @@
+"""
+This module provides functions for interacting with various LLM engines.
+
+It includes functions to set the LLM engine, and to run prompts against
+Claude, Codex, OpenRouter, and Gemini CLIs.
+"""
+
 import os
 import tempfile
 from typing import Literal, Optional
@@ -7,10 +14,23 @@ from .ui import status_manager
 from .utils import log, run
 
 LLM_ENGINE = os.getenv("LLM_ENGINE", "gemini")
+"""The globally selected LLM engine, defaults to 'gemini'."""
 LLM_MODEL = None
+"""The globally selected LLM model, if applicable."""
 
 
 def set_llm_engine(engine: Literal["gemini", "claude", "codex", "openrouter"], model: Optional[str] = None) -> None:
+    """
+    Sets the global LLM engine and optionally the model to be used.
+
+    Args:
+        engine: The LLM engine to use ('gemini', 'claude', 'codex', 'openrouter').
+        model: The specific model to use with the engine (required for 'openrouter').
+
+    Raises:
+        ValueError: If an unknown engine is specified or if a model is not
+                    provided for 'openrouter'.
+    """
     global LLM_ENGINE, LLM_MODEL
     if engine not in ("gemini", "claude", "codex", "openrouter"):
         raise ValueError(f"Unknown engine: {engine}")
@@ -21,7 +41,17 @@ def set_llm_engine(engine: Literal["gemini", "claude", "codex", "openrouter"], m
 
 
 def run_claude(prompt: str, yolo: bool, *, cwd: str) -> Optional[str]:
-    """Run Claude Code CLI and return the response."""
+    """
+    Runs the Claude Code CLI with the given prompt.
+
+    Args:
+        prompt: The prompt to send to Claude.
+        yolo: If True, bypasses permissions and sandbox.
+        cwd: The current working directory for the command.
+
+    Returns:
+        The response from Claude, or None if the call fails.
+    """
     # Build Claude CLI invocation: map yolo to --dangerously-skip-permissions before --print (-p)
     command = ["claude", *(["--dangerously-skip-permissions"] if yolo else []), "-p", prompt]
 
@@ -49,7 +79,20 @@ def run_codex(
     provider_env_key: Optional[str] = None,
     cwd: str,
 ) -> Optional[str]:
-    """Run Codex CLI and return the response."""
+    """
+    Runs the Codex CLI with the given prompt.
+
+    Args:
+        prompt: The prompt to send to Codex.
+        yolo: If True, bypasses approvals and sandbox.
+        model: The specific model to use.
+        provider_url: Custom provider URL for Codex.
+        provider_env_key: Environment variable key for custom provider API key.
+        cwd: The current working directory for the command.
+
+    Returns:
+        The response from Codex, or None if the call fails.
+    """
 
     # Codex CLI is noisy so we have to do things differently.
     # Create a file in os temp dir:
@@ -91,14 +134,36 @@ def run_codex(
 
 
 def run_openrouter(prompt: str, yolo: bool, model: str, *, cwd: str) -> Optional[str]:
-    """Run OpenRouter via Codex CLI and return the response."""
+    """
+    Runs OpenRouter via the Codex CLI with the given prompt.
+
+    Args:
+        prompt: The prompt to send to OpenRouter.
+        yolo: If True, bypasses approvals and sandbox.
+        model: The specific model to use with OpenRouter.
+        cwd: The current working directory for the command.
+
+    Returns:
+        The response from OpenRouter, or None if the call fails.
+    """
     provider_url = "https://openrouter.ai/api/v1"
     provider_env_key = "OPENROUTER_API_KEY"
     return run_codex(prompt, yolo, model=model, provider_url=provider_url, provider_env_key=provider_env_key, cwd=cwd)
 
 
 def run_gemini(prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: str) -> Optional[str]:
-    """Run Gemini CLI and return the response."""
+    """
+    Runs the Gemini CLI with the given prompt.
+
+    Args:
+        prompt: The prompt to send to Gemini.
+        yolo: If True, bypasses approvals and sandbox.
+        model: The specific Gemini model to use (defaults to 'gemini-2.5-flash').
+        cwd: The current working directory for the command.
+
+    Returns:
+        The response from Gemini, or None if the call fails.
+    """
     gemini_model = model or "gemini-2.5-flash"
     command = ["gemini", "-m", gemini_model, *(["--yolo"] if yolo else []), "-p", prompt]
 

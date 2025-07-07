@@ -1,3 +1,10 @@
+"""
+Main entry point for the agent application.
+
+This module handles command-line argument parsing, configuration loading,
+and orchestration of the agent's task processing.
+"""
+
 import argparse
 import os
 import shutil
@@ -16,6 +23,12 @@ from .utils import log
 
 
 def main() -> None:
+    """
+    Main function to run the agent.
+
+    Parses command-line arguments, sets up the environment, and initiates
+    the agentic loop for task processing.
+    """
     parser = argparse.ArgumentParser(description="Agentic task processing tool")
     parser.add_argument("--quiet", action="store_true", help="Suppress informational output")
     parser.add_argument("--cwd", help="Working directory for task execution")

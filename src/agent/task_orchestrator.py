@@ -1,3 +1,5 @@
+"""Orchestrates the execution of tasks, managing their planning and implementation phases."""
+
 from .constants import PLAN_FILE, STATE_FILE, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
 from .state_manager import read_state, write_state
@@ -14,7 +16,18 @@ def process_task(
     base_rev: str,
     cwd: str,
 ) -> bool:
-    """Process a single task through planning and implementation."""
+    """
+    Processes a single task through its planning and implementation phases.
+
+    Args:
+        task: The description of the task to process.
+        task_num: The sequential number of the task.
+        base_rev: The base Git revision (branch, commit, or tag) to start from.
+        cwd: The current working directory for task execution.
+
+    Returns:
+        True if the task is successfully completed, False otherwise.
+    """
     status_manager.set_phase(f"Task {task_num}")
     log(f"Processing task {task_num}: {task}", message_type="thought")
 
@@ -22,6 +35,7 @@ def process_task(
     state = read_state()
 
     def current_task_state() -> TaskState:
+        """Returns the current state of the task from the state manager."""
         return state.get(task_id, TaskState.PLAN.value)
 
     log(f"Current state for {task_id}: {current_task_state()}", message_type="thought")
@@ -70,9 +84,10 @@ def process_task(
             return False
 
     # Implementation phase
+    assert plan is not None, "Plan should not be None at this point"
     success = False
     if current_task_state() == TaskState.IMPLEMENT.value:
-        success = implementation_phase(task, plan, resolved_base_commit_sha, cwd=cwd)
+        success = implementation_phase(task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd)
         if success:
             if not has_tracked_diff(cwd=cwd):
                 log("No tracked changes after implementation, marking as DONE.", message_type="thought")

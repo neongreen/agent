@@ -1,3 +1,11 @@
+"""
+Configuration management for the agent.
+
+This module defines the data structures and logic for managing agent settings,
+including plan and implementation configurations, and handles loading settings
+from TOML files and environment variables.
+"""
+
 from typing import Any
 
 from pydantic import AliasGenerator, BaseModel, Field, model_validator
@@ -9,9 +17,12 @@ kebab_alias_generator = AliasGenerator(
     validation_alias=lambda field_name: field_name.replace("_", "-"),
     serialization_alias=lambda field_name: field_name.replace("_", "-"),
 )
+"""Alias generator to convert snake_case field names to kebab-case for TOML settings."""
 
 
 class PlanConfig(BaseModel):
+    """Configuration for the planning phase of the agent."""
+
     judge_extra_prompt: str = Field(default="")
     planner_extra_prompt: str = Field(default="")
 
@@ -22,6 +33,8 @@ class PlanConfig(BaseModel):
 
 
 class ImplementCompletionConfig(BaseModel):
+    """Configuration for the completion phase of implementation."""
+
     judge_extra_prompt: str = Field(default="")
 
     model_config = SettingsConfigDict(
@@ -31,6 +44,8 @@ class ImplementCompletionConfig(BaseModel):
 
 
 class ImplementConfig(BaseModel):
+    """Configuration for the implementation phase of the agent."""
+
     extra_prompt: str = Field(default="")
     judge_extra_prompt: str = Field(default="")
     completion: ImplementCompletionConfig = ImplementCompletionConfig()
@@ -42,6 +57,10 @@ class ImplementConfig(BaseModel):
 
 
 class AgentSettings(BaseSettings):
+    """
+    AgentSettings defines the configuration for the agent.
+    """
+
     default_base: str = Field(
         default="main",
         description="Default base branch, commit, or git specifier to switch to before creating a task branch",
@@ -60,10 +79,13 @@ class AgentSettings(BaseSettings):
         toml_file=".agent.toml",
     )
 
-    # This method removes the $schema field from the settings - it's used in TOML to validate the file
     @model_validator(mode="before")
     @classmethod
     def remove_schema_field(cls, values: Any) -> Any:
+        """
+        Removes the '$schema' field from the settings, which is used in TOML
+        for file validation but not needed internally.
+        """
         if isinstance(values, dict):
             values.pop("$schema", None)
         return values
@@ -77,6 +99,13 @@ class AgentSettings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """
+        Customizes the order of settings sources.
+
+        Settings are loaded with the following priority:
+        1. TOML file ('.agent.toml')
+        2. Default values
+        """
         # Settings priority:
         # 1. TOML file (config.toml)
         # 2. Default values

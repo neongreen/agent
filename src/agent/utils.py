@@ -1,3 +1,5 @@
+"""Utility functions for the agent."""
+
 import datetime
 import json
 import shlex
@@ -14,6 +16,13 @@ console = Console()
 
 
 def _print_formatted(message, message_type="default") -> None:
+    """
+    Prints a formatted message to the console based on message type.
+
+    Args:
+        message: The message string to print.
+        message_type: The type of message, which determines the formatting style.
+    """
     style = ""
     if message_type == "thought":
         style = "dim"
@@ -52,6 +61,8 @@ def log(
 
 
 class RunResult(TypedDict):
+    """Represents the result of a shell command execution."""
+
     exit_code: int
     stdout: str
     stderr: str

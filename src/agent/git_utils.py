@@ -1,3 +1,5 @@
+"""Utility functions for interacting with Git repositories."""
+
 import json
 import re
 from datetime import datetime
@@ -10,7 +12,15 @@ from .utils import log, run
 
 
 def sanitize_branch_name(name: str) -> str:
-    """Sanitizes a string to be a valid git branch name."""
+    """
+    Sanitizes a string to be a valid git branch name.
+
+    Args:
+        name: The string to sanitize.
+
+    Returns:
+        A sanitized string suitable for a Git branch name.
+    """
     name = name.lower()
     name = re.sub(r"[^a-z0-9/.]+", "-", name)  # Replace invalid characters with a single hyphen
     name = name.strip("-")  # Remove leading/trailing hyphens
@@ -20,7 +30,17 @@ def sanitize_branch_name(name: str) -> str:
 
 
 def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = None, *, cwd: str) -> Optional[str]:
-    """Generates a unique branch name by trying suggestions first, then appending a numerical suffix if necessary."""
+    """
+    Generates a unique branch name by trying suggestions first, then appending a numerical suffix if necessary.
+
+    Args:
+        base_name: The base name for the branch.
+        suggestions: A list of suggested branch names to try first.
+        cwd: The current working directory.
+
+    Returns:
+        A unique branch name, or None if unable to generate one.
+    """
     existing_branches_result = run(["git", "branch", "--list"], "Listing existing branches", directory=cwd)
     if not existing_branches_result["success"]:
         log("Failed to list existing branches.", message_type="tool_output_error")
@@ -51,7 +71,15 @@ def generate_unique_branch_name(base_name, suggestions: Optional[list[str]] = No
 
 
 def has_tracked_diff(*, cwd: str) -> bool:
-    """Checks if there are any tracked changes in the repository."""
+    """
+    Checks if there are any tracked changes in the repository.
+
+    Args:
+        cwd: The current working directory.
+
+    Returns:
+        True if there are tracked changes, False otherwise.
+    """
     result = run(["git", "status", "--porcelain"], "Checking for tracked changes", directory=cwd)
     if not result["success"]:
         log("Failed to check git status.", message_type="tool_output_error")
@@ -60,7 +88,16 @@ def has_tracked_diff(*, cwd: str) -> bool:
 
 
 def resolve_commit_specifier(specifier: str, *, cwd: str) -> Optional[str]:
-    """Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA."""
+    """
+    Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA.
+
+    Args:
+        specifier: The Git commit specifier.
+        cwd: The current working directory.
+
+    Returns:
+        The full commit SHA, or None if resolution fails.
+    """
     log(f"Resolving commit specifier: {specifier}", message_type="thought")
     command = ["git", "rev-parse", "--verify", specifier]
     result = run(command, f"Resolving {specifier} to commit SHA", directory=cwd)
@@ -80,11 +117,14 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: str) -> bool:
     """
     Set up git branch for task.
 
-    Arguments:
+    Args:
         task: Task description.
         task_num: Task number (always 1 for now)
         base_rev: Base branch, commit, or git specifier to base the task branch on.
         cwd: Optional working directory (defaults to current directory).
+
+    Returns:
+        True if the branch was set up successfully, False otherwise.
     """
     log(f"Setting up branch for task {task_num}: {task}", message_type="thought")
 
@@ -133,7 +173,15 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: str) -> bool:
 
 
 def get_current_branch(*, cwd: str) -> Optional[str]:
-    """Gets the current active Git branch name."""
+    """
+    Gets the current active Git branch name.
+
+    Args:
+        cwd: The current working directory.
+
+    Returns:
+        The current branch name, or None if not found.
+    """
     result = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], "Getting current branch", directory=cwd)
     if result["success"]:
         return result["stdout"].strip()
@@ -143,7 +191,17 @@ def get_current_branch(*, cwd: str) -> Optional[str]:
 
 
 def add_worktree(path: str, *, rev: str, cwd: str) -> bool:
-    """Adds a new git worktree at the specified path, based on the given revision."""
+    """
+    Adds a new git worktree at the specified path, based on the given revision.
+
+    Args:
+        path: The path where the worktree should be added.
+        rev: The revision to base the worktree on.
+        cwd: The current working directory.
+
+    Returns:
+        True if the worktree was added successfully, False otherwise.
+    """
     log(f"Adding worktree at {path} for revision {rev}", message_type="thought")
     command = ["git", "worktree", "add", path, rev]
     result = run(command, f"Adding worktree {path}", directory=cwd)
@@ -156,7 +214,16 @@ def add_worktree(path: str, *, rev: str, cwd: str) -> bool:
 
 
 def remove_worktree(path: str, *, cwd: str) -> bool:
-    """Removes a git worktree at the specified path."""
+    """
+    Removes a git worktree at the specified path.
+
+    Args:
+        path: The path to the worktree to remove.
+        cwd: The current working directory.
+
+    Returns:
+        True if the worktree was removed successfully, False otherwise.
+    """
     log(f"Removing worktree at {path}", message_type="thought")
     command = ["git", "worktree", "remove", "--force", path]
     result = run(command, f"Removing worktree {path}", directory=cwd)

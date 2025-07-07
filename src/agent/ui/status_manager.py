@@ -1,3 +1,5 @@
+"""Manages the display of the agent's current status and phase in the CLI."""
+
 from typing import Optional
 
 from rich.console import Console
@@ -12,6 +14,7 @@ _last_message: Optional[str] = None
 
 
 def _update_display() -> None:
+    """Updates the live display with the current phase, attempt info, and last message."""
     global live_display, _current_phase, _current_attempt_info, _last_message
     if live_display is not None:
         display_text = ""

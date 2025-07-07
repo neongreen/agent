@@ -1,3 +1,5 @@
+"""Handles the planning phase of the agent's execution, including iterative plan generation and review."""
+
 from typing import Optional
 
 from .config import AGENT_SETTINGS as config

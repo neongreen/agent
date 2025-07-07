@@ -1,3 +1,5 @@
+"""Manages the iterative implementation phase of a task, including code generation, execution, and evaluation."""
+
 from typing import Optional
 
 from .config import AGENT_SETTINGS as config
@@ -8,16 +10,27 @@ from .utils import log, run
 
 
 def implementation_phase(
-    task,
-    plan,
+    *,
+    task: str,
+    plan: str,
     base_commit: str,
     cwd: str,
 ) -> bool:
     """
-    Iterative implementation phase with early bailout.
+    Manages the iterative implementation phase of a task.
 
-    Arguments:
-        base_commit: *commit* to switch to before starting the implementation.
+    This function guides the agent through generating code, executing commands,
+    and evaluating the results, with a mechanism for early bailout if progress
+    stalls.
+
+    Args:
+        task: The description of the task being implemented.
+        plan: The implementation plan generated in the planning phase.
+        base_commit: The Git commit SHA to base the implementation branch on.
+        cwd: The current working directory for task execution.
+
+    Returns:
+        True if the implementation phase is successfully completed, False otherwise.
     """
     status_manager.set_phase("Implementation")
     log(f"Starting implementation phase for task: {task}", message_type="thought")
