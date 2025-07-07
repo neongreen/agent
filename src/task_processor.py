@@ -136,8 +136,9 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
             f"{plan}\n\n"
             f"Implement the next step for task {repr(task)}.\n"
             "Create files, run commands, and/or write code as needed.\n"
-            "When done, provide a concise summary of what you did.\n"
+            "When done, output 'IMPLEMENTATION_SUMMARY_START' and then a concise summary of what you did.\n"
             "Your response will help the reviewer of your implementation understand the changes made.\n"
+            "Finish your response with 'IMPLEMENTATION_SUMMARY_END'.\n"
         ).strip()
 
         if config and config.implement_extra_prompt:
