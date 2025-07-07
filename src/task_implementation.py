@@ -22,20 +22,25 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
     consecutive_failures = 0
     commits_made = 0
 
+    # Feedback from evaluating the previous implementation attempt done by the loop
+    feedback: Optional[str] = None
+
     for attempt in range(1, max_implementation_attempts + 1):
         status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
         log(f"Implementation attempt {attempt}", message_type="thought")
 
         # Ask Gemini to implement next step
         impl_prompt = (
-            f"Execution phase. Based on this plan:\n\n"
+            f"Execution phase. You are implementing this task: {repr(task)}. This is your attempt #{attempt} out of {max_implementation_attempts}.\n\n"
+            "Based on this plan:\n\n"
             f"{plan}\n\n"
+            f"{f'And the feedback about your previous attempt:\n\n{feedback}\n\n' if feedback else ''}"
             f"Implement the next step for task {repr(task)}.\n"
             "Create files, run commands, and/or write code as needed.\n"
             "When done, output 'IMPLEMENTATION_SUMMARY_START' and then a concise summary of what you did.\n"
             "Your response will help the reviewer of your implementation understand the changes made.\n"
             "Finish your response with 'IMPLEMENTATION_SUMMARY_END'.\n"
-        ).strip()
+        )
 
         if config and config.implement_extra_prompt:
             impl_prompt += f"\n\n{config.implement_extra_prompt}"
@@ -63,7 +68,7 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
 
         # Evaluate if it seems reasonable
         log(
-            f"Judging the implementation based on the diff. Gemini provided this explanation along with its implementation:\n{implementation_summary}",
+            f"Judging the implementation based on the diff. LLM provided this explanation along with its implementation:\n{implementation_summary}",
             message_type="thought",
         )
         eval_prompt = (
@@ -93,6 +98,8 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
                 log("Too many consecutive failures, giving up", message_type="tool_output_error")
                 return False
             continue
+
+        feedback = evaluation  # Store feedback for next iteration
 
         if evaluation.upper().startswith("SUCCESS"):
             status_manager.update_status(f"Successful (attempt {attempt}).")
