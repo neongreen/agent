@@ -28,6 +28,18 @@
           "title": "Judge-Extra-Prompt",
           "type": "string"
         },
+        "max-implementation-attempts": {
+          "default": 10,
+          "description": "Maximum number of attempts for the implementation phase.",
+          "title": "Max-Implementation-Attempts",
+          "type": "integer"
+        },
+        "max-consecutive-failures": {
+          "default": 3,
+          "description": "Maximum number of consecutive failures before giving up.",
+          "title": "Max-Consecutive-Failures",
+          "type": "integer"
+        },
         "completion": {
           "$ref": "#/$defs/ImplementCompletionConfig"
         }

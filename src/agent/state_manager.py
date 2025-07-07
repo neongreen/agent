@@ -1,11 +1,12 @@
 """Manages the reading and writing of the agent's operational state to a file."""
 
 import json
+from typing import Dict
 
-from .constants import STATE_FILE
+from .constants import STATE_FILE, TaskState
 
 
-def read_state() -> dict:
+def read_state() -> Dict[str, TaskState]:
     """
     Reads the current state from the state file.
 
@@ -15,15 +16,17 @@ def read_state() -> dict:
     if not STATE_FILE.exists():
         return {}
     with open(STATE_FILE, "r") as f:
-        return json.load(f)
+        raw_state = json.load(f)
+        return {task_id: TaskState.from_json(state_value) for task_id, state_value in raw_state.items()}
 
 
-def write_state(state: dict) -> None:
+def write_state(state: Dict[str, TaskState]) -> None:
     """
     Writes the current state to the state file.
 
     Args:
         state: The dictionary representing the agent's state to write.
     """
+    serializable_state = {task_id: task_state.to_json() for task_id, task_state in state.items()}
     with open(STATE_FILE, "w") as f:
-        json.dump(state, f, indent=4)
+        json.dump(serializable_state, f, indent=4)

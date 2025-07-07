@@ -52,6 +52,12 @@ class ImplementConfig(BaseModel):
 
     extra_prompt: str = Field(default="", description="Additional prompt for *implementing* the plan.")
     judge_extra_prompt: str = Field(default="", description="Additional prompt for *evaluating* the implementation.")
+    max_implementation_attempts: int = Field(
+        default=10, description="Maximum number of attempts for the implementation phase."
+    )
+    max_consecutive_failures: int = Field(
+        default=3, description="Maximum number of consecutive failures before giving up."
+    )
     completion: ImplementCompletionConfig = Field(
         default_factory=ImplementCompletionConfig,
         description="Configuration for the completion phase of implementation.",
