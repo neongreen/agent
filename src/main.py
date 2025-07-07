@@ -1,7 +1,6 @@
 import argparse
 import os
 import pprint
-import sys
 import tomllib
 from pathlib import Path
 
@@ -9,7 +8,7 @@ from pydantic import ValidationError
 
 from .config import AgentConfig, TomlConfig
 from .constants import AGENT_TEMP_DIR, STATE_FILE
-from .gemini_agent import choose_tasks, discover_tasks
+from .gemini_agent import set_llm_engine
 from .state_manager import write_state
 from .task_orchestrator import process_task
 from .ui import status_manager
@@ -30,15 +29,11 @@ def main() -> None:
         default=default_base_from_toml,
         help="Base branch, commit, or git specifier to switch to before creating a task branch (default: main or from .agent.toml)",
     )
-    parser.add_argument(
-        "--multi", action="store_true", help="Treat prompt as an instruction to find task, rather than a single task"
-    )
     parser.add_argument("--claude", action="store_true", help="Use Claude Code CLI instead of Gemini for LLM calls")
 
     args = parser.parse_args()
 
     # Set LLM engine if requested
-    from .gemini_agent import set_llm_engine
 
     if args.claude:
         set_llm_engine("claude")
@@ -95,20 +90,7 @@ def main() -> None:
         status_manager.init_status_bar()
         status_manager.set_phase("Agent initialized")
 
-        if args.multi:
-            # Find tasks
-            status_manager.set_phase("Discovering tasks")
-            log("Treating prompt as an instruction to discover tasks", message_type="thought", config=config)
-            tasks = discover_tasks(args.prompt, cwd)
-            if not tasks:
-                log("No tasks discovered", message_type="thought", config=config)
-                sys.exit(1)
-            selected_tasks = choose_tasks(tasks)
-            if not selected_tasks:
-                log("No tasks selected", message_type="thought", config=config)
-                sys.exit(0)
-        else:
-            selected_tasks = [args.prompt]
+        selected_tasks = [args.prompt]
 
         # Process each selected task
         for i, task in enumerate(selected_tasks, 1):

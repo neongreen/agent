@@ -6,7 +6,6 @@ This tool provides an agentic loop for processing tasks.
 
 ## Features
 
-- Task discovery from prompts or files
 - Iterative planning phase with Gemini approval
 - Iterative implementation phase with Gemini evaluation
 - Git branch management for each task
@@ -27,19 +26,6 @@ To process a single task, provide the task description as a prompt:
 uv run python -m src.main "Implement a new user authentication module"
 ```
 
-### Multi-Task Mode
-
-If your prompt contains multiple distinct tasks, you can use the `--multi` flag to have the agent discover and allow you to select tasks:
-```bash
-uv run python -m src.main "Refactor the database layer, then add a new API endpoint for user profiles."
-
-```bash
-uv run python -m src.main --multi "Refactor the database layer, then add a new API endpoint for user profiles."
-```
-
-The agent will list the discovered tasks and prompt you to select which ones to process.
-Each task will be processed in its own git branch starting from the specified base.
-Tasks are *parallel*, not sequential.
 
 ### Specifying Working Directory
 
