@@ -39,7 +39,17 @@ def log(
     message_human: Optional[str] = None,
     quiet=None,
 ) -> None:
-    """Simple logging function that respects quiet mode."""
+    """
+    Simple logging function that respects quiet mode.
+
+    Arguments:
+        message: The message to log to the log file.
+        message_type: The type of the message, used for formatting.
+        message_human: Optional human-readable message to display in the console. Should be formatted as Markdown.
+          If not provided, `message` will be used.
+        quiet: If provided, overrides the global quiet mode setting.
+    """
+
     if quiet is None:
         quiet = config.quiet_mode
 
@@ -90,9 +100,6 @@ def run(
         config: Agent configuration for logging settings.
     """
 
-    if description:
-        log(f"Executing: {description}", message_type=LLMOutputType.TOOL_EXECUTION)
-
     if status_message:
         status_manager.update_status(status_message)
 
@@ -110,7 +117,8 @@ def run(
 
     log(
         f"Running command: {command_display} in {abs_directory}",
-        message_human=f"Running command: {command_human_display} in {abs_directory}",
+        message_human=(description + "\n\n" if description else "")
+        + f"Running command: `{command_human_display}` in `{abs_directory}`",
         message_type=LLMOutputType.TOOL_EXECUTION,
     )
 
@@ -119,7 +127,16 @@ def run(
 
         if result.returncode != 0:
             log(
-                f"Command failed with exit code {result.returncode}\nStdout: {result.stdout}\nStderr: {result.stderr}",
+                f"Command {command_display} failed with exit code {result.returncode}\nStdout: {result.stdout}\nStderr: {result.stderr}",
+                message_human=(
+                    "\n\n".join(
+                        [
+                            f"Command `{command_human_display}` failed with exit code {result.returncode}",
+                            f"Stdout:\n\n```\n{result.stdout}\n```" if result.stdout.strip() else "Stdout: empty",
+                            f"Stderr:\n\n```\n{result.stderr}\n```" if result.stderr.strip() else "Stderr: empty",
+                        ]
+                    )
+                ),
                 message_type=LLMOutputType.TOOL_ERROR,
             )
 
@@ -151,23 +168,37 @@ def run(
 
 
 # TODO: this seems weird
-def format_tool_code_output(tool_output: RunResult) -> str:
+def format_tool_code_output(
+    tool_output: RunResult,
+    markdown_code_block: str | None = None,
+) -> str:
     """
     Formats the output of a tool code execution.
+
+    Args:
+        tool_output: The output of the tool execution as a RunResult.
+        markdown_code_block: If present, wraps the output in a Markdown code block with the specified language.
+          Used for human-readable output. Only applies to `stdout` and `stderr`.
     """
-    formatted_output = ""
-    if tool_output["stdout"] and tool_output["stdout"] != "(empty)":
-        formatted_output += f"stdout: {tool_output['stdout']}\n"
-    if tool_output["stderr"] and tool_output["stderr"] != "(empty)":
-        formatted_output += f"stderr: {tool_output['stderr']}\n"
+    formatted_output = []
+    if tool_output["stdout"] and tool_output["stdout"] != "":
+        if markdown_code_block:
+            formatted_output.append(f"stdout: \n\n```{markdown_code_block}\n{tool_output['stdout']}\n```\n")
+        else:
+            formatted_output.append(f"stdout: \n{tool_output['stdout']}\n")
+    if tool_output["stderr"] and tool_output["stderr"] != "":
+        if markdown_code_block:
+            formatted_output.append(f"stderr: \n\n```{markdown_code_block}\n{tool_output['stderr']}\n```\n")
+        else:
+            formatted_output.append(f"stderr: \n{tool_output['stderr']}\n")
     if tool_output["error"]:
-        formatted_output += f"error: {tool_output['error']}\n"
+        formatted_output.append(f"error: {tool_output['error']}\n")
     if tool_output["exit_code"] is not None:
-        formatted_output += f"exit_code: {tool_output['exit_code']}\n"
+        formatted_output.append(f"exit_code: {tool_output['exit_code']}\n")
     if tool_output["signal"] is not None:
-        formatted_output += f"signal: {tool_output['signal']}\n"
+        formatted_output.append(f"signal: {tool_output['signal']}\n")
     if tool_output["background_pids"]:
-        formatted_output += f"background_pids: {tool_output['background_pids']}\n"
+        formatted_output.append(f"background_pids: {tool_output['background_pids']}\n")
     if tool_output["process_group_pgid"] is not None:
-        formatted_output += f"process_group_pgid: {tool_output['process_group_pgid']}\n"
-    return formatted_output
+        formatted_output.append(f"process_group_pgid: {tool_output['process_group_pgid']}\n")
+    return "\n".join(formatted_output)

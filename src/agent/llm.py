@@ -76,7 +76,6 @@ class LLM:
             log(response, message_type=response_type)
             return response
         else:
-            log(f"Claude call failed: {result['stderr']}", message_type=LLMOutputType.TOOL_ERROR)
             return None
 
     def _run_codex(
@@ -128,7 +127,6 @@ class LLM:
                 log(response, message_type=response_type)
                 return response
             else:
-                log(f"Codex call failed: {result['stderr']}", message_type=LLMOutputType.TOOL_ERROR)
                 return None
 
     def _run_openrouter(
@@ -181,7 +179,6 @@ class LLM:
             log(response, message_type=response_type)
             return response
         else:
-            log(f"Gemini call failed: {result['stderr']}", message_type=LLMOutputType.TOOL_ERROR)
             return None
 
     def _run_opencode(
@@ -218,7 +215,6 @@ class LLM:
             log(content, message_type=response_type)
             return content
         else:
-            log(f"Opencode call failed: {result['stderr']}", message_type=LLMOutputType.TOOL_ERROR)
             return None
 
 
