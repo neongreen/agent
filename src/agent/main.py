@@ -17,25 +17,11 @@ from .cli_settings import CLISettings
 from .config import AGENT_SETTINGS as config
 from .constants import AGENT_TEMP_DIR
 from .llm import LLM
+from .output_formatter import LLMOutputType, display_task_summary
 from .state_manager import write_state
 from .task_orchestrator import process_task
 from .ui import status_manager
 from .utils import log
-
-
-def display_task_summary(task_results: list) -> None:
-    """Displays a summary of the processed tasks."""
-    log("\n--- Task Summary ---", message_type="thought")
-    for result in task_results:
-        log(f"Prompt: {result['prompt']}", message_type="thought")
-        log(f"Status: {result['status']}", message_type="thought")
-        if result["worktree"]:
-            log(f"Worktree: {result['worktree']}", message_type="thought")
-        if result["commit_hash"] != "N/A":
-            log(f"Commit: {result['commit_hash']}", message_type="thought")
-        if result["error"]:
-            log(f"Error: {result['error']}", message_type="tool_output_error")
-        log("--------------------", message_type="thought")
 
 
 def main() -> None:
@@ -86,7 +72,7 @@ def main() -> None:
 
     log(
         f"Configuration loaded:\n{config.model_dump_json(indent=2)}",
-        message_type="thought",
+        LLMOutputType.STATUS,
     )
 
     if [cli_settings.claude, cli_settings.codex, cli_settings.openrouter is not None].count(True) > 1:
@@ -110,7 +96,7 @@ def main() -> None:
 
     # Ensure the .agent directory exists
     if not AGENT_TEMP_DIR.exists():
-        log(f"Creating agent directory at {AGENT_TEMP_DIR}", message_type="thought")
+        log(f"Creating agent directory at {AGENT_TEMP_DIR}", message_type=LLMOutputType.STATUS)
         AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
     # XXX: Initialize state file if it doesn't exist.
@@ -123,20 +109,23 @@ def main() -> None:
     worktree_path = None
     # Worktree is enabled by default unless --no-worktree is specified
     if not cli_settings.no_worktree:
-        log("Temporary worktree mode enabled. Will create a git worktree for the task.", message_type="thought")
+        log(
+            "Temporary worktree mode enabled. Will create a git worktree for the task.",
+            LLMOutputType.STATUS,
+        )
         worktree_path = Path(tempfile.mkdtemp(prefix="agent_worktree_"))
         try:
             git_utils.add_worktree(worktree_path, rev=base, cwd=effective_cwd)
             work_dir = worktree_path
         except Exception as e:
-            log(f"Failed to create temporary worktree: {e}", message_type="tool_output_error")
+            log(f"Failed to create temporary worktree: {e}", LLMOutputType.TOOL_ERROR)
             exit(1)
     else:
         work_dir = effective_cwd
 
-    log(f"Using working directory: {work_dir}", message_type="thought")
+    log(f"Using working directory: {work_dir}", LLMOutputType.STATUS)
 
-    log("Starting agentic loop", message_type="thought")
+    log("Starting agentic loop", LLMOutputType.STATUS)
 
     try:
         status_manager.init_status_bar()
@@ -146,7 +135,7 @@ def main() -> None:
         task_results = []
 
         for i, task_prompt in enumerate(selected_tasks, 1):
-            log(f"Processing task {i}/{len(selected_tasks)}: '{task_prompt}'", message_type="thought")
+            log(f"Processing task {i}/{len(selected_tasks)}: '{task_prompt}'", LLMOutputType.STATUS)
             current_worktree_path: Path | None = None
             task_status = "Failed"
             task_commit_hash = "N/A"
@@ -164,7 +153,7 @@ def main() -> None:
                 task_commit_hash = git_utils.get_current_commit_hash(cwd=current_worktree_path)
             except Exception as e:
                 task_error = str(e)
-                log(f"Error processing task {i}: {e}", message_type="tool_output_error")
+                log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
             finally:
                 task_results.append(
                     {
@@ -184,10 +173,10 @@ def main() -> None:
                     except Exception as e:
                         log(
                             f"Error cleaning up temporary worktree {current_worktree_path}: {e}",
-                            message_type="tool_output_error",
+                            LLMOutputType.TOOL_ERROR,
                         )
 
-        log("Agentic loop completed")
+        log("Agentic loop completed", LLMOutputType.STATUS)
         status_manager.set_phase("Agentic loop completed")
         display_task_summary(task_results)
 

@@ -12,7 +12,7 @@ from rich.console import Console
 
 from .config import AGENT_SETTINGS as config
 from .constants import AGENT_TEMP_DIR
-from .output_formatter import LLMOutputType
+from .output_formatter import LLMOutputType, print_formatted_message
 from .ui import status_manager
 
 
@@ -31,34 +31,13 @@ def get_session_log_file_path() -> Path:
     return _session_log_file_path
 
 
-def _print_formatted(message, message_type: LLMOutputType | str = "default") -> None:
-    """
-    Prints a formatted message to the console based on message type.
-
-    Args:
-        message: The message string to print.
-        message_type: The type of message, which determines the formatting style.
-    """
-    style = ""
-    if message_type == "thought":
-        style = "dim"
-    elif message_type == "tool_code":
-        style = "cyan"
-    elif message_type == "tool_output_stdout":
-        style = "green"
-    elif message_type == "tool_output_stderr" or message_type == "tool_output_error":
-        style = "red"
-    elif message_type == "file_path":
-        style = "yellow"
-
-    console.print(message, style=style)
-
-
+# TODO: should we forbid using `print_formatted_message` directly and require `log` instead?
+# Probably yes.
 def log(
     message: str,
+    message_type: LLMOutputType,
     message_human: Optional[str] = None,
     quiet=None,
-    message_type: LLMOutputType | str = "default",
 ) -> None:
     """Simple logging function that respects quiet mode."""
     if quiet is None:
@@ -67,7 +46,7 @@ def log(
     log_entry = {"timestamp": datetime.datetime.now().isoformat(), "message": message}
 
     if not quiet:
-        _print_formatted(message_human or message, message_type=message_type)
+        print_formatted_message(message_human or message, message_type)
 
     session_log_file = get_session_log_file_path()
     if not session_log_file.exists():
@@ -112,7 +91,7 @@ def run(
     """
 
     if description:
-        log(f"Executing: {description}", message_type="tool_code")
+        log(f"Executing: {description}", message_type=LLMOutputType.TOOL_EXECUTION)
 
     if status_message:
         status_manager.update_status(status_message)
@@ -132,21 +111,19 @@ def run(
     log(
         f"Running command: {command_display} in {abs_directory}",
         message_human=f"Running command: {command_human_display} in {abs_directory}",
-        message_type="tool_code",
+        message_type=LLMOutputType.TOOL_EXECUTION,
     )
 
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=abs_directory, shell=shell)
 
         if result.returncode != 0:
-            log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error")
-            log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
+            log(
+                f"Command failed with exit code {result.returncode}\nStdout: {result.stdout}\nStderr: {result.stderr}",
+                message_type=LLMOutputType.TOOL_ERROR,
+            )
 
-        if log_stdout:
-            log(f"Stdout: {result.stdout or '<empty>'}", message_type="tool_output_stdout")
-
-        # Actually no need to log stderr on success
-        # log(f"Stderr: {result.stderr or '<empty>'}", message_type="tool_output_stderr")
+        # TODO: do we want to log success? or do we always log it later somewhere?
 
         return RunResult(
             exit_code=result.returncode,
@@ -160,7 +137,7 @@ def run(
         )
 
     except Exception as e:
-        log(f"Error running command: {e}", message_type="tool_output_error")
+        log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
         return RunResult(
             exit_code=-1,
             stdout="",
@@ -173,6 +150,7 @@ def run(
         )
 
 
+# TODO: this seems weird
 def format_tool_code_output(tool_output: RunResult) -> str:
     """
     Formats the output of a tool code execution.
