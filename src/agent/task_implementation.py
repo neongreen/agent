@@ -263,15 +263,10 @@ def implementation_phase(
     finally:
         try:
             diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=cwd)
-            if diff is not None and diff != 0:
+            if not diff["success"]:
                 run(["git", "add", "."], "Adding remaining files before final commit", directory=cwd)
                 run(
-                    [
-                        "git",
-                        "commit",
-                        "-m",
-                        "Final implementation commit (auto)",
-                    ],
+                    ["git", "commit", "-m", "Final commit (auto)"],
                     "Final commit after implementation phase",
                     directory=cwd,
                 )
