@@ -44,6 +44,9 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
                 'Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.'
             ).strip()
 
+        if config and config.plan_planner_extra_prompt:
+            plan_prompt += f"\n\n{config.plan_planner_extra_prompt}"
+
         status_manager.update_status(f"Getting plan from Gemini (round {round_num})...")
         current_plan = run_gemini(plan_prompt, yolo=True)
         if not current_plan:
@@ -58,8 +61,8 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
             "Respond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."
         )
 
-        if config and config.judge_extra_prompt:
-            review_prompt += f"\n\n{config.judge_extra_prompt}"
+        if config and config.plan_judge_extra_prompt:
+            review_prompt += f"\n\n{config.plan_judge_extra_prompt}"
 
         status_manager.update_status(f"Reviewing plan (round {round_num})...")
         current_review = run_gemini(review_prompt, yolo=True)
@@ -132,6 +135,9 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             "Your response will help the reviewer of your implementation understand the changes made.\n"
         ).strip()
 
+        if config and config.implement_extra_prompt:
+            impl_prompt += f"\n\n{config.implement_extra_prompt}"
+
         status_manager.update_status(f"Getting implementation from Gemini (attempt {attempt})...")
         implementation_summary = run_gemini(impl_prompt, yolo=True)
         if not implementation_summary:
@@ -158,6 +164,9 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             "Here is the diff of the changes made:\n\n"
             f"{run(['git', 'diff'], directory=cwd)['stdout']}"
         )
+
+        if config and config.implement_judge_extra_prompt:
+            eval_prompt += f"\n\n{config.implement_judge_extra_prompt}"
 
         status_manager.update_status(f"Evaluating implementation (attempt {attempt})...")
         evaluation = run_gemini(eval_prompt, yolo=True)
@@ -203,6 +212,10 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
                 "Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed."
                 "If 'CONTINUE', provide specific next steps to take, or objections to address."
             )
+
+            if config and config.implement_completion_judge_extra_prompt:
+                completion_prompt += f"\n\n{config.implement_completion_judge_extra_prompt}"
+
             completion_check = run_gemini(completion_prompt, yolo=True)
 
             if completion_check and completion_check.upper().startswith("COMPLETE"):

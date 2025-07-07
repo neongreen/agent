@@ -77,12 +77,33 @@ Sample `.agent.toml`:
 # If not set, `main` is used as the default.
 default-base = "HEAD"
 
+# If set to true, suppresses informational output from the agent.
+quiet-mode = false
+
 [plan]
 # Provides an additional prompt to the Gemini model during the plan review process.
 # This can be used to enforce specific rules or guidelines for plans.
 judge-extra-prompt = """
   You must reject the plan if it proposes writing tests.
 """
+
+# Provides an additional prompt to the Gemini model during the planning phase.
+# This can be used to guide the agent's planning process.
+planner-extra-prompt = ""
+
+[implement]
+# Provides an additional prompt to the Gemini model during the implementation phase.
+# This can be used to guide the agent's implementation process.
+extra-prompt = ""
+
+# Provides an additional prompt to the Gemini model during the implementation review process.
+# This can be used to enforce specific rules or guidelines for implementations.
+judge-extra-prompt = ""
+
+[implement.completion]
+# Provides an additional prompt to the Gemini model during the implementation completion review process.
+# This can be used to enforce specific rules or guidelines for completed implementations.
+judge-extra-prompt = ""
 ```
 
 ## License
