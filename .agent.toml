@@ -11,13 +11,14 @@ post-implementation-hook-command = """
 
 [plan]
 planner-extra-prompt = """
-  Please also include running 'uv run pyright --project .' to typecheck the project into your plan.
+  Note: do not propose writing tests, running automatic tests, or doing testing manually.
+  If you do, your plan will be rejected.
+  However, please include typechecking the code with `uv run pyright --project .` in your plan.
 """
 
 judge-extra-prompt = """
   You must reject the plan if:
     - The plan proposes writing tests.
-    - The plan proposes to remove unused imports (unless they are *preventing compilation*, rather than just being unused).
     - The plan proposes to run automatic tests or do testing manually, including "basic sanity checks" or "smoke testing".
       Note that linters or type checkers *are allowed*.
     - The plan proposes to run the agent tool itself (src/agent/main.py).
