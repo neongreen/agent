@@ -6,10 +6,9 @@ This tool provides an agentic loop for processing tasks.
 
 ## Features
 
-- Iterative planning phase with Gemini approval
-- Iterative implementation phase with Gemini evaluation
-- Git branch management for each task
-- Configurable via `.agent.toml`
+- Agentic loop
+- Judging stuff
+- Configurable
 
 ## Installation
 
@@ -30,7 +29,6 @@ To process a single task, provide the task description as a prompt:
 ```bash
 uvx git+https://github.com/neongreen/agent "Implement a new user authentication module"
 ```
-
 
 ### Specifying Working Directory
 
@@ -59,11 +57,23 @@ uvx git+https://github.com/neongreen/agent "Optimize image loading" --quiet
 ### Choosing LLM CLI
 
 By default, the agent uses the Gemini CLI for language model calls.
-To use the Claude Code CLI instead, pass the `--claude` flag:
+
+- `--claude` - Use Claude Code
+- `--codex` - Use [OpenAI Codex](https://github.com/openai/codex) CLI
+- `--openrouter MODEL` - Use OpenRouter (via Codex CLI) with the specified model
 
 ```bash
+# Use Claude Code
 uvx git+https://github.com/neongreen/agent --claude "Implement feature X"
+
+# Use OpenAI Codex; for some reason `codex` doesn't grab its own key from its own config when ran non-interactively
+OPENAI_API_KEY=$(jq -r .OPENAI_API_KEY ~/.codex/auth.json) uvx git+https://github.com/neongreen/agent --codex "Implement feature X"
+
+# Use OpenRouter with a specific model
+OPENROUTER_API_KEY=... uvx git+https://github.com/neongreen/agent --openrouter x-ai/grok-3 "Implement feature X"
 ```
+
+CLI tools must be installed beforehand.
 
 ## Configuration
 
