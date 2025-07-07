@@ -9,6 +9,7 @@ from .constants import STATE_FILE
 from .gemini_agent import choose_tasks, discover_tasks
 from .state_manager import write_state
 from .task_processor import process_task
+from .ui import status_manager
 from .utils import log
 
 
@@ -82,28 +83,37 @@ def main() -> None:
 
     log("Starting agentic loop", message_type="thought", config=agent_config)
 
-    if args.multi:
-        # Find tasks
-        log("Treating prompt as an instruction to discover tasks", message_type="thought", config=agent_config)
-        tasks = discover_tasks(args.prompt, cwd)
-        if not tasks:
-            log("No tasks discovered", message_type="thought", config=agent_config)
-            sys.exit(1)
-        selected_tasks = choose_tasks(tasks)
-        if not selected_tasks:
-            log("No tasks selected", message_type="thought", config=agent_config)
-            sys.exit(0)
-    else:
-        selected_tasks = [args.prompt]
+    try:
+        status_manager.init_status_bar()
+        status_manager.update_status("Agent initialized.")
 
-    # Process each selected task
-    for i, task in enumerate(selected_tasks, 1):
-        try:
-            process_task(task, i, args.base, cwd, agent_config)
-        except Exception as e:
-            log(f"Error processing task {i}: {e}", message_type="tool_output_error", config=agent_config)
+        if args.multi:
+            # Find tasks
+            status_manager.update_status("Discovering tasks...")
+            log("Treating prompt as an instruction to discover tasks", message_type="thought", config=agent_config)
+            tasks = discover_tasks(args.prompt, cwd)
+            if not tasks:
+                log("No tasks discovered", message_type="thought", config=agent_config)
+                sys.exit(1)
+            selected_tasks = choose_tasks(tasks)
+            if not selected_tasks:
+                log("No tasks selected", message_type="thought", config=agent_config)
+                sys.exit(0)
+        else:
+            selected_tasks = [args.prompt]
 
-    log("Agentic loop completed", config=agent_config)
+        # Process each selected task
+        for i, task in enumerate(selected_tasks, 1):
+            try:
+                process_task(task, i, args.base, cwd, agent_config)
+            except Exception as e:
+                log(f"Error processing task {i}: {e}", message_type="tool_output_error", config=agent_config)
+
+        log("Agentic loop completed", config=agent_config)
+        status_manager.update_status("Agentic loop completed.")
+
+    finally:
+        status_manager.cleanup_status_bar()
 
 
 if __name__ == "__main__":
