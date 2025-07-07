@@ -112,6 +112,7 @@ def main() -> None:
             exit(1)
     else:
         work_dir = effective_cwd
+    worktree_path = None
 
     log(f"Using working directory: {work_dir}", message_type="thought")
 

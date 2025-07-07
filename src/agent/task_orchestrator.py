@@ -2,7 +2,7 @@
 
 from .constants import PLAN_FILE, STATE_FILE, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
-from .output_formatter import print_formatted_message
+from .output_formatter import format_llm_thought, print_formatted_message
 from .state_manager import read_state, write_state
 from .task_implementation import implementation_phase
 from .task_planning import planning_phase
@@ -43,6 +43,7 @@ def process_task(
         format_llm_thought(f"Current state for {task_id}: {current_task_state()}"), message_type="thought"
     )
 
+    resolved_base_commit_sha = None
     # Set up branch
     if current_task_state() == TaskState.PLAN.value:
         # Resolve the base_branch to a commit SHA before setting up the task branch
@@ -61,6 +62,15 @@ def process_task(
             return False
         state[task_id] = TaskState.PLAN.value
         write_state(state)
+    elif current_task_state() == TaskState.IMPLEMENT.value or current_task_state() == TaskState.DONE.value:
+        resolved_base_commit_sha = resolve_commit_specifier(base_rev, cwd=cwd)
+        if not resolved_base_commit_sha:
+            print_formatted_message(
+                f"Failed to resolve base specifier: {base_rev} for resuming task", message_type="tool_output_error"
+            )
+            state[task_id] = TaskState.ABORT.value
+            write_state(state)
+            return False
     # Planning phase
     plan = None
     if current_task_state() == TaskState.PLAN.value:
@@ -94,6 +104,7 @@ def process_task(
     assert plan is not None, "Plan should not be None at this point"
     success = False
     if current_task_state() == TaskState.IMPLEMENT.value:
+        assert resolved_base_commit_sha is not None, "resolved_base_commit_sha should not be None at this point"
         success = implementation_phase(task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd)
         if success:
             if not has_tracked_diff(cwd=cwd):
