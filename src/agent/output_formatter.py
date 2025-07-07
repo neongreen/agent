@@ -1,5 +1,6 @@
 from rich.console import Console
 from rich.markdown import Markdown
+from rich.panel import Panel
 
 console = Console()
 
@@ -9,11 +10,11 @@ def print_formatted_message(message: str, message_type: str):
     Prints a formatted message to the console based on its type.
     """
     if message_type == "thought":
-        console.print(Markdown(f"# LLM Thought\n\n{message}", style="bold magenta"))
+        console.print(Panel(Markdown(message), title="LLM Thought", title_align="left", border_style="magenta"))
     elif message_type == "plan":
-        console.print(Markdown(f"# Proposed Plan\n\n{message}", style="bold green"))
+        console.print(Panel(Markdown(message), title="Proposed Plan", title_align="left", border_style="green"))
     elif message_type == "reviewer_feedback":
-        console.print(Markdown(f"# Reviewer Feedback\n\n{message}", style="bold yellow"))
+        console.print(Panel(Markdown(message), title="Reviewer Feedback", title_align="left", border_style="yellow"))
     else:
         console.print(message)
 
@@ -22,18 +23,14 @@ def format_llm_thought(thought_text: str) -> str:
     """
     Formats LLM thoughts for aesthetic output.
     """
-    return f"""```
-{thought_text}
-```"""
+    return thought_text
 
 
 def format_reviewer_feedback(feedback_text: str) -> str:
     """
     Formats reviewer feedback for aesthetic output.
     """
-    return f"""```
-{feedback_text}
-```"""
+    return feedback_text
 
 
 def format_plan(plan_text: str) -> str:
