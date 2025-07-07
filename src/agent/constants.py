@@ -1,5 +1,7 @@
 """Defines constants and enumerations used throughout the agent's codebase."""
 
+import uuid
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
@@ -14,8 +16,13 @@ class TaskState(Enum):
 
 
 # Constants
-AGENT_TEMP_DIR = Path(".agent")
-"""Base directory for agent-related temporary files."""
+AGENT_STATE_BASE_DIR = Path.home() / ".agent"
+"""Base directory for agent-related persistent files."""
+
+# Generate a unique session directory
+SESSION_ID = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + str(uuid.uuid4())
+AGENT_TEMP_DIR = AGENT_STATE_BASE_DIR / "sessions" / SESSION_ID
+"""Base directory for agent-related temporary files for the current session."""
 
 STATE_FILE = AGENT_TEMP_DIR / ".agent_state.json"
 """Path to the file storing the agent's current state."""
