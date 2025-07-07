@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Literal, Optional
 
-from .constants import AGENT_TEMP_DIR
+from .constants import AGENT_STATE_BASE_DIR, AGENT_TEMP_DIR
 from .ui import status_manager
 from .utils import log, run
 
@@ -215,9 +215,27 @@ def run_opencode(
     prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: Path, phase: Optional[str] = None
 ) -> Optional[str]:
     opencode_model = model or "github-copilot/gpt-4.1"
+
+    # We need a version with print mode:
+    # https://github.com/sst/opencode/pull/533
+
+    opencode_path = AGENT_STATE_BASE_DIR / "bin" / "opencode"
+    if not opencode_path.exists():
+        log(
+            f"Opencode CLI (custom version) not found at {opencode_path}. Please run 'mise run build-opencode'.",
+            message_type="error",
+        )
+        return None
+
+    # command = [str(opencode_path), "run", "--print", "--output-format=json", "--model", opencode_model, prompt]
+    command = [str(opencode_path), "run", "--print", "--model", opencode_model, prompt]
+
+    # Temporarily adding this for debug since opencode is new
+    log(f"Opencode command: {shlex.join(command)}", message_type="debug")
+
     # Opencode is always YOLO
-    command = ["opencode", "run", "--model", opencode_model, prompt]
     log(f"Opencode prompt: {prompt}", message_type="thought")
+
     result = run(
         command,
         phase or "Calling Opencode",
@@ -226,30 +244,25 @@ def run_opencode(
         status_message=phase or "Calling Opencode",
         log_stdout=False,
     )
-    # Temporarily adding this for debug since opencode is new
-    log(f"Opencode command: {shlex.join(command)}", message_type="debug")
-
-    # Opencode output looks like this:
-    #
-    # █▀▀█ █▀▀█ █▀▀ █▀▀▄ █▀▀ █▀▀█ █▀▀▄ █▀▀
-    # █░░█ █░░█ █▀▀ █░░█ █░░ █░░█ █░░█ █▀▀
-    # ▀▀▀▀ █▀▀▀ ▀▀▀ ▀  ▀ ▀▀▀ ▀▀▀▀ ▀▀▀  ▀▀▀
-    #
-    # >  generate five short branch names for task "add opencode in the readme"
-    #
-    # @  github-copilot/gpt-4.1
-    #
-    # add-opencode-readme
-    # opencode-readme-update
-    # readme-opencode-badge
-    # mention-opencode-readme
-    # doc-opencode-readme
 
     if result["success"]:
-        response = result["stdout"].split(f"@  {model}", maxsplit=1)[-1].strip()
+        # response_json = result["stdout"].strip()
+        # # TODO: check type, subtype, is_error
+        # try:
+        #     response: dict = json.loads(response_json)
+        #     content = response.get("result", "")
+        # except Exception as e:
+        #     log(f"Failed to parse Opencode response as JSON: {e}", message_type="tool_output_error")
+        #     return None
+        # status_manager.update_status("Successful.")
+        # log(f"Opencode response: {content}", message_type="thought")
+        # return content
+
+        response = result["stdout"].strip()
+        content = response.split("Text  ", maxsplit=1)[-1].strip()
         status_manager.update_status("Successful.")
-        log(f"Opencode response: {response}", message_type="thought")
-        return response
+        log(f"Opencode response: {content}", message_type="thought")
+        return content
     else:
         log(f"Opencode call failed: {result['stderr']}", message_type="tool_output_error")
         return None
