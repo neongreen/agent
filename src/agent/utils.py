@@ -11,7 +11,8 @@ from typing import Optional, TypedDict
 from rich.console import Console
 
 from .config import AGENT_SETTINGS as config
-from .constants import AGENT_TEMP_DIR, LLMOutputType
+from .constants import AGENT_TEMP_DIR
+from .output_formatter import LLMOutputType
 from .ui import status_manager
 
 
@@ -170,3 +171,25 @@ def run(
             background_pids=None,
             process_group_pgid=None,
         )
+
+
+def format_tool_code_output(tool_output: RunResult) -> str:
+    """
+    Formats the output of a tool code execution.
+    """
+    formatted_output = ""
+    if tool_output["stdout"] and tool_output["stdout"] != "(empty)":
+        formatted_output += f"stdout: {tool_output['stdout']}\n"
+    if tool_output["stderr"] and tool_output["stderr"] != "(empty)":
+        formatted_output += f"stderr: {tool_output['stderr']}\n"
+    if tool_output["error"]:
+        formatted_output += f"error: {tool_output['error']}\n"
+    if tool_output["exit_code"] is not None:
+        formatted_output += f"exit_code: {tool_output['exit_code']}\n"
+    if tool_output["signal"] is not None:
+        formatted_output += f"signal: {tool_output['signal']}\n"
+    if tool_output["background_pids"]:
+        formatted_output += f"background_pids: {tool_output['background_pids']}\n"
+    if tool_output["process_group_pgid"] is not None:
+        formatted_output += f"process_group_pgid: {tool_output['process_group_pgid']}\n"
+    return formatted_output

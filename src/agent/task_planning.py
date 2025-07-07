@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 from .config import AGENT_SETTINGS as config
-from .constants import PLAN_FILE, LLMOutputType
+from .constants import PLAN_FILE
 from .llm import LLM
-from .output_formatter import format_llm_thought, format_reviewer_feedback, print_formatted_message
+from .output_formatter import LLMOutputType, format_llm_thought, format_reviewer_feedback, print_formatted_message
 from .ui import status_manager
 from .utils import log
 

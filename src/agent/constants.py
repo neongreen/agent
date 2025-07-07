@@ -15,18 +15,6 @@ class TaskState(Enum):
     ABORT = "ABORT"
 
 
-class LLMOutputType(Enum):
-    """Represents the different types of LLM outputs."""
-
-    PLAN = "plan"
-    FEEDBACK = "feedback"
-    IMPLEMENTATION_JUDGE = "implementation_judge"
-    THOUGHT = "thought"
-    TOOL_CODE = "tool_code"
-    TOOL_OUTPUT = "tool_output"
-    TOOL_OUTPUT_ERROR = "tool_output_error"
-
-
 # Constants
 AGENT_STATE_BASE_DIR = Path.home() / ".agent"
 """Base directory for agent-related persistent files."""

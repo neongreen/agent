@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from .constants import PLAN_FILE, STATE_FILE, LLMOutputType, TaskState
+from .constants import PLAN_FILE, STATE_FILE, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
 from .llm import LLM
-from .output_formatter import format_llm_thought, print_formatted_message
+from .output_formatter import LLMOutputType, format_llm_thought, print_formatted_message
 from .state_manager import read_state, write_state
 from .task_implementation import implementation_phase
 from .task_planning import planning_phase

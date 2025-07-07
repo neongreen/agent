@@ -1,3 +1,5 @@
+from enum import Enum
+
 from rich.console import Console
 from rich.errors import MarkupError
 from rich.markdown import Markdown
@@ -5,8 +7,17 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from agent.constants import LLMOutputType
-from agent.utils import RunResult
+
+class LLMOutputType(Enum):
+    """Represents the different types of LLM outputs."""
+
+    PLAN = "plan"
+    FEEDBACK = "feedback"
+    IMPLEMENTATION_JUDGE = "implementation_judge"
+    THOUGHT = "thought"
+    TOOL_CODE = "tool_code"
+    TOOL_OUTPUT = "tool_output"
+    TOOL_OUTPUT_ERROR = "tool_output_error"
 
 
 console = Console()
@@ -77,25 +88,3 @@ def display_task_summary(task_results: list):
         table.add_row(prompt, status, worktree, commit_hash, error)
 
     console.print(table)
-
-
-def format_tool_code_output(tool_output: RunResult) -> str:
-    """
-    Formats the output of a tool code execution.
-    """
-    formatted_output = ""
-    if tool_output["stdout"] and tool_output["stdout"] != "(empty)":
-        formatted_output += f"stdout: {tool_output['stdout']}\n"
-    if tool_output["stderr"] and tool_output["stderr"] != "(empty)":
-        formatted_output += f"stderr: {tool_output['stderr']}\n"
-    if tool_output["error"]:
-        formatted_output += f"error: {tool_output['error']}\n"
-    if tool_output["exit_code"] is not None:
-        formatted_output += f"exit_code: {tool_output['exit_code']}\n"
-    if tool_output["signal"] is not None:
-        formatted_output += f"signal: {tool_output['signal']}\n"
-    if tool_output["background_pids"]:
-        formatted_output += f"background_pids: {tool_output['background_pids']}\n"
-    if tool_output["process_group_pgid"] is not None:
-        formatted_output += f"process_group_pgid: {tool_output['process_group_pgid']}\n"
-    return formatted_output
