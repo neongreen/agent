@@ -74,6 +74,8 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
             "  - REJECTED REJECTED REJECTED if the plan must be revised.\n"
             "If you approve the plan, provide a brief, one sentence comment on the plan.\n"
             "If you reject the plan, provide detailed feedback on what needs to be improved.\n"
+            "To remind you: you *must* output the *final* verdict in the first line of your response.\n"
+            "If you need to do any checks, do them before outputting the verdict.\n"
         )
 
         if config.plan.judge_extra_prompt:
