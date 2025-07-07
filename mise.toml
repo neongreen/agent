@@ -30,12 +30,15 @@ run = """
   jj x 'fd .py | xargs uvx --isolated autoimport'
 """
 
-[tasks.cleanup]
-run = [
-  "jj x 'ruff check --fix; ruff format'",
-  "jj abandon 'mutable() & empty()'",
-]
+# D213, D209 - format multiline docstrings
+[tasks.ruff-fix]
+run = """
+  jj x -r 'mutable()' '\
+    ruff check --fix --extend-select D213,D209 ; \
+    ruff format \
+  '"""
 
+description = "Run ruff to fix the Python files, including some fixes that are not linted"
 [tasks.clean-branches]
 description = "Remove all branches below main/dev"
 run = '''
