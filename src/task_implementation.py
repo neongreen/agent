@@ -119,12 +119,15 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
             # Check if task is complete
             status_manager.update_status("Checking if task is complete...")
             completion_prompt = (
-                f"Is the task {repr(task)} now complete based on the work done?"
-                "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done."
-                "The work has been done in the current git branch, and you can inspect the files, run commands, and check the diffs."
-                "You may not finish your response at 'I have to check ...' or 'I have to inspect files ...' - you must use your tools to check directly."
-                "Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed."
-                "If 'CONTINUE', provide specific next steps to take, or objections to address."
+                f"Is the task {repr(task)} now complete based on the work done?\n"
+                "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
+                "You may not finish your response at 'I have to check ...' or 'I have to inspect files ...' - you must use your tools to check directly.\n"
+                "Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed.\n"
+                "If 'CONTINUE', provide specific next steps to take, or objections to address.\n"
+                "Here are the uncommitted changes:\n\n"
+                f"{run(['git', 'diff', '--', ':!plan.md'], directory=cwd)['stdout']}\n\n"
+                "Here is the diff of the changes made in previous commits:\n\n"
+                f"{run(['git', 'diff', base_commit + '..HEAD', '--', ':!plan.md'], directory=cwd)['stdout']}"
             )
 
             if config and config.implement_completion_judge_extra_prompt:
