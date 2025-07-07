@@ -1,6 +1,7 @@
 [tools]
 python = "3.13.5"
 uv = "0.7.18"
+"pipx:ty" = "latest"
 
 [tasks.run]
 description = "Run the agent"
@@ -11,6 +12,10 @@ description = "Auto-add types to the Python files"
 run = [
   'jj x fd .py -x uv run --with=autotyping --isolated python -m autotyping {} --safe',
 ]
+
+[tasks.ty]
+description = "Run ty to check types in the Python files"
+run = "ty check"
 
 [tasks.autoimport]
 description = "Add missing imports to the Python files"

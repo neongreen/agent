@@ -93,13 +93,13 @@ def run(
         log(f"Stdout: {result.stdout}", message_type="tool_output_stdout", config=config)
         log(f"Stderr: {result.stderr}", message_type="tool_output_stderr", config=config)
 
-        return {
-            "exit_code": result.returncode,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "success": result.returncode == 0,
-        }
+        return RunResult(
+            exit_code=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            success=result.returncode == 0,
+        )
 
     except Exception as e:
         log(f"Error running command: {e}", message_type="tool_output_error", config=config)
-        return {"exit_code": -1, "stdout": "", "stderr": str(e), "success": False}
+        return RunResult(exit_code=-1, stdout="", stderr=str(e), success=False)
