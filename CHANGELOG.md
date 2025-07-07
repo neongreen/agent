@@ -2,6 +2,9 @@
 
 ## v0-2025.07.07
 
+Added:
+- Gemini: Tell the user whether `GEMINI_API_KEY` is set
+
 Fixed:
 - Better prompts for judge verdicts to work around GPT 4.1 issues
 - Miscellaneous logging fixes
