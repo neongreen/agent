@@ -46,6 +46,18 @@ By default, the agent will create task branches from `main`. You can specify a d
 uvx git+https://github.com/neongreen/agent "Add feature X" --base develop
 ```
 
+### Worktree Mode
+
+The agent uses Git worktrees by default for task implementations. This provides a clean, isolated environment for changes.
+
+To disable worktree mode, use the `--no-worktree` flag:
+
+```bash
+uvx git+https://github.com/neongreen/agent "Implement feature Y" --no-worktree
+```
+
+This will perform the work in the current directory (or in the `--cwd` directory if specified).
+
 ### Suppressing Output
 
 To suppress informational output from the agent, use the `--quiet` flag:

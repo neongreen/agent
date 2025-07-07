@@ -60,9 +60,9 @@ def main() -> None:
         help="Show the current configuration and exit",
     )
     parser.add_argument(
-        "--worktree",
+        "--no-worktree",
         action="store_true",
-        help="Create a git worktree in a temporary folder and perform work there.",
+        help="Work directly in the target directory rather than in a temporary Git worktree.",
     )
     parser.add_argument("prompt", nargs="*", help="Task(s) to do")
 
@@ -116,7 +116,8 @@ def main() -> None:
         args.base = config.default_base or "main"
 
     worktree_path = None
-    if args.worktree:
+    # Worktree is enabled by default unless --no-worktree is specified
+    if not args.no_worktree:
         log("Temporary worktree mode enabled. Will create a git worktree for the task.", message_type="thought")
         worktree_path = tempfile.mkdtemp(prefix="agent_worktree_")
         try:
