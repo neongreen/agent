@@ -23,6 +23,7 @@ def main() -> None:
     )
     parser.add_argument("--claude", action="store_true", help="Use Claude Code CLI instead of Gemini for LLM calls")
     parser.add_argument("--codex", action="store_true", help="Use Codex CLI instead of Gemini for LLM calls")
+    parser.add_argument("--openrouter", default=None, help="Use OpenRouter (via Codex); specify the model name")
     parser.add_argument(
         "--show-config",
         action="store_true",
@@ -50,13 +51,17 @@ def main() -> None:
         )
 
     # Set LLM engine if requested
-    if args.claude and args.codex:
-        parser.error("Cannot specify both --claude and --codex")
+    if [args.claude, args.codex, args.openrouter is not None].count(True) > 1:
+        parser.error("Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, or --openrouter.")
 
     if args.claude:
         set_llm_engine("claude")
     elif args.codex:
         set_llm_engine("codex")
+    elif args.openrouter is not None:
+        set_llm_engine("openrouter", model=args.openrouter)
+    else:
+        set_llm_engine("gemini")
 
     # Determine effective working directory
     effective_cwd = args.cwd if args.cwd else os.getcwd()
