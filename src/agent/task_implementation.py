@@ -1,8 +1,9 @@
 """Manages the iterative implementation phase of a task, including code generation, execution, and evaluation."""
 
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, TypedDict, assert_never
+from typing import Literal, Optional, assert_never
 
 from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE
@@ -10,11 +11,6 @@ from .llm import LLM, check_verdict
 from .output_formatter import LLMOutputType, print_formatted_message
 from .ui import status_manager
 from .utils import format_tool_code_output, log, run
-
-
-class ImplementationResult(TypedDict):
-    status: str
-    feedback: str
 
 
 class ImplementationVerdict(Enum):
@@ -96,6 +92,98 @@ def _evaluate_implementation(
     return verdict, evaluation
 
 
+@dataclass(frozen=True)
+class ImplementationPhaseResult:
+    status: Literal["complete", "in_progress", "failed", "interrupted", "incomplete"]
+    feedback: Optional[str] = None
+
+
+def _handle_successful_implementation(
+    llm: LLM,
+    task: str,
+    cwd: Path,
+    base_commit: str,
+) -> ImplementationPhaseResult:
+    # Generate commit message and commit
+    status_manager.update_status("Generating commit message")
+    commit_msg_prompt = (
+        f"Generate a concise commit message (max 15 words) for this implementation step: {repr(task)}.\n"
+        "You *may not* output Markdown, code blocks, or any other formatting.\n"
+        "You may only output a single line.\n"
+    )
+    commit_msg = llm.run(commit_msg_prompt, yolo=False, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
+    if not commit_msg:
+        commit_msg = "Implementation step for task"
+
+    status_manager.update_status("Committing implementation")
+    run(["git", "add", "."], "Adding implementation files", directory=cwd)
+    run(
+        ["git", "commit", "-m", f"{commit_msg[:100]}"],
+        "Committing implementation",
+        directory=cwd,
+    )
+
+    # Check if task is complete
+    status_manager.update_status("Checking if task is complete...")
+    completion_prompt = (
+        f"Is the task {repr(task)} now complete based on the work done?\n"
+        "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
+        "You may not finish your response at 'I have to check ...' or 'I have to inspect files ...' - you must use your tools to check directly.\n"
+        "The first line of your response must be:\n"
+        "  - COMPLETE COMPLETE COMPLETE if the task is fully done;\n"
+        "  - CONTINUE CONTINUE CONTINUE if more work is needed.\n"
+        "If 'continue', provide specific next steps to take, or objections to address.\n"
+        "Here are the uncommitted changes:\n\n"
+        f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
+        "Here is the diff of the changes made in previous commits:\n\n"
+        f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}"
+    )
+
+    if config.implement.completion.judge_extra_prompt:
+        completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
+
+    completion_evaluation = llm.run(completion_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION)
+    completion_verdict = check_verdict(TaskCompletionVerdict, completion_evaluation or "")
+
+    if not completion_evaluation:
+        status_manager.update_status("Failed to get a task completion evaluation.", style="red")
+        log("LLM provided no output", message_type=LLMOutputType.ERROR)
+        return ImplementationPhaseResult(
+            status="failed",
+            feedback="Failed to get a task completion evaluation",
+        )
+
+    elif not completion_verdict:
+        status_manager.update_status("Failed to get a task completion verdict.", style="red")
+        log(
+            f"Couldn't determine the verdict from the task completion evaluation. Evaluation was:\n\n{completion_evaluation}",
+            message_type=LLMOutputType.ERROR,
+        )
+        return ImplementationPhaseResult(
+            status="failed",
+            feedback="Couldn't determine the verdict from the task completion evaluation",
+        )
+
+    elif completion_verdict == TaskCompletionVerdict.COMPLETE:
+        status_manager.update_status("Task marked as complete.")
+        log("Task marked as complete", message_type=LLMOutputType.STATUS)
+        return ImplementationPhaseResult(
+            status="complete",
+            feedback=completion_evaluation,
+        )
+
+    elif completion_verdict == TaskCompletionVerdict.CONTINUE:
+        status_manager.update_status("Task not complete, continuing implementation.")
+        log("Task not complete, continuing implementation", message_type=LLMOutputType.STATUS)
+        return ImplementationPhaseResult(
+            status="in_progress",
+            feedback=completion_evaluation,
+        )
+
+    else:
+        assert_never(completion_verdict)
+
+
 def implementation_phase(
     *,
     task: str,
@@ -103,7 +191,7 @@ def implementation_phase(
     base_commit: str,
     cwd: Path,
     llm: LLM,
-) -> ImplementationResult:
+) -> ImplementationPhaseResult:
     """
     Manages the iterative implementation phase of a task.
 
@@ -164,7 +252,7 @@ def implementation_phase(
     commits_made = 0
 
     feedback: Optional[str] = None
-    result: Optional[ImplementationResult] = None
+    result: Optional[ImplementationPhaseResult] = None
     try:
         for attempt in range(1, max_implementation_attempts + 1):
             status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
@@ -186,10 +274,10 @@ def implementation_phase(
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
                     log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
-                    result = {
-                        "status": "failed",
-                        "feedback": "Too many consecutive failures to get implementation from Gemini",
-                    }
+                    result = ImplementationPhaseResult(
+                        status="failed",
+                        feedback="Too many consecutive failures to get an implementation",
+                    )
                     break
                 continue
 
@@ -209,23 +297,26 @@ def implementation_phase(
                 cwd=cwd,
             )
 
-            if not evaluation or verdict is None:
+            if not evaluation:
+                status_manager.update_status("Failed to get an evaluation.", style="red")
+                log("LLM provided no output", message_type=LLMOutputType.ERROR)
+
+            elif not verdict:
                 status_manager.update_status("Failed to get a verdict.", style="red")
-                if evaluation:
-                    log(
-                        f"Couldn't determine the verdict from the evaluation. Evaluation was:\n\n{evaluation}",
-                        message_type=LLMOutputType.ERROR,
-                    )
-                else:
-                    log("LLM provided no output", message_type=LLMOutputType.ERROR)
+                log(
+                    f"Couldn't determine the verdict from the evaluation. Evaluation was:\n\n{evaluation}",
+                    message_type=LLMOutputType.ERROR,
+                )
+
+            if not verdict or not evaluation:
                 consecutive_failures += 1
                 # If we have too many consecutive failures, give up and exit the loop
                 if consecutive_failures >= max_consecutive_failures:
                     log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
-                    result = {
-                        "status": "failed",
-                        "feedback": "Too many consecutive failures to get evaluation from Gemini",
-                    }
+                    result = ImplementationPhaseResult(
+                        status="failed",
+                        feedback="Too many consecutive failures to evaluate implementation",
+                    )
                     break
                 else:
                     # Ok let's try again, go back to the start of the loop
@@ -240,73 +331,17 @@ def implementation_phase(
                 consecutive_failures = 0
                 commits_made += 1
 
-                # Generate commit message and commit
-                status_manager.update_status("Generating commit message")
-                commit_msg_prompt = (
-                    f"Generate a concise commit message (max 15 words) for this implementation step: {repr(task)}.\n"
-                    "You *may not* output Markdown, code blocks, or any other formatting.\n"
-                    "You may only output a single line.\n"
+                completion_result = _handle_successful_implementation(
+                    llm=llm,
+                    task=task,
+                    cwd=cwd,
+                    base_commit=base_commit,
                 )
-                commit_msg = llm.run(commit_msg_prompt, yolo=False, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
-                if not commit_msg:
-                    commit_msg = "Implementation step for task"
-
-                status_manager.update_status("Committing implementation")
-                run(["git", "add", "."], "Adding implementation files", directory=cwd)
-                run(
-                    ["git", "commit", "-m", f"{commit_msg[:100]}"],
-                    "Committing implementation",
-                    directory=cwd,
-                )
-
-                # Check if task is complete
-                status_manager.update_status("Checking if task is complete...")
-                completion_prompt = (
-                    f"Is the task {repr(task)} now complete based on the work done?\n"
-                    "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
-                    "You may not finish your response at 'I have to check ...' or 'I have to inspect files ...' - you must use your tools to check directly.\n"
-                    "The first line of your response must be:\n"
-                    "  - COMPLETE COMPLETE COMPLETE if the task is fully done;\n"
-                    "  - CONTINUE CONTINUE CONTINUE if more work is needed.\n"
-                    "If 'continue', provide specific next steps to take, or objections to address.\n"
-                    "Here are the uncommitted changes:\n\n"
-                    f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
-                    "Here is the diff of the changes made in previous commits:\n\n"
-                    f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}"
-                )
-
-                if config.implement.completion.judge_extra_prompt:
-                    completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
-
-                completion_evaluation = llm.run(
-                    completion_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION
-                )
-                completion_verdict = check_verdict(TaskCompletionVerdict, completion_evaluation or "")
-
-                if not completion_evaluation:
-                    status_manager.update_status("Failed to get a task completion evaluation.", style="red")
-                    log("LLM provided no output", message_type=LLMOutputType.ERROR)
-
-                elif not completion_verdict:
-                    status_manager.update_status("Failed to get a task completion verdict.", style="red")
-                    log(
-                        f"Couldn't determine the verdict from the task completion evaluation. Evaluation was:\n\n{completion_evaluation}",
-                        message_type=LLMOutputType.ERROR,
-                    )
-
-                elif completion_verdict == TaskCompletionVerdict.COMPLETE:
-                    status_manager.update_status("Task marked as complete.")
-                    log("Task marked as complete", message_type=LLMOutputType.STATUS)
-                    result = {"status": "completed", "feedback": completion_evaluation}
+                if completion_result.status == "complete":
+                    result = completion_result
                     break
-
-                elif completion_verdict == TaskCompletionVerdict.CONTINUE:
-                    status_manager.update_status("Task not complete, continuing implementation.")
-                    log("Task not complete, continuing implementation", message_type=LLMOutputType.STATUS)
-                    feedback = completion_evaluation
-
                 else:
-                    assert_never(completion_verdict)
+                    feedback = completion_result.feedback
 
             elif verdict == ImplementationVerdict.PARTIAL:
                 status_manager.update_status(f"Partial progress (attempt {attempt}).")
@@ -318,7 +353,9 @@ def implementation_phase(
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
                     log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
-                    result = {"status": "failed", "feedback": "Too many consecutive failures in implementation"}
+                    result = ImplementationPhaseResult(
+                        status="failed", feedback="Too many consecutive failures in implementation"
+                    )
                     break
 
             else:
@@ -326,9 +363,12 @@ def implementation_phase(
                 assert_never(verdict)
 
             # Check if we've made no commits recently
-            if attempt >= 5 and commits_made == 0:
-                log("No commits made in 5 attempts, giving up", message_type=LLMOutputType.ERROR)
-                result = {"status": "failed", "feedback": "No commits made in 5 attempts"}
+            bailout_check_result = _check_bailout_conditions(
+                attempt, commits_made, consecutive_failures, max_consecutive_failures
+            )
+            if bailout_check_result.bailout:
+                log(bailout_check_result.reason, message_type=LLMOutputType.ERROR)
+                result = ImplementationPhaseResult(status="failed", feedback=bailout_check_result.reason)
                 break
         else:
             # If we exit the loop without breaking, it means we reached max attempts
@@ -337,26 +377,51 @@ def implementation_phase(
                 message_type=LLMOutputType.ERROR,
             )
             status_manager.update_status("Incomplete.", style="red")
-            return {"status": "incomplete", "feedback": "Implementation incomplete after maximum attempts"}
+            return ImplementationPhaseResult(
+                status="incomplete", feedback="Implementation incomplete after maximum attempts"
+            )
 
     except KeyboardInterrupt:
         log("Implementation interrupted by user (KeyboardInterrupt)", message_type=LLMOutputType.ERROR)
         status_manager.update_status("Interrupted by user.", style="red")
-        result = {"status": "interrupted", "feedback": "Implementation interrupted by user"}
+        result = ImplementationPhaseResult(status="interrupted", feedback="Implementation interrupted by user")
     except Exception as e:
         log(f"Implementation failed: {e}", message_type=LLMOutputType.ERROR)
         status_manager.update_status("Implementation failed.", style="red")
-        result = {"status": "failed", "feedback": str(e)}
+        result = ImplementationPhaseResult(status="failed", feedback=str(e))
     finally:
-        try:
-            diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=cwd)
-            if not diff["success"]:
-                run(["git", "add", "."], "Adding remaining files before final commit", directory=cwd)
-                run(
-                    ["git", "commit", "-m", "Final commit (auto)"],
-                    "Final commit after implementation phase",
-                    directory=cwd,
-                )
-        except Exception as e:
-            log(f"Failed to make final commit: {e}", message_type=LLMOutputType.TOOL_ERROR)
+        _perform_final_cleanup(cwd)
     return result
+
+
+@dataclass(frozen=True)
+class BailoutCheckResult:
+    bailout: bool
+    reason: str
+
+
+def _check_bailout_conditions(
+    attempt: int,
+    commits_made: int,
+    consecutive_failures: int,
+    max_consecutive_failures: int,
+) -> BailoutCheckResult:
+    if consecutive_failures >= max_consecutive_failures:
+        return BailoutCheckResult(bailout=True, reason="Too many consecutive failures, giving up")
+    if attempt >= 5 and commits_made == 0:
+        return BailoutCheckResult(bailout=True, reason="No commits made in 5 attempts, giving up")
+    return BailoutCheckResult(bailout=False, reason="")
+
+
+def _perform_final_cleanup(cwd: Path):
+    try:
+        diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=cwd)
+        if not diff["success"]:
+            run(["git", "add", "."], "Adding remaining files before final commit", directory=cwd)
+            run(
+                ["git", "commit", "-m", "Final commit (auto)"],
+                "Final commit after implementation phase",
+                directory=cwd,
+            )
+    except Exception as e:
+        log(f"Failed to make final commit: {e}", message_type=LLMOutputType.TOOL_ERROR)

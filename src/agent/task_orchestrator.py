@@ -7,7 +7,7 @@ from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_br
 from .llm import LLM
 from .output_formatter import LLMOutputType, print_formatted_message
 from .state_manager import read_state, write_state
-from .task_implementation import ImplementationResult, implementation_phase
+from .task_implementation import ImplementationPhaseResult, implementation_phase
 from .task_planning import planning_phase
 from .ui import status_manager
 from .utils import log
@@ -20,7 +20,7 @@ def process_task(
     base_rev: str,
     cwd: Path,
     llm: LLM,
-) -> ImplementationResult:
+) -> ImplementationPhaseResult:
     """
     Processes a single task through its planning and implementation phases.
 
@@ -58,14 +58,14 @@ def process_task(
             )
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return {"status": "failed", "feedback": "Failed to resolve base specifier"}
+            return ImplementationPhaseResult(status="failed", feedback="Failed to resolve base specifier")
 
         if not setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd, llm=llm):
             print_formatted_message("Failed to set up task branch", message_type=LLMOutputType.TOOL_ERROR)
             status_manager.update_status("Failed to set up task branch.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return {"status": "failed", "feedback": "Failed to set up task branch"}
+            return ImplementationPhaseResult(status="failed", feedback="Failed to set up task branch")
         state[task_id] = TaskState.PLAN.value
         write_state(state)
     elif current_task_state() == TaskState.IMPLEMENT.value or current_task_state() == TaskState.DONE.value:
@@ -77,7 +77,9 @@ def process_task(
             )
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return {"status": "failed", "feedback": f"Failed to resolve base specifier: {base_rev} for resuming task"}
+            return ImplementationPhaseResult(
+                status="failed", feedback=f"Failed to resolve base specifier: {base_rev} for resuming task"
+            )
     # Planning phase
     plan = None
     if current_task_state() == TaskState.PLAN.value:
@@ -87,7 +89,7 @@ def process_task(
             status_manager.update_status("Failed.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return {"status": "failed", "feedback": "Planning phase failed"}
+            return ImplementationPhaseResult(status="failed", feedback="Planning phase failed")
         state[task_id] = TaskState.IMPLEMENT.value
         write_state(state)
     elif current_task_state() == TaskState.IMPLEMENT.value or current_task_state() == TaskState.DONE.value:
@@ -103,15 +105,17 @@ def process_task(
             status_manager.update_status("No plan found for resuming.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
-            return {"status": "failed", "feedback": "No plan found for resuming"}
+            return ImplementationPhaseResult(status="failed", feedback="No plan found for resuming")
 
     # Implementation phase
     assert plan is not None, "Plan should not be None at this point"
-    result: ImplementationResult = {"status": "failed", "feedback": "Implementation not attempted"}
+    result: ImplementationPhaseResult = ImplementationPhaseResult(
+        status="failed", feedback="Implementation not attempted"
+    )
     if current_task_state() == TaskState.IMPLEMENT.value:
         assert resolved_base_commit_sha is not None, "resolved_base_commit_sha should not be None at this point"
         result = implementation_phase(task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd, llm=llm)
-        if result["status"] == "completed":
+        if result.status == "complete":
             if not has_tracked_diff(cwd=cwd):
                 print_formatted_message(
                     "No tracked changes after implementation, marking as DONE.",
@@ -132,9 +136,9 @@ def process_task(
             f"Task {task_num} already marked as DONE, skipping implementation.",
             message_type=LLMOutputType.STATUS,
         )
-        result = {"status": "completed", "feedback": "Task already marked as DONE"}
+        result = ImplementationPhaseResult(status="complete", feedback="Task already marked as DONE")
 
-    if result["status"] == "completed":
+    if result.status == "complete":
         print_formatted_message((f"Task {task_num} completed successfully"), message_type=LLMOutputType.STATUS)
         # Remove the agent state file after a task is done
         try:
