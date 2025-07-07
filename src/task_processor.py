@@ -111,7 +111,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
     return None
 
 
-def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = None) -> bool:
+def implementation_phase(task, plan, base_branch, cwd=None, config: Optional[AgentConfig] = None) -> bool:
     """Iterative implementation phase with early bailout."""
     status_manager.update_status(f"Starting implementation phase for task: {task}")
     log(f"Starting implementation phase for task: {task}", message_type="thought", config=config)
@@ -162,7 +162,7 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
             "Here is the summary of the implementation:\n\n"
             f"{implementation_summary}\n\n"
             "Here is the diff of the changes made:\n\n"
-            f"{run(['git', 'diff'], directory=cwd)['stdout']}"
+            f"{run(['git', 'diff', base_branch + '..HEAD'], directory=cwd)['stdout']}"
         )
 
         if config and config.implement_judge_extra_prompt:
@@ -311,7 +311,7 @@ def process_task(
     # Implementation phase
     success = False
     if current_task_state() == TaskState.IMPLEMENT.value:
-        success = implementation_phase(task, plan, cwd, config)
+        success = implementation_phase(task, plan, base_branch, cwd, config)
         if success:
             if not has_tracked_diff(cwd):
                 log("No tracked changes after implementation, marking as DONE.", message_type="thought")
