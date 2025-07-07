@@ -2,10 +2,21 @@
 python = "3.13.5"
 uv = "0.7.18"
 "pipx:ty" = "latest"
+taplo = "latest"
 
 [tasks.run]
 description = "Run the agent"
 run = "uv run agent"
+
+[tasks.check]
+description = "Run all checks on the Python files"
+depends = ["lint", "pyright", "check-schema"]
+
+[tasks.generate-schema]
+description = "Generate config.schema.json from Pydantic"
+run = "uv run scripts/generate_schema.py"
+
+# Cleanup / autofix
 
 [tasks.add-types]
 description = "Auto-add types to the Python files"
@@ -13,16 +24,8 @@ run = [
   'jj x fd .py -x uv run --with=autotyping --isolated python -m autotyping {} --safe',
 ]
 
-[tasks.pyright]
-description = "Run pyright to check types in the Python files"
-run = "uv run pyright --project ."
-
-[tasks.ty]
-description = "Run ty to check types in the Python files"
-run = "ty check"
-
 [tasks.autoimport]
-description = "Add missing imports to the Python files"
+description = "Add missing imports to the Python files, across all commits"
 run = """
   jj x 'fd .py | xargs uvx --isolated autoimport'
 """
@@ -38,3 +41,23 @@ description = "Remove all branches below main/dev"
 run = '''
   jj bookmark list -r '::(main|dev)' -T'self++"\n"' | grep -Ev '^(main|dev)$' | xargs jj bookmark delete
 '''
+
+# Checks
+
+[tasks.check-schema]
+description = "Check that the checked-in schema matches Pydantic and the current .agent.toml"
+run = ["uv run scripts/generate_schema.py --diff", "taplo validate .agent.toml"]
+
+[tasks.lint]
+description = "Run ruff to check the Python files"
+run = "ruff check"
+
+[tasks.pyright]
+description = "Run pyright to check types in the Python files"
+run = "uv run pyright --project ."
+
+# Misc
+
+[tasks.ty]
+description = "Run ty to check types in the Python files (doesn't fully work yet)"
+run = "ty check"

@@ -1,66 +1,95 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "TomlConfig",
-  "description": "Schema for the TOML configuration of the agent.",
-  "type": "object",
+  "$defs": {
+    "ImplementCompletionConfig": {
+      "description": "Configuration for the completion phase of implementation.",
+      "properties": {
+        "judge-extra-prompt": {
+          "default": "",
+          "description": "Additional instructions for *evaluating* whether the implementation is complete. This phase determines if the agent has successfully implemented the task.",
+          "title": "Judge-Extra-Prompt",
+          "type": "string"
+        }
+      },
+      "title": "ImplementCompletionConfig",
+      "type": "object"
+    },
+    "ImplementConfig": {
+      "description": "Configuration for the implementation phase of the agent.",
+      "properties": {
+        "extra-prompt": {
+          "default": "",
+          "description": "Additional prompt for *implementing* the plan.",
+          "title": "Extra-Prompt",
+          "type": "string"
+        },
+        "judge-extra-prompt": {
+          "default": "",
+          "description": "Additional prompt for *evaluating* the implementation.",
+          "title": "Judge-Extra-Prompt",
+          "type": "string"
+        },
+        "completion": {
+          "$ref": "#/$defs/ImplementCompletionConfig"
+        }
+      },
+      "title": "ImplementConfig",
+      "type": "object"
+    },
+    "PlanConfig": {
+      "description": "Configuration for the planning phase of the agent.",
+      "properties": {
+        "planner-extra-prompt": {
+          "default": "",
+          "description": "Additional instructions for *generating* the plan.",
+          "title": "Planner-Extra-Prompt",
+          "type": "string"
+        },
+        "judge-extra-prompt": {
+          "default": "",
+          "description": "Additional instructions for *evaluating* the plan.",
+          "title": "Judge-Extra-Prompt",
+          "type": "string"
+        }
+      },
+      "title": "PlanConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "AgentSettings defines the configuration for the agent.",
   "properties": {
+    "default-base": {
+      "default": "main",
+      "description": "Default base branch, commit, or git specifier to switch to before creating a task branch",
+      "title": "Default-Base",
+      "type": "string"
+    },
+    "quiet-mode": {
+      "default": false,
+      "description": "Suppress informational output",
+      "title": "Quiet-Mode",
+      "type": "boolean"
+    },
+    "plan": {
+      "$ref": "#/$defs/PlanConfig",
+      "description": "Configuration for the planning phase."
+    },
+    "implement": {
+      "$ref": "#/$defs/ImplementConfig",
+      "description": "Configuration for the implementation phase."
+    },
+    "post-implementation-hook-command": {
+      "default": "",
+      "description": "Shell command to run after each implementation step, e.g. 'ruff format'",
+      "title": "Post-Implementation-Hook-Command",
+      "type": "string"
+    },
     "$schema": {
       "type": "string",
       "description": "The schema URL for validation."
-    },
-    "default-base": {
-    "type": "string",
-      "description": "The default base for the agent."
-    },
-    "quiet-mode": {
-      "type": "boolean",
-      "description": "Whether the agent should run in quiet mode."
-    },
-    "plan": {
-      "type": "object",
-      "description": "Configuration for the planning phase.",
-      "properties": {
-        "judge-extra-prompt": {
-          "type": "string",
-          "description": "Extra prompt for the judge in the planning phase."
-        },
-        "planner-extra-prompt": {
-          "type": "string",
-          "description": "Extra prompt for the planner in the planning phase."
-        }
-      },
-      "additionalProperties": false
-    },
-    "implement": {
-      "type": "object",
-      "description": "Configuration for the implementation phase.",
-      "properties": {
-        "extra-prompt": {
-          "type": "string",
-          "description": "Extra prompt for the implementation phase."
-        },
-        "judge-extra-prompt": {
-          "type": "string",
-          "description": "Extra prompt for the judge in the implementation phase."
-        },
-        "completion": {
-          "type": "object",
-          "description": "Configuration for the implementation completion phase.",
-          "properties": {
-            "judge-extra-prompt": {
-              "type": "string",
-              "description": "Extra prompt for the judge in the implementation completion phase."
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    "post-implementation-hook-command": {
-    "type": "string",
-      "description": "Command to execute after each implementation phase."
     }
   },
-  "additionalProperties": false
+  "title": "AgentSettings",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
 }
