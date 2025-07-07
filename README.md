@@ -13,13 +13,13 @@ This tool provides an agentic loop for processing tasks.
 
 ## Installation
 
-Install `uv`.
+Install `uv`, then:
 
-Then run:
-
-```sh
+```bash
 uvx git+https://github.com/neongreen/agent
 ```
+
+This runs the agent from the latest commit on the `main` branch of the repository.
 
 ## Usage
 
@@ -28,7 +28,7 @@ uvx git+https://github.com/neongreen/agent
 To process a single task, provide the task description as a prompt:
 
 ```bash
-uv run python -m src.main "Implement a new user authentication module"
+uvx git+https://github.com/neongreen/agent "Implement a new user authentication module"
 ```
 
 
@@ -37,7 +37,7 @@ uv run python -m src.main "Implement a new user authentication module"
 You can specify a different working directory for the agent to operate in using the `--cwd` flag:
 
 ```bash
-uv run python -m src.main "Fix bug in login flow" --cwd /path/to/your/project
+uvx git+https://github.com/neongreen/agent "Fix bug in login flow" --cwd /path/to/your/project
 ```
 
 ### Specifying Base Branch
@@ -45,7 +45,7 @@ uv run python -m src.main "Fix bug in login flow" --cwd /path/to/your/project
 By default, the agent will create task branches from `main`. You can specify a different base branch, commit, or git specifier using the `--base` flag:
 
 ```bash
-uv run python -m src.main "Add feature X" --base develop
+uvx git+https://github.com/neongreen/agent "Add feature X" --base develop
 ```
 
 ### Suppressing Output
@@ -53,7 +53,7 @@ uv run python -m src.main "Add feature X" --base develop
 To suppress informational output from the agent, use the `--quiet` flag:
 
 ```bash
-uv run python -m src.main "Optimize image loading" --quiet
+uvx git+https://github.com/neongreen/agent "Optimize image loading" --quiet
 ```
 
 ### Choosing LLM CLI
@@ -62,30 +62,8 @@ By default, the agent uses the Gemini CLI for language model calls.
 To use the Claude Code CLI instead, pass the `--claude` flag:
 
 ```bash
-uv run python -m src.main --claude "Implement feature X"
+uvx git+https://github.com/neongreen/agent --claude "Implement feature X"
 ```
-### Run from GitHub via uv
-
-You can run the agent directly from a remote GitHub repository without cloning it locally using the `--project` option.
-
-```bash
-uv run --project https://github.com/<ORG>/<REPO>.git[@<ref>] [--directory <subdirectory>] -- python -m <ENTRYPOINT>
-```
-
-- `@<ref>` (optional) can be a branch name, tag, or commit SHA. Defaults to `main` if omitted.
-- `--directory <subdirectory>` (optional) specifies a subdirectory within the repository containing the project. Defaults to the repository root.
-- The `--` separates uv options from the command to run.
-
-For example, to run this agent directly from GitHub's `main` branch:
-
-```bash
-uv run --project https://github.com/your-org/agent.git -- python -m src.main
-```
-
-> **Prerequisites:**
->
-- You must have `uv` (version >= 0.7.x) installed.
-- The first run will download the repository and may take a few moments.
 
 ## Configuration
 
@@ -136,6 +114,10 @@ judge-extra-prompt = ""
 # This can be used to enforce specific rules or guidelines for completed implementations.
 judge-extra-prompt = ""
 ```
+
+## Dev notes
+
+To run from source locally, get Mise and then `mise run run` will run the agent.
 
 ## License
 
