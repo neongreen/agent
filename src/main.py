@@ -6,6 +6,7 @@ import re
 import shlex
 import subprocess
 import sys
+import textwrap
 import tomllib
 from enum import Enum
 from pathlib import Path
@@ -32,6 +33,11 @@ def _print_formatted(message, message_type="default", indent_level=0) -> None:
     color = ""
     if message_type == "thought":
         color = COLOR_GRAY
+        # Apply word wrapping for thought messages
+        terminal_width = os.get_terminal_size().columns
+        # Adjust wrap_width based on indent_level
+        wrap_width = terminal_width - len(indent)
+        message = textwrap.fill(message, width=wrap_width, subsequent_indent=indent)
     elif message_type == "tool_code":
         color = COLOR_CYAN
     elif message_type == "tool_output_stdout":
