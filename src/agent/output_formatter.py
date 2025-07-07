@@ -1,6 +1,8 @@
 from rich.console import Console
+from rich.errors import MarkupError
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.text import Text
 
 console = Console()
 
@@ -9,14 +11,19 @@ def print_formatted_message(message: str, message_type: str):
     """
     Prints a formatted message to the console based on its type.
     """
-    if message_type == "thought":
-        console.print(Panel(Markdown(message), title="LLM Thought", title_align="left", border_style="magenta"))
-    elif message_type == "plan":
-        console.print(Panel(Markdown(message), title="Proposed Plan", title_align="left", border_style="green"))
-    elif message_type == "reviewer_feedback":
-        console.print(Panel(Markdown(message), title="Reviewer Feedback", title_align="left", border_style="yellow"))
-    else:
-        console.print(message)
+    try:
+        if message_type == "thought":
+            console.print(Panel(Markdown(message), title="LLM Thought", title_align="left", border_style="magenta"))
+        elif message_type == "plan":
+            console.print(Panel(Markdown(message), title="Proposed Plan", title_align="left", border_style="green"))
+        elif message_type == "reviewer_feedback":
+            console.print(
+                Panel(Markdown(message), title="Reviewer Feedback", title_align="left", border_style="yellow")
+            )
+        else:
+            console.print(message)
+    except MarkupError:
+        console.print(Text.from_markup(message).plain)
 
 
 def format_llm_thought(thought_text: str) -> str:
