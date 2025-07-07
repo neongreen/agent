@@ -3,7 +3,7 @@ Configuration management for the agent.
 
 This module defines the data structures and logic for managing agent settings,
 including plan and implementation configurations, and handles loading settings
-from TOML files and environment variables.
+from TOML files.
 """
 
 from typing import Any
@@ -23,8 +23,8 @@ kebab_alias_generator = AliasGenerator(
 class PlanConfig(BaseModel):
     """Configuration for the planning phase of the agent."""
 
-    judge_extra_prompt: str = Field(default="")
-    planner_extra_prompt: str = Field(default="")
+    planner_extra_prompt: str = Field(default="", description="Additional instructions for *generating* the plan.")
+    judge_extra_prompt: str = Field(default="", description="Additional instructions for *evaluating* the plan.")
 
     model_config = SettingsConfigDict(
         alias_generator=kebab_alias_generator,
@@ -35,7 +35,11 @@ class PlanConfig(BaseModel):
 class ImplementCompletionConfig(BaseModel):
     """Configuration for the completion phase of implementation."""
 
-    judge_extra_prompt: str = Field(default="")
+    judge_extra_prompt: str = Field(
+        default="",
+        # TODO: what is 'complete' really? what is the completion phase?
+        description="Additional instructions for *evaluating* whether the implementation is complete.",
+    )
 
     model_config = SettingsConfigDict(
         alias_generator=kebab_alias_generator,
@@ -46,9 +50,12 @@ class ImplementCompletionConfig(BaseModel):
 class ImplementConfig(BaseModel):
     """Configuration for the implementation phase of the agent."""
 
-    extra_prompt: str = Field(default="")
-    judge_extra_prompt: str = Field(default="")
-    completion: ImplementCompletionConfig = ImplementCompletionConfig()
+    extra_prompt: str = Field(default="", description="Additional prompt for *implementing* the plan.")
+    judge_extra_prompt: str = Field(default="", description="Additional prompt for *evaluating* the implementation.")
+    completion: ImplementCompletionConfig = Field(
+        default_factory=ImplementCompletionConfig,
+        description="Configuration for the completion phase of implementation.",
+    )
 
     model_config = SettingsConfigDict(
         alias_generator=kebab_alias_generator,
@@ -66,8 +73,10 @@ class AgentSettings(BaseSettings):
         description="Default base branch, commit, or git specifier to switch to before creating a task branch",
     )
     quiet_mode: bool = Field(default=False, description="Suppress informational output")
-    plan: PlanConfig = Field(default_factory=PlanConfig)
-    implement: ImplementConfig = Field(default_factory=ImplementConfig)
+    plan: PlanConfig = Field(default_factory=PlanConfig, description="Configuration for the planning phase.")
+    implement: ImplementConfig = Field(
+        default_factory=ImplementConfig, description="Configuration for the implementation phase."
+    )
     post_implementation_hook_command: str = Field(
         default="",
         description="Shell command to run after each implementation step, e.g. 'ruff format'",
@@ -106,9 +115,6 @@ class AgentSettings(BaseSettings):
         1. TOML file ('.agent.toml')
         2. Default values
         """
-        # Settings priority:
-        # 1. TOML file (config.toml)
-        # 2. Default values
         return TomlConfigSettingsSource(settings_cls), init_settings
 
 
