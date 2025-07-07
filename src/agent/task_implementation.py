@@ -58,6 +58,39 @@ def _get_implementation_summary(
     return llm.run(impl_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
 
 
+def _get_and_process_implementation_summary(
+    llm: LLM,
+    task: str,
+    attempt: int,
+    max_implementation_attempts: int,
+    plan: str,
+    feedback: Optional[str],
+    cwd: Path,
+) -> Optional[str]:
+    implementation_summary = _get_implementation_summary(
+        llm=llm,
+        task=task,
+        attempt=attempt,
+        max_implementation_attempts=max_implementation_attempts,
+        plan=plan,
+        feedback=feedback,
+        cwd=cwd,
+    )
+    if not implementation_summary:
+        status_manager.update_status("Failed to get implementation.", style="red")
+        log("Failed to get implementation", message_type=LLMOutputType.ERROR)
+        return None
+
+    if config.post_implementation_hook_command:
+        run(
+            config.post_implementation_hook_command,
+            "Running post-implementation hook command",
+            directory=cwd,
+            shell=True,
+        )
+    return implementation_summary
+
+
 def _evaluate_implementation(
     llm: LLM,
     task: str,
@@ -234,11 +267,31 @@ def implementation_phase(
 
     Finally, a cleanup step attempts to commit any remaining uncommitted changes.
 
+    **LLM Interactions:**
+    - **Implementation Summary Generation:** The `_get_implementation_summary` function
+      prompts the LLM to generate a summary of the implementation steps taken. This
+      is a free-form response from the LLM, intended to describe the changes it made.
+    - **Implementation Evaluation:** The `_evaluate_implementation` function prompts
+      the LLM to evaluate the generated implementation. The LLM is expected to
+      return a specific verdict (SUCCESS, PARTIAL, FAILURE) and provide feedback
+      based on the current state of the repository (uncommitted changes and
+      previous commits). This is a structured response that is parsed to determine
+      the next steps.
+    - **Commit Message Generation:** When an implementation step is successful, the
+      LLM is prompted to generate a concise commit message using `_handle_successful_implementation`.
+      This is a single-line, free-form response.
+    - **Task Completion Check:** After a successful implementation and commit, the
+      `_handle_successful_implementation` function prompts the LLM to determine
+      if the overall task is complete. The LLM is expected to return a specific
+      verdict (COMPLETE, CONTINUE) and provide reasoning. This is a structured
+      response that dictates whether the implementation phase should end or continue.
+
     Args:
         task: The description of the task being implemented.
         plan: The implementation plan generated in the planning phase.
         base_commit: The Git commit SHA to base the implementation branch on.
         cwd: The current working directory for task execution as a Path.
+        llm: The LLM instance to use for interactions.
 
     Returns:
         A dictionary containing the status of the implementation and any feedback.
@@ -258,7 +311,7 @@ def implementation_phase(
             status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
             print_formatted_message(f"Implementation attempt {attempt}", message_type=LLMOutputType.STATUS)
 
-            implementation_summary = _get_implementation_summary(
+            implementation_summary = _get_and_process_implementation_summary(
                 llm=llm,
                 task=task,
                 attempt=attempt,
@@ -269,8 +322,6 @@ def implementation_phase(
             )
 
             if not implementation_summary:
-                status_manager.update_status("Failed to get implementation.", style="red")
-                log("Failed to get implementation", message_type=LLMOutputType.ERROR)
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
                     log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
@@ -280,14 +331,6 @@ def implementation_phase(
                     )
                     break
                 continue
-
-            if config.post_implementation_hook_command:
-                run(
-                    config.post_implementation_hook_command,
-                    "Running post-implementation hook command",
-                    directory=cwd,
-                    shell=True,
-                )
 
             verdict, evaluation = _evaluate_implementation(
                 llm=llm,
