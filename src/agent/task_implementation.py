@@ -128,6 +128,7 @@ def implementation_phase(
                 return {"status": "failed", "feedback": "Too many consecutive failures to get evaluation from Gemini"}
             continue
 
+        print_formatted_message(evaluation, message_type=LLMOutputType.IMPLEMENTATION_JUDGE)
         feedback = evaluation  # Store feedback for next iteration
 
         if evaluation.upper().startswith("SUCCESS"):

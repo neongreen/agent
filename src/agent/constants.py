@@ -20,6 +20,7 @@ class LLMOutputType(Enum):
 
     PLAN = "plan"
     FEEDBACK = "feedback"
+    IMPLEMENTATION_JUDGE = "implementation_judge"
     THOUGHT = "thought"
     TOOL_CODE = "tool_code"
     TOOL_OUTPUT = "tool_output"

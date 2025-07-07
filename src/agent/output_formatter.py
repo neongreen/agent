@@ -25,6 +25,10 @@ def print_formatted_message(message: str, message_type: LLMOutputType):
             console.print(
                 Panel(Markdown(message), title="Reviewer Feedback", title_align="left", border_style="yellow")
             )
+        elif message_type == LLMOutputType.IMPLEMENTATION_JUDGE:
+            console.print(
+                Panel(Markdown(message), title="Implementation Judge Feedback", title_align="left", border_style="blue")
+            )
         else:
             console.print(message)
     except MarkupError:
