@@ -182,7 +182,13 @@ def choose_tasks(tasks):
 
     while True:
         try:
-            selected_input = input("Enter task numbers (space/comma separated) or 'q' to quit: ").strip()
+            if len(tasks) == 1:
+                selected_input = input("Press Enter to select this task, or 'q' to quit: ").strip()
+                if selected_input == "":
+                    return [tasks[0]]
+            else:
+                selected_input = input("Enter task numbers (space/comma separated) or 'q' to quit: ").strip()
+
             if selected_input.lower() == "q":
                 return []
 
