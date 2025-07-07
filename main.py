@@ -12,6 +12,25 @@ LOG_FILE = ".agentic-log"
 QUIET_MODE = False
 
 
+def generate_unique_branch_name(base_name, cwd=None):
+    """Generates a unique branch name by appending a numerical suffix if necessary."""
+    existing_branches_result = run(["git", "branch", "--list"], "Listing existing branches", directory=cwd)
+    if not existing_branches_result["success"]:
+        log("Failed to list existing branches.")
+        return None
+
+    existing_branches = [
+        line.strip().replace("* ", "") for line in existing_branches_result["stdout"].split("\n") if line.strip()
+    ]
+
+    new_branch_name = base_name
+    counter = 1
+    while new_branch_name in existing_branches:
+        new_branch_name = f"{base_name}-{counter}"
+        counter += 1
+    return new_branch_name
+
+
 def log(message, quiet=None) -> None:
     """Simple logging function that respects quiet mode."""
     if quiet is None:
@@ -176,7 +195,10 @@ def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
         return False
 
     # Create and switch to task branch
-    branch_name = f"task-{task_num}"
+    base_branch_name = f"task-{task_num}"
+    branch_name = generate_unique_branch_name(base_branch_name, cwd)
+    if not branch_name:
+        return False
     result = run(["git", "switch", "-c", branch_name], f"Creating task branch {branch_name}", directory=cwd)
 
     if not result["success"]:
