@@ -143,7 +143,9 @@ def run(
 
         if log_stdout:
             log(f"Stdout: {result.stdout or '<empty>'}", message_type="tool_output_stdout")
-        log(f"Stderr: {result.stderr or '<empty>'}", message_type="tool_output_stderr")
+
+        # Actually no need to log stderr on success
+        # log(f"Stderr: {result.stderr or '<empty>'}", message_type="tool_output_stderr")
 
         return RunResult(
             exit_code=result.returncode,

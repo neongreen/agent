@@ -55,6 +55,7 @@ def main() -> None:
     parser.add_argument("--claude", action="store_true", help="Use Claude Code CLI instead of Gemini for LLM calls")
     parser.add_argument("--codex", action="store_true", help="Use Codex CLI instead of Gemini for LLM calls")
     parser.add_argument("--openrouter", default=None, help="Use OpenRouter (via Codex); specify the model name")
+    parser.add_argument("--opencode", action="store_true", help="Use Opencode CLI instead of Gemini for LLM calls")
     parser.add_argument(
         "--show-config",
         action="store_true",
@@ -97,6 +98,8 @@ def main() -> None:
         set_llm_engine("codex")
     elif args.openrouter is not None:
         set_llm_engine("openrouter", model=args.openrouter)
+    elif args.opencode:
+        set_llm_engine("opencode")
     else:
         set_llm_engine("gemini")
 

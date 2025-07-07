@@ -3,6 +3,7 @@ python = "3.13.5"
 uv = "0.7.18"
 "pipx:ty" = "latest"
 taplo = "latest"
+"npm:opencode-ai" = "0.1.194"
 
 [tasks.run]
 description = "Run the agent"

@@ -73,6 +73,7 @@ By default, the agent uses the Gemini CLI for language model calls.
 - `--claude` - Use Claude Code
 - `--codex` - Use [OpenAI Codex](https://github.com/openai/codex) CLI
 - `--openrouter MODEL` - Use OpenRouter (via Codex CLI) with the specified model
+- `--opencode` - Use [Opencode CLI](https://opencode.ai) for LLM calls (uses `github-copilot/gpt-4.1` by default)
 
 ```bash
 # Use Claude Code
@@ -83,6 +84,9 @@ OPENAI_API_KEY=$(jq -r .OPENAI_API_KEY ~/.codex/auth.json) uvx git+https://githu
 
 # Use OpenRouter with a specific model
 OPENROUTER_API_KEY=... uvx git+https://github.com/neongreen/agent --openrouter x-ai/grok-3 "Implement feature X"
+
+# Use Opencode CLI (uses github-copilot/gpt-4.1 by default)
+uvx git+https://github.com/neongreen/agent --opencode "Implement feature X"
 ```
 
 CLI tools must be installed beforehand.

@@ -6,6 +6,7 @@ Claude, Codex, OpenRouter, and Gemini CLIs.
 """
 
 import os
+import shlex
 import tempfile
 from pathlib import Path
 from typing import Literal, Optional
@@ -21,7 +22,9 @@ LLM_MODEL = None
 """The globally selected LLM model, if applicable."""
 
 
-def set_llm_engine(engine: Literal["gemini", "claude", "codex", "openrouter"], model: Optional[str] = None) -> None:
+def set_llm_engine(
+    engine: Literal["gemini", "claude", "codex", "openrouter", "opencode"], model: Optional[str] = None
+) -> None:
     """
     Sets the global LLM engine and optionally the model to be used.
 
@@ -34,10 +37,12 @@ def set_llm_engine(engine: Literal["gemini", "claude", "codex", "openrouter"], m
                     provided for 'openrouter'.
     """
     global LLM_ENGINE, LLM_MODEL
-    if engine not in ("gemini", "claude", "codex", "openrouter"):
+    if engine not in ("gemini", "claude", "codex", "openrouter", "opencode"):
         raise ValueError(f"Unknown engine: {engine}")
     if engine == "openrouter" and model is None:
         raise ValueError("Model must be specified for OpenRouter")
+    if engine == "opencode" and model is None:
+        model = "github-copilot/gpt-4.1"
     LLM_ENGINE = engine
     LLM_MODEL = model
 
@@ -206,6 +211,50 @@ def run_gemini(
         return None
 
 
+def run_opencode(
+    prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: Path, phase: Optional[str] = None
+) -> Optional[str]:
+    opencode_model = model or "github-copilot/gpt-4.1"
+    # Opencode is always YOLO
+    command = ["opencode", "run", "--model", opencode_model, prompt]
+    log(f"Opencode prompt: {prompt}", message_type="thought")
+    result = run(
+        command,
+        phase or "Calling Opencode",
+        command_human=command[:-1] + ["<prompt>"],
+        directory=cwd,
+        status_message=phase or "Calling Opencode",
+        log_stdout=False,
+    )
+    # Temporarily adding this for debug since opencode is new
+    log(f"Opencode command: {shlex.join(command)}", message_type="debug")
+
+    # Opencode output looks like this:
+    #
+    # █▀▀█ █▀▀█ █▀▀ █▀▀▄ █▀▀ █▀▀█ █▀▀▄ █▀▀
+    # █░░█ █░░█ █▀▀ █░░█ █░░ █░░█ █░░█ █▀▀
+    # ▀▀▀▀ █▀▀▀ ▀▀▀ ▀  ▀ ▀▀▀ ▀▀▀▀ ▀▀▀  ▀▀▀
+    #
+    # >  generate five short branch names for task "add opencode in the readme"
+    #
+    # @  github-copilot/gpt-4.1
+    #
+    # add-opencode-readme
+    # opencode-readme-update
+    # readme-opencode-badge
+    # mention-opencode-readme
+    # doc-opencode-readme
+
+    if result["success"]:
+        response = result["stdout"].split(f"@  {model}", maxsplit=1)[-1].strip()
+        status_manager.update_status("Successful.")
+        log(f"Opencode response: {response}", message_type="thought")
+        return response
+    else:
+        log(f"Opencode call failed: {result['stderr']}", message_type="tool_output_error")
+        return None
+
+
 def run_llm(prompt: str, yolo: bool, *, cwd: Path, phase: Optional[str] = None) -> Optional[str]:
     """
     Run selected LLM CLI and return the response.
@@ -230,5 +279,9 @@ def run_llm(prompt: str, yolo: bool, *, cwd: Path, phase: Optional[str] = None) 
         return run_openrouter(prompt, yolo, model=LLM_MODEL, cwd=cwd, phase=phase)
     elif LLM_ENGINE == "gemini":
         return run_gemini(prompt, yolo, model=LLM_MODEL, cwd=cwd, phase=phase)
+    elif LLM_ENGINE == "opencode":
+        return run_opencode(prompt, yolo, model=LLM_MODEL, cwd=cwd, phase=phase)
     else:
-        raise ValueError(f"Unknown LLM engine: {LLM_ENGINE}. Supported engines: gemini, claude, codex, openrouter.")
+        raise ValueError(
+            f"Unknown LLM engine: {LLM_ENGINE}. Supported engines: gemini, claude, codex, openrouter, opencode."
+        )
