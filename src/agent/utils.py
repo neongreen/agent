@@ -2,6 +2,7 @@ import datetime
 import json
 import shlex
 import subprocess
+from posixpath import abspath
 from typing import Optional, TypedDict
 
 from rich.console import Console
@@ -88,9 +89,13 @@ def run(
     else:
         command_human_display = shlex.join(command_human)
 
+    if directory is None:
+        directory = "."
+    directory = abspath(directory)
+
     log(
-        f"Running command: {command_display}",
-        message_human=f"Running command: {command_human_display}",
+        f"Running command: {command_display} in {directory}",
+        message_human=f"Running command: {command_human_display} in {directory}",
         message_type="tool_code",
     )
 
