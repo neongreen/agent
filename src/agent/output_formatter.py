@@ -1,55 +1,39 @@
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.text import Text
 
 console = Console()
 
 
-def format_llm_thought(thought_text: str) -> Markdown:
-    """Formats LLM thoughts as a Markdown block."""
-    return Markdown(
-        f"""# LLM Thought
-{thought_text}
-""",
-        style="dim",
-    )
-
-
-def format_reviewer_feedback(feedback_text: str) -> Markdown:
-    """Formats reviewer feedback as a Markdown block."""
-    return Markdown(
-        f"""# Reviewer Feedback
-{feedback_text}
-""",
-        style="red",
-    )
-
-
-def format_plan(plan_text: str) -> Markdown:
-    """Formats a plan as a Markdown block."""
-    return Markdown(
-        f"""# Proposed Plan
-{plan_text}
-""",
-        style="cyan",
-    )
-
-
-def print_formatted_message(message, message_type="default"):
-    """Prints a formatted message to the console based on message type."""
+def print_formatted_message(message: str, message_type: str):
+    """
+    Prints a formatted message to the console based on its type.
+    """
     if message_type == "thought":
-        console.print(format_llm_thought(message))
-    elif message_type == "reviewer_feedback":
-        console.print(format_reviewer_feedback(message))
+        console.print(Markdown(f"# LLM Thought\n\n{message}", style="bold magenta"))
     elif message_type == "plan":
-        console.print(format_plan(message))
-    elif message_type == "tool_code":
-        console.print(Text(message, style="cyan"))
-    elif message_type == "tool_output_stdout":
-        console.print(Text(message, style="green"))
-    elif message_type == "tool_output_stderr" or message_type == "tool_output_error":
-        console.print(Text(message, style="red"))
-    elif message_type == "file_path":
-        console.print(Text(message, style="yellow"))
+        console.print(Markdown(f"# Proposed Plan\n\n{message}", style="bold green"))
+    elif message_type == "reviewer_feedback":
+        console.print(Markdown(f"# Reviewer Feedback\n\n{message}", style="bold yellow"))
     else:
-        console.print(Text(message))
+        console.print(message)
+
+
+def format_llm_thought(thought_text: str) -> str:
+    """
+    Formats LLM thoughts for aesthetic output.
+    """
+    return thought_text
+
+
+def format_reviewer_feedback(feedback_text: str) -> str:
+    """
+    Formats reviewer feedback for aesthetic output.
+    """
+    return feedback_text
+
+
+def format_plan(plan_text: str) -> str:
+    """
+    Formats a plan for aesthetic output.
+    """
+    return plan_text

@@ -5,6 +5,7 @@ from typing import Optional
 from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE
 from .gemini_agent import run_llm
+from .output_formatter import print_formatted_message
 from .ui import status_manager
 from .utils import log, run
 
@@ -35,7 +36,7 @@ def implementation_phase(
         True if the implementation phase is successfully completed, False otherwise.
     """
     status_manager.set_phase("Implementation")
-    log(f"Starting implementation phase for task: {task}", message_type="thought")
+    print_formatted_message(f"Starting implementation phase for task: {task}", message_type="thought")
 
     max_implementation_attempts = 10
     max_consecutive_failures = 3
@@ -47,7 +48,7 @@ def implementation_phase(
 
     for attempt in range(1, max_implementation_attempts + 1):
         status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
-        log(f"Implementation attempt {attempt}", message_type="thought")
+        print_formatted_message(f"Implementation attempt {attempt}", message_type="thought")
 
         # Ask Gemini to implement next step
         impl_prompt = (
@@ -70,7 +71,9 @@ def implementation_phase(
 
         if not implementation_summary:
             status_manager.update_status("Failed to get implementation from Gemini.", style="red")
-            log("Failed to get implementation summary from Gemini", message_type="tool_output_error")
+            print_formatted_message(
+                "Failed to get implementation summary from Gemini", message_type="tool_output_error"
+            )
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
                 log("Too many consecutive failures, giving up", message_type="tool_output_error")
