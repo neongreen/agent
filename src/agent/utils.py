@@ -43,6 +43,9 @@ def log(
     if not quiet:
         _print_formatted(message_human or message, message_type=message_type)
 
+    if not LOG_FILE.exists():
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            f.write("")
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_entry) + "\n")
 
