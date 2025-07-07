@@ -13,6 +13,10 @@ run = [
   'jj x fd .py -x uv run --with=autotyping --isolated python -m autotyping {} --safe',
 ]
 
+[tasks.pyright]
+description = "Run pyright to check types in the Python files"
+run = "uv run pyright --project ."
+
 [tasks.ty]
 description = "Run ty to check types in the Python files"
 run = "ty check"

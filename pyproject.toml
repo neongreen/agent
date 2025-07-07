@@ -9,7 +9,10 @@ requires-python = ">=3.13"
 agent = "agent.main:main"
 
 [dependency-groups]
-dev = ["ruff>=0.12.2"]
+dev = [
+    "pyright>=1.1.402",
+    "ruff>=0.12.2",
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
