@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 
 from rich.console import Console
 from rich.errors import MarkupError
@@ -11,13 +11,22 @@ from rich.text import Text
 class LLMOutputType(Enum):
     """Represents the different types of LLM outputs."""
 
-    PLAN = "plan"
-    FEEDBACK = "feedback"
-    IMPLEMENTATION_JUDGE = "implementation_judge"
-    THOUGHT = "thought"
-    TOOL_CODE = "tool_code"
-    TOOL_OUTPUT = "tool_output"
-    TOOL_OUTPUT_ERROR = "tool_output_error"
+    PLAN = auto()
+    """Proposed plan by the LLM."""
+    EVALUATION = auto()
+    """Evaluation by the judge."""
+    STATUS = auto()
+    """Some kind of status message."""
+    PROMPT = auto()
+    """The prompt sent to the LLM."""
+    LLM_RESPONSE = auto()
+    """Any generic response from the LLM."""
+    TOOL_EXECUTION = auto()
+    """Calling any command (shell, etc)."""
+    TOOL_OUTPUT = auto()
+    """Output from a tool execution."""
+    TOOL_ERROR = auto()
+    """Error from a tool execution."""
 
 
 console = Console()
@@ -28,43 +37,34 @@ def print_formatted_message(message: str, message_type: LLMOutputType):
     Prints a formatted message to the console based on its type.
     """
     try:
-        if message_type == LLMOutputType.THOUGHT:
-            console.print(Panel(Markdown(message), title="LLM Thought", title_align="left", border_style="magenta"))
+        if message_type == LLMOutputType.STATUS:
+            console.print(Panel(Markdown(message), title="Status", title_align="left", border_style="magenta"))
         elif message_type == LLMOutputType.PLAN:
-            console.print(Panel(Markdown(message), title="Proposed Plan", title_align="left", border_style="green"))
-        elif message_type == LLMOutputType.FEEDBACK:
+            console.print(Panel(Markdown(message), title="Proposed plan", title_align="left", border_style="green"))
+        elif message_type == LLMOutputType.EVALUATION:
             console.print(
-                Panel(Markdown(message), title="Reviewer Feedback", title_align="left", border_style="yellow")
+                Panel(Markdown(message), title="Reviewer evaluation", title_align="left", border_style="yellow")
             )
-        elif message_type == LLMOutputType.IMPLEMENTATION_JUDGE:
+        elif message_type == LLMOutputType.TOOL_EXECUTION:
+            console.print(Panel(Markdown(message), title="Tool execution", title_align="left", border_style="cyan"))
+        elif message_type == LLMOutputType.TOOL_OUTPUT:
+            console.print(Panel(Markdown(message), title="Tool output", title_align="left", border_style="white"))
+        elif message_type == LLMOutputType.TOOL_ERROR:
             console.print(
-                Panel(Markdown(message), title="Implementation Judge Feedback", title_align="left", border_style="blue")
+                Panel(Markdown(message), title="Tool execution failure", title_align="left", border_style="red")
+            )
+        elif message_type == LLMOutputType.PROMPT:
+            console.print(Panel(Markdown(message), title="Prompt", title_align="left", border_style="bright_blue"))
+        elif message_type == LLMOutputType.LLM_RESPONSE:
+            console.print(
+                Panel(Markdown(message), title="LLM response", title_align="left", border_style="bright_magenta")
             )
         else:
             console.print(message)
     except MarkupError:
         console.print(Text.from_markup(message).plain)
 
-
-def format_llm_thought(thought_text: str) -> str:
-    """
-    Formats LLM thoughts for aesthetic output.
-    """
-    return thought_text
-
-
-def format_reviewer_feedback(feedback_text: str) -> str:
-    """
-    Formats reviewer feedback for aesthetic output.
-    """
-    return feedback_text
-
-
-def format_plan(plan_text: str) -> str:
-    """
-    Formats a plan for aesthetic output.
-    """
-    return plan_text
+    console.print("\n", end="")
 
 
 def display_task_summary(task_results: list):

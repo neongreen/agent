@@ -37,7 +37,7 @@ def implementation_phase(
         A dictionary containing the status of the implementation and any feedback.
     """
     status_manager.set_phase("Implementation")
-    print_formatted_message(f"Starting implementation phase for task: {task}", message_type=LLMOutputType.THOUGHT)
+    print_formatted_message(f"Starting implementation phase for task: {task}", message_type=LLMOutputType.STATUS)
 
     max_implementation_attempts = 10
     max_consecutive_failures = 3
@@ -49,7 +49,7 @@ def implementation_phase(
     try:
         for attempt in range(1, max_implementation_attempts + 1):
             status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
-            print_formatted_message(f"Implementation attempt {attempt}", message_type=LLMOutputType.THOUGHT)
+            print_formatted_message(f"Implementation attempt {attempt}", message_type=LLMOutputType.STATUS)
 
             # Ask Gemini to implement next step
             impl_prompt = (
@@ -67,20 +67,16 @@ def implementation_phase(
             if config.implement.extra_prompt:
                 impl_prompt += f"\n\n{config.implement.extra_prompt}"
 
-            status_manager.update_status("Getting implementation from Gemini")
-            implementation_summary = llm.run(impl_prompt, yolo=True, cwd=cwd)
+            status_manager.update_status("Getting implementation")
+            implementation_summary = llm.run(impl_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
 
             if not implementation_summary:
-                status_manager.update_status("Failed to get implementation from Gemini.", style="red")
-                try:
-                    raise Exception("Failed to get implementation from Gemini")
-                except Exception as e:
-                    print_formatted_message(
-                        f"Error during implementation: {e}", message_type=LLMOutputType.TOOL_OUTPUT_ERROR
-                    )
+                status_manager.update_status("Failed to get implementation.", style="red")
+                # TODO: this is just an error, not a tool error
+                log("Failed to get implementation", message_type=LLMOutputType.TOOL_ERROR)
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type="tool_output_error")
+                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.TOOL_ERROR)
                     result = {
                         "status": "failed",
                         "feedback": "Too many consecutive failures to get implementation from Gemini",
@@ -91,7 +87,7 @@ def implementation_phase(
             if config.post_implementation_hook_command:
                 log(
                     f"Running post-implementation hook: {config.post_implementation_hook_command}",
-                    message_type="thought",
+                    message_type=LLMOutputType.TOOL_EXECUTION,
                 )
                 run(
                     config.post_implementation_hook_command,
@@ -100,11 +96,6 @@ def implementation_phase(
                     shell=True,
                 )
 
-            # Evaluate if it seems reasonable
-            log(
-                f"Judging the implementation based on the diff. LLM provided this explanation along with its implementation:\n{implementation_summary}",
-                message_type="thought",
-            )
             # SUCCESS, PARTIAL, FAILURE correspond to the 'ImplementationVerdict' enum
             eval_prompt = (
                 f"Evaluate if this implementation makes progress on the task {repr(task)}.\n"
@@ -128,7 +119,7 @@ def implementation_phase(
                 eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
 
             status_manager.update_status("Evaluating implementation")
-            evaluation = llm.run(eval_prompt, yolo=True, cwd=cwd)
+            evaluation = llm.run(eval_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION)
             verdict = check_verdict(ImplementationVerdict, evaluation or "")
 
             if not evaluation or verdict is None:
@@ -136,14 +127,14 @@ def implementation_phase(
                 if evaluation:
                     log(
                         f"Couldn't determine the verdict from the evaluation. Evaluation was:\n\n{evaluation}",
-                        message_type="tool_output_error",
+                        message_type=LLMOutputType.TOOL_ERROR,
                     )
                 else:
-                    log("LLM provided no output", message_type="tool_output_error")
+                    log("LLM provided no output", message_type=LLMOutputType.TOOL_ERROR)
                 consecutive_failures += 1
                 # If we have too many consecutive failures, give up and exit the loop
                 if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type="tool_output_error")
+                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.TOOL_ERROR)
                     result = {
                         "status": "failed",
                         "feedback": "Too many consecutive failures to get evaluation from Gemini",
@@ -154,12 +145,11 @@ def implementation_phase(
                     continue
 
             # We have our verdict
-            print_formatted_message(evaluation, message_type=LLMOutputType.IMPLEMENTATION_JUDGE)
             feedback = evaluation  # Store feedback for next iteration
 
             if verdict == ImplementationVerdict.SUCCESS:
                 status_manager.update_status(f"Successful (attempt {attempt}).")
-                log(f"Implementation successful in attempt {attempt}", message_type="thought")
+                log(f"Implementation successful in attempt {attempt}", message_type=LLMOutputType.STATUS)
                 consecutive_failures = 0
                 commits_made += 1
 
@@ -170,7 +160,7 @@ def implementation_phase(
                     "You *may not* output Markdown, code blocks, or any other formatting.\n"
                     "You may only output a single line.\n"
                 )
-                commit_msg = llm.run(commit_msg_prompt, yolo=False, cwd=cwd)
+                commit_msg = llm.run(commit_msg_prompt, yolo=False, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
                 if not commit_msg:
                     commit_msg = "Implementation step for task"
 
@@ -201,29 +191,31 @@ def implementation_phase(
                 if config.implement.completion.judge_extra_prompt:
                     completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
 
-                completion_evaluation = llm.run(completion_prompt, yolo=True, cwd=cwd)
+                completion_evaluation = llm.run(
+                    completion_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION
+                )
                 completion_verdict = check_verdict(TaskCompletionVerdict, completion_evaluation or "")
 
                 if not completion_evaluation:
                     status_manager.update_status("Failed to get a task completion evaluation.", style="red")
-                    log("LLM provided no output", message_type="tool_output_error")
+                    log("LLM provided no output", message_type=LLMOutputType.TOOL_ERROR)
 
                 elif not completion_verdict:
                     status_manager.update_status("Failed to get a task completion verdict.", style="red")
                     log(
                         f"Couldn't determine the verdict from the task completion evaluation. Evaluation was:\n\n{completion_evaluation}",
-                        message_type="tool_output_error",
+                        message_type=LLMOutputType.TOOL_ERROR,
                     )
 
                 elif completion_verdict == TaskCompletionVerdict.COMPLETE:
                     status_manager.update_status("Task marked as complete.")
-                    log("Task marked as complete", message_type="thought")
+                    log("Task marked as complete", message_type=LLMOutputType.STATUS)
                     result = {"status": "completed", "feedback": completion_evaluation}
                     break
 
                 elif completion_verdict == TaskCompletionVerdict.CONTINUE:
                     status_manager.update_status("Task not complete, continuing implementation.")
-                    log("Task not complete, continuing implementation", message_type="thought")
+                    log("Task not complete, continuing implementation", message_type=LLMOutputType.STATUS)
                     feedback = completion_evaluation
 
                 else:
@@ -231,14 +223,14 @@ def implementation_phase(
 
             elif verdict == ImplementationVerdict.PARTIAL:
                 status_manager.update_status(f"Partial progress (attempt {attempt}).")
-                log(f"Partial progress in attempt {attempt}", message_type="thought")
+                log(f"Partial progress in attempt {attempt}", message_type=LLMOutputType.STATUS)
 
             elif verdict == ImplementationVerdict.FAILURE:
                 status_manager.update_status(f"Failed (attempt {attempt}).", style="red")
-                log(f"Implementation failed in attempt {attempt}", message_type="tool_output_error")
+                log(f"Implementation failed in attempt {attempt}", message_type=LLMOutputType.TOOL_ERROR)
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type="tool_output_error")
+                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.TOOL_ERROR)
                     result = {"status": "failed", "feedback": "Too many consecutive failures in implementation"}
                     break
 
@@ -248,16 +240,23 @@ def implementation_phase(
 
             # Check if we've made no commits recently
             if attempt >= 5 and commits_made == 0:
-                log("No commits made in 5 attempts, giving up", message_type="tool_output_error")
+                log("No commits made in 5 attempts, giving up", message_type=LLMOutputType.TOOL_ERROR)
                 result = {"status": "failed", "feedback": "No commits made in 5 attempts"}
                 break
 
+        log(
+            f"Implementation incomplete after {max_implementation_attempts} attempts",
+            message_type=LLMOutputType.TOOL_ERROR,
+        )
+        status_manager.update_status("Incomplete.", style="red")
+        return {"status": "incomplete", "feedback": "Implementation incomplete after maximum attempts"}
+
     except KeyboardInterrupt:
-        log("Implementation interrupted by user (KeyboardInterrupt)", message_type="tool_output_error")
+        log("Implementation interrupted by user (KeyboardInterrupt)", message_type=LLMOutputType.TOOL_ERROR)
         status_manager.update_status("Interrupted by user.", style="red")
         result = {"status": "interrupted", "feedback": "Implementation interrupted by user"}
     except Exception as e:
-        log(f"Implementation failed: {e}", message_type="tool_output_error")
+        log(f"Implementation failed: {e}", message_type=LLMOutputType.TOOL_ERROR)
         status_manager.update_status("Implementation failed.", style="red")
         result = {"status": "failed", "feedback": str(e)}
     finally:
@@ -276,7 +275,7 @@ def implementation_phase(
                     directory=cwd,
                 )
         except Exception as e:
-            log(f"Failed to make final commit: {e}", message_type="tool_output_error")
+            log(f"Failed to make final commit: {e}", message_type=LLMOutputType.TOOL_ERROR)
     return result or {}
 
 

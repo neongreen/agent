@@ -6,13 +6,13 @@ Claude, Codex, OpenRouter, Opencode, and Gemini CLIs.
 """
 
 import os
-import shlex
 import tempfile
 from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional, Type
 
 from .constants import AGENT_STATE_BASE_DIR, AGENT_TEMP_DIR
+from .output_formatter import LLMOutputType
 from .ui import status_manager
 from .utils import log, run
 
@@ -31,25 +31,37 @@ class LLM:
         if engine == "opencode" and model is None:
             self.model = "github-copilot/gpt-4.1"
 
-    def run(self, prompt: str, yolo: bool, *, cwd: Path, phase: Optional[str] = None) -> Optional[str]:
+    def run(
+        self, prompt: str, yolo: bool, *, cwd: Path, phase: Optional[str] = None, response_type: LLMOutputType
+    ) -> Optional[str]:
         if self.engine == "claude":
-            return self._run_claude(prompt, yolo, cwd=cwd, phase=phase)
+            return self._run_claude(prompt, yolo, cwd=cwd, phase=phase, response_type=response_type)
         elif self.engine == "codex":
-            return self._run_codex(prompt, yolo, model=self.model, cwd=cwd, phase=phase)
+            return self._run_codex(prompt, yolo, model=self.model, cwd=cwd, phase=phase, response_type=response_type)
         elif self.engine == "openrouter":
             assert self.model is not None, "Checked in the constructor."
-            return self._run_openrouter(prompt, yolo, model=self.model, cwd=cwd, phase=phase)
+            return self._run_openrouter(
+                prompt, yolo, model=self.model, cwd=cwd, phase=phase, response_type=response_type
+            )
         elif self.engine == "gemini":
-            return self._run_gemini(prompt, yolo, model=self.model, cwd=cwd, phase=phase)
+            return self._run_gemini(prompt, yolo, model=self.model, cwd=cwd, phase=phase, response_type=response_type)
         elif self.engine == "opencode":
             assert self.model is not None, "Checked in the constructor."
-            return self._run_opencode(prompt, yolo, model=self.model, cwd=cwd, phase=phase)
+            return self._run_opencode(prompt, yolo, model=self.model, cwd=cwd, phase=phase, response_type=response_type)
         else:
             raise ValueError(f"Unknown LLM engine: {self.engine}.")
 
-    def _run_claude(self, prompt: str, yolo: bool, *, cwd: Path, phase: Optional[str] = None) -> Optional[str]:
+    def _run_claude(
+        self,
+        prompt: str,
+        yolo: bool,
+        *,
+        cwd: Path,
+        phase: Optional[str] = None,
+        response_type: LLMOutputType,
+    ) -> Optional[str]:
         command = ["claude", *(["--dangerously-skip-permissions"] if yolo else []), "-p", prompt]
-        log(f"Claude prompt: {prompt}", message_type="thought")
+        log(prompt, message_type=LLMOutputType.PROMPT)
         result = run(
             command,
             "Calling Claude",
@@ -61,21 +73,23 @@ class LLM:
         if result["success"]:
             response = result["stdout"].strip()
             status_manager.update_status("Successful.")
-            log(f"Claude response: {response}", message_type="thought")
+            log(response, message_type=response_type)
             return response
         else:
-            log(f"Claude call failed: {result['stderr']}", message_type="tool_output_error")
+            log(f"Claude call failed: {result['stderr']}", message_type=LLMOutputType.TOOL_ERROR)
             return None
 
     def _run_codex(
         self,
         prompt: str,
         yolo: bool,
+        *,
         cwd: Path,
         model: Optional[str] = None,
         provider_url: Optional[str] = None,
         provider_env_key: Optional[str] = None,
         phase: Optional[str] = None,
+        response_type: LLMOutputType,
     ) -> Optional[str]:
         with tempfile.NamedTemporaryFile(
             "r", prefix="agent-codex-output", dir=AGENT_TEMP_DIR, delete=True
@@ -99,7 +113,7 @@ class LLM:
                 f"--output-last-message={temp_file_path}",
                 prompt,
             ]
-            log(f"Codex prompt: {prompt}", message_type="thought")
+            log(prompt, message_type=LLMOutputType.PROMPT)
             result = run(
                 command,
                 "Calling Codex",
@@ -111,14 +125,21 @@ class LLM:
             if result["success"]:
                 status_manager.update_status("Successful.")
                 response = temp_file.read().strip()
-                log(f"Codex response: {response}", message_type="thought")
+                log(response, message_type=response_type)
                 return response
             else:
-                log(f"Codex call failed: {result['stderr']}", message_type="tool_output_error")
+                log(f"Codex call failed: {result['stderr']}", message_type=LLMOutputType.TOOL_ERROR)
                 return None
 
     def _run_openrouter(
-        self, prompt: str, yolo: bool, model: str, *, cwd: Path, phase: Optional[str] = None
+        self,
+        prompt: str,
+        yolo: bool,
+        model: str,
+        *,
+        cwd: Path,
+        phase: Optional[str] = None,
+        response_type: LLMOutputType,
     ) -> Optional[str]:
         provider_url = "https://openrouter.ai/api/v1"
         provider_env_key = "OPENROUTER_API_KEY"
@@ -130,14 +151,22 @@ class LLM:
             provider_env_key=provider_env_key,
             cwd=cwd,
             phase=phase,
+            response_type=response_type,
         )
 
     def _run_gemini(
-        self, prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: Path, phase: Optional[str] = None
+        self,
+        prompt: str,
+        yolo: bool,
+        model: Optional[str] = None,
+        *,
+        cwd: Path,
+        phase: Optional[str] = None,
+        response_type: LLMOutputType,
     ) -> Optional[str]:
         gemini_model = model or "gemini-2.5-flash"
         command = ["gemini", "-m", gemini_model, *(["--yolo"] if yolo else []), "-p", prompt]
-        log(f"Gemini prompt: {prompt}", message_type="thought")
+        log(prompt, message_type=LLMOutputType.PROMPT)
         result = run(
             command,
             phase or "Calling Gemini",
@@ -149,25 +178,31 @@ class LLM:
         if result["success"]:
             response = result["stdout"].strip()
             status_manager.update_status("Successful.")
-            log(f"Gemini response: {response}", message_type="thought")
+            log(response, message_type=response_type)
             return response
         else:
-            log(f"Gemini call failed: {result['stderr']}", message_type="tool_output_error")
+            log(f"Gemini call failed: {result['stderr']}", message_type=LLMOutputType.TOOL_ERROR)
             return None
 
     def _run_opencode(
-        self, prompt: str, yolo: bool, model: str, *, cwd: Path, phase: Optional[str] = None
+        self,
+        prompt: str,
+        yolo: bool,
+        model: str,
+        *,
+        cwd: Path,
+        phase: Optional[str] = None,
+        response_type: LLMOutputType,
     ) -> Optional[str]:
         opencode_path = AGENT_STATE_BASE_DIR / "bin" / "opencode"
         if not opencode_path.exists():
             log(
                 f"Opencode CLI (custom version) not found at {opencode_path}. Please run 'mise run build-opencode'.",
-                message_type="error",
+                message_type=LLMOutputType.TOOL_ERROR,
             )
             return None
         command = [str(opencode_path), "run", "--print", "--model", model, prompt]
-        log(f"Opencode command: {shlex.join(command)}", message_type="debug")
-        log(f"Opencode prompt: {prompt}", message_type="thought")
+        log(prompt, message_type=LLMOutputType.PROMPT)
         result = run(
             command,
             phase or "Calling Opencode",
@@ -180,10 +215,10 @@ class LLM:
             response = result["stdout"].strip()
             content = response.split("Text  ", maxsplit=1)[-1].strip()
             status_manager.update_status("Successful.")
-            log(f"Opencode response: {content}", message_type="thought")
+            log(content, message_type=response_type)
             return content
         else:
-            log(f"Opencode call failed: {result['stderr']}", message_type="tool_output_error")
+            log(f"Opencode call failed: {result['stderr']}", message_type=LLMOutputType.TOOL_ERROR)
             return None
 
 

@@ -8,6 +8,7 @@ from typing import Optional
 
 from .constants import TASK_META_DIR
 from .llm import LLM
+from .output_formatter import LLMOutputType
 from .utils import log, run
 
 
@@ -43,7 +44,7 @@ def get_existing_branch_names(*, cwd: Path) -> list[str]:
     """
     result = run(["git", "branch", "--list"], "Listing existing branches", directory=cwd)
     if not result["success"]:
-        log("Failed to list existing branches.", message_type="tool_output_error")
+        log("Failed to list existing branches.", LLMOutputType.TOOL_ERROR)
         return []
     return [line.strip().replace("* ", "") for line in result["stdout"].split("\n") if line.strip()]
 
@@ -93,7 +94,7 @@ def has_tracked_diff(*, cwd: Path) -> bool:
     """
     result = run(["git", "status", "--porcelain"], "Checking for tracked changes", directory=cwd)
     if not result["success"]:
-        log("Failed to check git status.", message_type="tool_output_error")
+        log("Failed to check git status.", LLMOutputType.TOOL_ERROR)
         return False
     return bool(result["stdout"].strip())
 
@@ -109,17 +110,17 @@ def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
     Returns:
         The full commit SHA, or None if resolution fails.
     """
-    log(f"Resolving commit specifier: {specifier}", message_type="thought")
+    log(f"Resolving commit specifier: {specifier}", LLMOutputType.STATUS)
     command = ["git", "rev-parse", "--verify", specifier]
     result = run(command, f"Resolving {specifier} to commit SHA", directory=cwd)
 
     if result["success"] and result["stdout"].strip():
-        log(f"Resolved {specifier} to {result['stdout'].strip()}", message_type="thought")
+        log(f"Resolved {specifier} to {result['stdout'].strip()}", LLMOutputType.STATUS)
         return result["stdout"].strip()
     else:
         log(
             f"Failed to resolve commit specifier: {specifier}. Stderr: {result['stderr']}",
-            message_type="tool_output_error",
+            LLMOutputType.TOOL_ERROR,
         )
         return None
 
@@ -137,7 +138,7 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> 
     Returns:
         True if the branch was set up successfully, False otherwise.
     """
-    log(f"Setting up branch for task {task_num}: {task}", message_type="thought")
+    log(f"Setting up branch for task {task_num}: {task}", LLMOutputType.STATUS)
 
     # Decide on the branch name
     allowed_types = [
@@ -166,7 +167,7 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> 
         "You may only output a single line."
     )
 
-    suggestions_response = llm.run(branch_prompt, yolo=False, cwd=cwd)
+    suggestions_response = llm.run(branch_prompt, yolo=False, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
     if suggestions_response:
         suggestions = [s.strip() for s in suggestions_response.split(",") if s.strip()]
     else:
@@ -182,7 +183,7 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> 
     )
 
     if not result["success"]:
-        log(f"Failed to create branch {branch_name}", message_type="tool_output_error")
+        log(f"Failed to create branch {branch_name}", message_type=LLMOutputType.TOOL_ERROR)
         return False
 
     # Write task metadata
@@ -201,7 +202,7 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> 
     with open(task_meta_path, "w") as f:
         json.dump(task_meta, f, indent=2)
 
-    log(f"Created task branch and metadata for task {task_num}", message_type="thought")
+    log(f"Created task branch and metadata for task {task_num}", LLMOutputType.STATUS)
     return True
 
 
@@ -219,7 +220,7 @@ def get_current_branch(*, cwd: Path) -> Optional[str]:
     if result["success"]:
         return result["stdout"].strip()
     else:
-        log(f"Failed to get current branch. Stderr: {result['stderr']}", message_type="tool_output_error")
+        log(f"Failed to get current branch. Stderr: {result['stderr']}", LLMOutputType.TOOL_ERROR)
         return None
 
 
@@ -237,7 +238,10 @@ def get_current_commit_hash(*, cwd: Path) -> Optional[str]:
     if result["success"]:
         return result["stdout"].strip()
     else:
-        log(f"Failed to get current commit hash. Stderr: {result['stderr']}", message_type="tool_output_error")
+        log(
+            f"Failed to get current commit hash. Stderr: {result['stderr']}",
+            message_type=LLMOutputType.TOOL_ERROR,
+        )
         return None
 
 
@@ -253,14 +257,17 @@ def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
     Returns:
         True if the worktree was added successfully, False otherwise.
     """
-    log(f"Adding worktree at {path} for revision {rev}", message_type="thought")
+    log(f"Adding worktree at {path} for revision {rev}", LLMOutputType.STATUS)
     command = ["git", "worktree", "add", str(path), rev]
     result = run(command, f"Adding worktree {path}", directory=cwd)
     if result["success"]:
-        log(f"Successfully added worktree at {path}", message_type="thought")
+        log(f"Successfully added worktree at {path}", message_type=LLMOutputType.STATUS)
         return True
     else:
-        log(f"Failed to add worktree at {path}. Stderr: {result['stderr']}", message_type="tool_output_error")
+        log(
+            f"Failed to add worktree at {path}. Stderr: {result['stderr']}",
+            message_type=LLMOutputType.TOOL_ERROR,
+        )
         return False
 
 
@@ -275,12 +282,15 @@ def remove_worktree(path: Path, *, cwd: Path) -> bool:
     Returns:
         True if the worktree was removed successfully, False otherwise.
     """
-    log(f"Removing worktree at {path}", message_type="thought")
+    log(f"Removing worktree at {path}", message_type=LLMOutputType.STATUS)
     command = ["git", "worktree", "remove", "--force", str(path)]
     result = run(command, f"Removing worktree {path}", directory=cwd)
     if result["success"]:
-        log(f"Successfully removed worktree at {path}", message_type="thought")
+        log(f"Successfully removed worktree at {path}", message_type=LLMOutputType.STATUS)
         return True
     else:
-        log(f"Failed to remove worktree at {path}. Stderr: {result['stderr']}", message_type="tool_output_error")
+        log(
+            f"Failed to remove worktree at {path}. Stderr: {result['stderr']}",
+            LLMOutputType.TOOL_ERROR,
+        )
         return False
