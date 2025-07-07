@@ -42,9 +42,9 @@ run = """
   '"""
 
 [tasks.clean-branches]
-description = "Remove all branches below main/dev"
+description = "Remove all agent branches (bookmarks) below main"
 run = '''
-  jj bookmark list -r '::(main|dev)' -T'self++"\n"' | grep -Ev '^(main|dev)$' | xargs jj bookmark delete
+  jj bookmark list -r 'main | (~main::)' -T'self++"\n"' | grep -E '^agent/' | grep -Ev '^main$' | xargs jj bookmark delete
 '''
 
 # Checks
