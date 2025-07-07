@@ -5,7 +5,7 @@ from typing import Optional
 
 from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE, LLMOutputType
-from .llm import run_llm
+from .llm import LLM
 from .output_formatter import format_tool_code_output, print_formatted_message
 from .ui import status_manager
 from .utils import log, run
@@ -17,6 +17,7 @@ def implementation_phase(
     plan: str,
     base_commit: str,
     cwd: Path,
+    llm: LLM,
 ) -> dict:
     """
     Manages the iterative implementation phase of a task.
@@ -66,7 +67,7 @@ def implementation_phase(
             impl_prompt += f"\n\n{config.implement.extra_prompt}"
 
         status_manager.update_status("Getting implementation from Gemini")
-        implementation_summary = run_llm(impl_prompt, yolo=True, cwd=cwd)
+        implementation_summary = llm.run(impl_prompt, yolo=True, cwd=cwd)
 
         if not implementation_summary:
             status_manager.update_status("Failed to get implementation from Gemini.", style="red")
@@ -117,7 +118,7 @@ def implementation_phase(
             eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
 
         status_manager.update_status("Evaluating implementation")
-        evaluation = run_llm(eval_prompt, yolo=True, cwd=cwd)
+        evaluation = llm.run(eval_prompt, yolo=True, cwd=cwd)
         if not evaluation:
             status_manager.update_status("Failed to get evaluation from Gemini.", style="red")
             log("Failed to get evaluation from Gemini", message_type="tool_output_error")
@@ -142,7 +143,7 @@ def implementation_phase(
                 "You *may not* output Markdown, code blocks, or any other formatting.\n"
                 "You may only output a single line.\n"
             )
-            commit_msg = run_llm(commit_msg_prompt, yolo=False, cwd=cwd)
+            commit_msg = llm.run(commit_msg_prompt, yolo=False, cwd=cwd)
             if not commit_msg:
                 commit_msg = "Implementation step for task"
 
@@ -171,7 +172,7 @@ def implementation_phase(
             if config.implement.completion.judge_extra_prompt:
                 completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
 
-            completion_check = run_llm(completion_prompt, yolo=True, cwd=cwd)
+            completion_check = llm.run(completion_prompt, yolo=True, cwd=cwd)
 
             if completion_check and completion_check.upper().startswith("COMPLETE"):
                 status_manager.update_status("Task marked as complete.")

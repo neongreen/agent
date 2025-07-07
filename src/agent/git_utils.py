@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from .constants import TASK_META_DIR
-from .llm import run_llm
+from .llm import LLM
 from .utils import log, run
 
 
@@ -124,7 +124,7 @@ def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
         return None
 
 
-def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path) -> bool:
+def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> bool:
     """
     Set up git branch for task.
 
@@ -165,7 +165,8 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path) -> bool:
         "You *may not* include anything else in the response. Do not include Markdown, code blocks, or any other formatting.\n"
         "You may only output a single line."
     )
-    suggestions_response = run_llm(branch_prompt, yolo=False, cwd=cwd)
+
+    suggestions_response = llm.run(branch_prompt, yolo=False, cwd=cwd)
     if suggestions_response:
         suggestions = [s.strip() for s in suggestions_response.split(",") if s.strip()]
     else:

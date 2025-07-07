@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .constants import PLAN_FILE, STATE_FILE, LLMOutputType, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
+from .llm import LLM
 from .output_formatter import format_llm_thought, print_formatted_message
 from .state_manager import read_state, write_state
 from .task_implementation import implementation_phase
@@ -18,6 +19,7 @@ def process_task(
     *,
     base_rev: str,
     cwd: Path,
+    llm: LLM,
 ) -> dict:
     """
     Processes a single task through its planning and implementation phases.
@@ -60,7 +62,7 @@ def process_task(
             write_state(state)
             return {"status": "failed", "feedback": "Failed to resolve base specifier"}
 
-        if not setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd):
+        if not setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd, llm=llm):
             print_formatted_message("Failed to set up task branch", message_type=LLMOutputType.TOOL_OUTPUT_ERROR)
             status_manager.update_status("Failed to set up task branch.", style="red")
             state[task_id] = TaskState.ABORT.value
@@ -81,7 +83,7 @@ def process_task(
     # Planning phase
     plan = None
     if current_task_state() == TaskState.PLAN.value:
-        plan = planning_phase(task, cwd=cwd)
+        plan = planning_phase(task, cwd=cwd, llm=llm)
         if not plan:
             print_formatted_message("Planning phase failed", message_type=LLMOutputType.TOOL_OUTPUT_ERROR)
             status_manager.update_status("Failed.", style="red")
@@ -113,7 +115,7 @@ def process_task(
     if current_task_state() == TaskState.IMPLEMENT.value:
         assert resolved_base_commit_sha is not None, "resolved_base_commit_sha should not be None at this point"
         implementation_result = implementation_phase(
-            task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd
+            task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd, llm=llm
         )
         if implementation_result["status"] == "completed":
             if not has_tracked_diff(cwd=cwd):

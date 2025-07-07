@@ -15,7 +15,7 @@ import rich
 from . import git_utils
 from .config import AGENT_SETTINGS as config
 from .constants import AGENT_TEMP_DIR
-from .llm import set_llm_engine
+from .llm import LLM
 from .state_manager import write_state
 from .task_orchestrator import process_task
 from .ui import status_manager
@@ -92,16 +92,17 @@ def main() -> None:
     if [args.claude, args.codex, args.openrouter is not None].count(True) > 1:
         parser.error("Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, or --openrouter.")
 
+    # This is the only place where LLM() should be instantiated.
     if args.claude:
-        set_llm_engine("claude")
+        llm = LLM(engine="claude", model=None)
     elif args.codex:
-        set_llm_engine("codex")
+        llm = LLM(engine="codex", model=None)
     elif args.openrouter is not None:
-        set_llm_engine("openrouter", model=args.openrouter)
+        llm = LLM(engine="openrouter", model=args.openrouter)
     elif args.opencode:
-        set_llm_engine("opencode")
+        llm = LLM(engine="opencode", model=None)  # The default is set in the LLM class
     else:
-        set_llm_engine("gemini")
+        llm = LLM(engine="gemini", model=None)
 
     effective_cwd = Path(os.path.abspath(str(args.cwd) if args.cwd else os.getcwd()))
 
@@ -159,7 +160,7 @@ def main() -> None:
                 # Change to the new worktree directory
                 os.chdir(current_worktree_path)
 
-                process_task(task_prompt, i, base_rev=args.base, cwd=current_worktree_path)
+                process_task(task_prompt, i, base_rev=args.base, cwd=current_worktree_path, llm=llm)
                 task_status = "Success"
                 task_commit_hash = git_utils.get_current_commit_hash(cwd=current_worktree_path)
 

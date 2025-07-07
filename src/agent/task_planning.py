@@ -5,13 +5,13 @@ from typing import Optional
 
 from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE, LLMOutputType
-from .llm import run_llm
+from .llm import LLM
 from .output_formatter import format_llm_thought, format_reviewer_feedback, print_formatted_message
 from .ui import status_manager
 from .utils import log
 
 
-def planning_phase(task: str, *, cwd: Path) -> Optional[str]:
+def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
     """
     Iterative planning phase with Gemini approval.
 
@@ -60,7 +60,7 @@ def planning_phase(task: str, *, cwd: Path) -> Optional[str]:
             plan_prompt += f"\n\n{config.plan.planner_extra_prompt}"
 
         status_manager.update_status("Getting plan from Gemini")
-        current_plan = run_llm(plan_prompt, yolo=True, cwd=cwd)
+        current_plan = llm.run(plan_prompt, yolo=True, cwd=cwd)
         if not current_plan:
             status_manager.update_status("Failed to get plan from Gemini.", style="red")
             print_formatted_message("Failed to get plan from Gemini", message_type=LLMOutputType.TOOL_OUTPUT_ERROR)
@@ -77,7 +77,7 @@ def planning_phase(task: str, *, cwd: Path) -> Optional[str]:
             review_prompt += f"\n\n{config.plan.judge_extra_prompt}"
 
         status_manager.update_status("Reviewing plan")
-        current_review = run_llm(review_prompt, yolo=True, cwd=cwd)
+        current_review = llm.run(review_prompt, yolo=True, cwd=cwd)
         if not current_review:
             status_manager.update_status("Failed to get plan review from Gemini.", style="red")
             print_formatted_message(
