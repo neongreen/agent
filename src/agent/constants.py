@@ -2,17 +2,27 @@
 
 import uuid
 from datetime import datetime
-from enum import Enum
+from enum import Enum, auto
 from pathlib import Path
 
 
 class TaskState(Enum):
     """Represents the different states a task can be in."""
 
-    PLAN = "PLAN"
-    IMPLEMENT = "IMPLEMENT"
-    DONE = "DONE"
-    ABORT = "ABORT"
+    PLAN = auto()
+    IMPLEMENT = auto()
+    DONE = auto()
+    ABORT = auto()
+
+    def __str__(self):
+        return self.name
+
+    def to_json(self):
+        return self.value
+
+    @classmethod
+    def from_json(cls, value):
+        return cls(value)
 
 
 # Constants

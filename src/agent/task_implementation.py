@@ -1,4 +1,4 @@
-"""Manages the iterative implementation phase of a task, including code generation, execution, and evaluation."""
+"""Manages the iterative step phase of a task, including code generation, execution, and evaluation."""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -13,15 +13,18 @@ from .ui import status_manager
 from .utils import format_tool_code_output, log, run
 
 
-class ImplementationVerdict(Enum):
-    """Enum for possible verdicts from the implementation judge."""
+class StepVerdict(Enum):
+    """Enum for possible verdicts from the step judge."""
 
     SUCCESS = "SUCCESS"
+    """Work done here is a good step forward."""
     PARTIAL = "PARTIAL"
+    """Keep work done in this step so far, but it needs more iteration."""
     FAILURE = "FAILURE"
+    """Work done in this step is not useful and should be discarded."""
 
 
-class TaskCompletionVerdict(Enum):
+class TaskVerdict(Enum):
     """Enum for possible verdicts from the task completion judge."""
 
     COMPLETE = "COMPLETE"
@@ -30,90 +33,367 @@ class TaskCompletionVerdict(Enum):
     """More work is needed."""
 
 
-def _get_implementation_summary(
-    llm: LLM,
-    task: str,
-    attempt: int,
-    max_implementation_attempts: int,
-    plan: str,
-    feedback: Optional[str],
-    cwd: Path,
-) -> Optional[str]:
+# States
+
+# Solving a task
+# - consists of multiple steps
+#   - and each step consists of multiple attempts
+
+
+@dataclass(frozen=True, slots=True)
+class TaskState:
+    """Base class for all states."""
+
+    steps_made: int
+    """How many steps were made since the start of working on this task"""
+
+    consecutive_failed_steps: int
+    """How many failing attempts we have made in a row"""
+
+
+@dataclass(frozen=True, slots=True)
+class StepState(TaskState):
+    """Base class for all states happening while working on a step."""
+
+    attempt: int
+    """The current attempt number inside the step - how many times we've tried to finish it."""
+    consecutive_failed_attempts: int
+    """The number of consecutive failures (not success/partial) in the current step."""
+    feedback: Optional[str]
+    """Judge's feedback from the previous attempt"""
+
+
+@dataclass(frozen=True, slots=True)
+class ReadyForWork:
+    """
+    Represents the initial state where the agent is ready to start working on a task.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class Attempt(StepState):
+    """Represents the state where the agent is actively working on a attempt."""
+
+
+# ────────────────────────────── Evaluate state ──────────────────────────────
+@dataclass(frozen=True, slots=True)
+class Evaluate(StepState):
+    """
+    Represents the state where the agent reviews the just‑generated step and decides on a verdict.
+    """
+
+    step_summary: str
+    """Natural‑language summary of the work done in the current attempt"""
+
+
+# ───────────────────── ReviewCompletion state ─────────────────────
+@dataclass(frozen=True, slots=True)
+class ReviewCompletion(StepState):
+    """
+    After a successful step, commit the changes and ask whether the overall task is finished.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class Complete:
+    """
+    Represents the state where the task step is complete.
+    """
+
+    status: Optional[str] = None
+    """A message indicating the completion status."""
+    attempt: int = 0
+    """The iteration number at which the step was completed."""
+
+
+@dataclass(frozen=True, slots=True)
+class Failed:
+    """
+    Represents the state where the task step has failed.
+    """
+
+    status: Optional[str] = None
+    """A message indicating the failure status."""
+    attempt: int = 0
+    """The iteration number at which the step failed."""
+
+
+type State = ReadyForWork | Attempt | Evaluate | ReviewCompletion | Complete | Failed
+
+# Events
+
+
+@dataclass(frozen=True, slots=True)
+class Tick:
+    """Keep going."""
+
+
+type Event = Tick
+
+
+@dataclass(frozen=True, slots=True)
+class Settings:
+    task: str
+    plan: str
+    base_attempt: str
+    cwd: Path
+    llm: LLM
+    max_step_attempts: int = 10
+    max_consecutive_failures: int = 3
+
+
+def transition(
+    state: State,
+    event: Event,
+    settings: Settings,
+) -> State:
+    """
+    single‑step transition for the task‑execution state‑machine
+
+    all long‑running side‑effects (llm calls, git commands, etc.) are executed
+    inside the relevant branches, so the caller only needs to keep feeding
+    events until a terminal state (`Complete` or `Failed`) is reached
+    """
+    match state, event:
+        # ────────────────────────────── terminal states ──────────────────────────────
+        case Complete(), _:
+            _perform_final_cleanup(settings.cwd)
+            return state
+
+        case Failed(), _:
+            _perform_final_cleanup(settings.cwd)
+            return state
+
+        # ─────────────────────────────── bootstrapping ───────────────────────────────
+        case ReadyForWork(), Tick():
+            return Attempt(
+                attempt=1,
+                consecutive_failed_steps=0,
+                consecutive_failed_attempts=0,
+                steps_made=0,
+                feedback=None,
+            )
+
+        # ─────────────────────────────── main work loop ──────────────────────────────
+        case Attempt(
+            attempt=attempt,
+            consecutive_failed_attempts=consecutive_failed_attempts,
+            consecutive_failed_steps=consecutive_failed_steps,
+            steps_made=steps_made,
+            feedback=feedback,
+        ), Tick():
+            # hard stop if we've run out of attempts
+            if attempt > settings.max_step_attempts:
+                return Failed(
+                    status=f"Exceeded maximum step attempts ({attempt})",
+                    attempt=attempt,
+                )
+
+            # 1️⃣  generate a step summary ------------------------------------------------
+            step_summary = _get_and_process_step_summary(settings, attempt, feedback)
+            if not step_summary:
+                consecutive_failed_attempts += 1
+                if consecutive_failed_attempts >= settings.max_consecutive_failures:
+                    return Failed(
+                        status=f"Too many consecutive failures ({consecutive_failed_attempts}) "
+                        "to generate attempt summary",
+                        attempt=attempt,
+                    )
+                return Attempt(
+                    attempt=attempt + 1,
+                    consecutive_failed_steps=consecutive_failed_steps,
+                    consecutive_failed_attempts=consecutive_failed_attempts,
+                    steps_made=steps_made,
+                    feedback=feedback,
+                )
+
+            # after generating a valid step summary, hand over to the Evaluate state
+            return Evaluate(
+                attempt=attempt,
+                consecutive_failed_steps=consecutive_failed_steps,
+                consecutive_failed_attempts=consecutive_failed_attempts,
+                steps_made=steps_made,
+                feedback=feedback,
+                step_summary=step_summary,
+            )
+
+        # ────────────────────────────── evaluation loop ──────────────────────────────
+        case Evaluate(
+            attempt=attempt,
+            consecutive_failed_attempts=consecutive_failed_attempts,
+            consecutive_failed_steps=consecutive_failed_steps,
+            steps_made=steps_made,
+            feedback=feedback,
+            step_summary=step_summary,
+        ), Tick():
+            # 2️⃣  judge the step ---------------------------------------------------------
+            verdict, evaluation = _evaluate_step(settings, step_summary)
+            log(f"debug: step verdict {verdict}", message_type=LLMOutputType.DEBUG)
+            if not verdict:
+                consecutive_failed_attempts += 1
+                if consecutive_failed_attempts >= settings.max_consecutive_failures:
+                    return Failed(
+                        status="Too many consecutive failures to evaluate step",
+                        attempt=attempt,
+                    )
+                return Attempt(
+                    attempt=attempt + 1,
+                    consecutive_failed_steps=consecutive_failed_steps,
+                    consecutive_failed_attempts=consecutive_failed_attempts,
+                    steps_made=steps_made,
+                    feedback=evaluation or "Failed to evaluate step",
+                )
+
+            # 3️⃣  branch on verdict ------------------------------------------------------
+            match verdict:
+                case StepVerdict.SUCCESS:
+                    # hand over to the completion‑review state
+                    return ReviewCompletion(
+                        attempt=attempt,
+                        consecutive_failed_steps=consecutive_failed_steps,
+                        consecutive_failed_attempts=consecutive_failed_attempts,
+                        steps_made=steps_made,
+                        feedback=evaluation,
+                    )
+
+                case StepVerdict.PARTIAL:
+                    return Attempt(
+                        attempt=attempt + 1,
+                        consecutive_failed_steps=consecutive_failed_steps,
+                        consecutive_failed_attempts=consecutive_failed_attempts,
+                        steps_made=steps_made,
+                        feedback=evaluation,
+                    )
+
+                case StepVerdict.FAILURE:
+                    consecutive_failed_attempts += 1
+                    if consecutive_failed_attempts >= settings.max_consecutive_failures:
+                        return Failed(
+                            status="Too many consecutive failures in step",
+                            attempt=attempt,
+                        )
+                    return Attempt(
+                        attempt=attempt + 1,
+                        consecutive_failed_steps=consecutive_failed_steps + 1,
+                        consecutive_failed_attempts=consecutive_failed_attempts,
+                        steps_made=steps_made,
+                        feedback=evaluation,
+                    )
+
+                case other:
+                    assert_never(other)
+
+        # ─────────────────── completion‑review loop ───────────────────
+        case ReviewCompletion(
+            attempt=attempt,
+            consecutive_failed_attempts=consecutive_failed_attempts,
+            consecutive_failed_steps=consecutive_failed_steps,
+            steps_made=steps_made,
+            feedback=feedback,
+        ), Tick():
+            completion_result = _handle_successful_step(settings, attempt, steps_made)
+
+            match completion_result.status:
+                case TaskVerdict.COMPLETE:
+                    return Complete(status=completion_result.feedback, attempt=attempt)
+                case TaskVerdict.CONTINUE:
+                    return Attempt(
+                        attempt=attempt + 1,
+                        consecutive_failed_steps=0,
+                        consecutive_failed_attempts=0,
+                        steps_made=steps_made + 1,
+                        feedback=completion_result.feedback,
+                    )
+                case "failed":
+                    log("Failed to evaluate task completion", message_type=LLMOutputType.ERROR)
+                    return Attempt(
+                        attempt=attempt + 1,
+                        consecutive_failed_steps=consecutive_failed_steps + 1,
+                        consecutive_failed_attempts=consecutive_failed_attempts + 1,
+                        steps_made=steps_made,
+                        feedback="Failed to evaluate task completion",
+                    )
+                case other:
+                    assert_never(other)
+
+        # ────────────────────────────── fallback guard ───────────────────────────────
+        case _, _:
+            log(
+                f"Unhandled transition from {state} with event {event}",
+                message_type=LLMOutputType.ERROR,
+            )
+            return state
+
+
+def _get_step_summary(settings: Settings, attempt: int, feedback: Optional[str]) -> Optional[str]:
+    """
+    Generate the implementation prompt for a single attempt, invoke the LLM,
+    and return its natural‑language summary of work done.
+
+    The LLM must start its reply with 'My summary of the step:' and finish with
+    'This is the end of the attempt summary'.  Return `None` when the model
+    fails to produce a response.
+    """
     impl_prompt = (
-        f"Execution phase. You are implementing this task: {repr(task)}. This is your attempt #{attempt} out of {max_implementation_attempts}.\n\n"
-        "Based on this plan:\n\n"
-        f"{plan}\n\n"
+        f"Execution phase. You are implementing this task: {repr(settings.task)}. This is your attempt #{attempt} out of {settings.max_step_attempts}.\n"
+        "\n"
+        "Based on this plan:\n"
+        "\n"
+        f"{settings.plan}\n"
+        "\n"
         f"{f'And the feedback about your previous attempt:\n\n{feedback}\n\n' if feedback else ''}"
-        f"Implement the next step for task {repr(task)}.\n"
+        f"Implement the next step for task {repr(settings.task)}.\n"
         "Create files, run commands, and/or write code as needed.\n"
-        "When done, output a concise summary of what you did, starting with 'My summary of the implementation:'.\n"
-        "Your response will help the reviewer of your implementation understand the changes made.\n"
-        "Finish your response with 'This is the end of the implementation summary'.\n"
+        "When done, output a concise summary of what you did, starting with 'My summary of the step:'.\n"
+        "Your response will help the reviewer of your step understand the changes made.\n"
+        "Finish your response with 'This is the end of the attempt summary'.\n"
     )
 
     if config.implement.extra_prompt:
-        impl_prompt += f"\n\n{config.implement.extra_prompt}"
+        impl_prompt += f"""\n\n{config.implement.extra_prompt}"""
 
-    status_manager.update_status("Getting implementation")
-    return llm.run(impl_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
+    status_manager.update_status("Getting step")
+    return settings.llm.run(impl_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.LLM_RESPONSE)
 
 
-def _get_and_process_implementation_summary(
-    llm: LLM,
-    task: str,
-    attempt: int,
-    max_implementation_attempts: int,
-    plan: str,
-    feedback: Optional[str],
-    cwd: Path,
-) -> Optional[str]:
-    implementation_summary = _get_implementation_summary(
-        llm=llm,
-        task=task,
-        attempt=attempt,
-        max_implementation_attempts=max_implementation_attempts,
-        plan=plan,
-        feedback=feedback,
-        cwd=cwd,
-    )
-    if not implementation_summary:
-        status_manager.update_status("Failed to get implementation.", style="red")
-        log("Failed to get implementation", message_type=LLMOutputType.ERROR)
+def _get_and_process_step_summary(settings: Settings, attempt: int, feedback: Optional[str]) -> Optional[str]:
+    """
+    Call `_get_step_summary`, run the optional post‑implementation hook, and
+    handle status/logging.  Returns the step summary or `None` on failure.
+    """
+    step_summary = _get_step_summary(settings, attempt, feedback)
+    if not step_summary:
+        status_manager.update_status("Failed to get step.", style="red")
+        log("Failed to get step", message_type=LLMOutputType.ERROR)
         return None
 
-    if config.post_implementation_hook_command:
+    if hasattr(config, "post_implementation_hook_command") and config.post_implementation_hook_command:
         run(
             config.post_implementation_hook_command,
-            "Running post-implementation hook command",
-            directory=cwd,
+            "Running post-step hook command",
+            directory=settings.cwd,
             shell=True,
         )
-    return implementation_summary
+    return step_summary
 
 
-def _evaluate_implementation(
-    llm: LLM,
-    task: str,
-    implementation_summary: str,
-    base_commit: str,
-    cwd: Path,
-) -> tuple[Optional[ImplementationVerdict], Optional[str]]:
+def _evaluate_step(settings: Settings, step_summary: Optional[str]) -> tuple[Optional[StepVerdict], Optional[str]]:
     eval_prompt = (
-        f"Evaluate if this implementation makes progress on the task {repr(task)}.\n"
+        f"Evaluate if this step makes progress on the task {repr(settings.task)}.\n"
         "The first line of your response must be:\n"
         "  - SUCCESS SUCCESS SUCCESS if it's a good step forward;\n"
         "  - PARTIAL PARTIAL PARTIAL if it's somewhat helpful;\n"
         "  - FAILURE FAILURE FAILURE if it's not useful.\n"
-        "For the 'success' verdict, provide a brief comment on the implementation.\n"
+        "For the 'success' verdict, provide a brief comment on the step.\n"
         "For the 'partial' verdict, provide specific feedback on what could be improved or what remains to be done.\n"
-        "For the 'failure' verdict, list specific reasons why the implementation is inadequate.\n"
-        "The implementation is either in the uncommitted changes, in the previous commits, or both.\n"
-        "Here is the summary of the implementation:\n\n"
-        f"{implementation_summary}\n\n"
+        "For the 'failure' verdict, list specific reasons why the step is inadequate.\n"
+        "The step is either in the uncommitted changes, in the previous attempts, or both.\n"
+        "Here is the summary of the step:\n\n"
+        f"{step_summary}\n\n"
         "Here are the uncommitted changes:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
-        "Here is the diff of the changes made in previous commits:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
+        f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        "Here is the diff of the changes made in previous attempts:\n\n"
+        f"{format_tool_code_output(run(['git', 'diff', settings.base_attempt + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "To remind you: you *must* output the *final* verdict in the first line of your response.\n"
         "If you need to do any checks, do them before outputting the verdict.\n"
     )
@@ -121,47 +401,54 @@ def _evaluate_implementation(
     if config.implement.judge_extra_prompt:
         eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
 
-    status_manager.update_status("Evaluating implementation")
-    evaluation = llm.run(eval_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION)
-    verdict = check_verdict(ImplementationVerdict, evaluation or "")
+    status_manager.update_status("Evaluating step")
+    evaluation = settings.llm.run(eval_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.EVALUATION)
+    verdict = check_verdict(StepVerdict, evaluation or "")
     return verdict, evaluation
 
 
 @dataclass(frozen=True)
-class ImplementationPhaseResult:
-    status: Literal["complete", "in_progress", "failed", "interrupted", "incomplete"]
+class StepPhaseResult:
+    status: TaskVerdict | Literal["failed"]
     feedback: Optional[str] = None
+    attempt: int = 0
 
 
-def _handle_successful_implementation(
-    llm: LLM,
-    task: str,
-    cwd: Path,
-    base_commit: str,
-) -> ImplementationPhaseResult:
-    # Generate commit message and commit
+def _generate_commit_message(settings: Settings) -> str:
+    """Generate and return a concise, single‑line commit message for the current step."""
     status_manager.update_status("Generating commit message")
     commit_msg_prompt = (
-        f"Generate a concise commit message (max 15 words) for this implementation step: {repr(task)}.\n"
+        f"Generate a concise commit message (max 15 words) for this step: {repr(settings.task)}.\n"
         "You *may not* output Markdown, code blocks, or any other formatting.\n"
         "You may only output a single line.\n"
     )
-    commit_msg = llm.run(commit_msg_prompt, yolo=False, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
+    commit_msg = settings.llm.run(
+        commit_msg_prompt,
+        yolo=False,
+        cwd=settings.cwd,
+        response_type=LLMOutputType.LLM_RESPONSE,
+    )
     if not commit_msg:
-        commit_msg = "Implementation step for task"
+        commit_msg = "Step for task"
+    return commit_msg
 
-    status_manager.update_status("Committing implementation")
-    run(["git", "add", "."], "Adding implementation files", directory=cwd)
+
+def _commit_step(settings: Settings, commit_msg: str) -> None:
+    """Stage and commit the changes for this step."""
+    status_manager.update_status("Committing step")
+    run(["git", "add", "."], "Adding files", directory=settings.cwd)
     run(
         ["git", "commit", "-m", f"{commit_msg[:100]}"],
-        "Committing implementation",
-        directory=cwd,
+        "Committing step",
+        directory=settings.cwd,
     )
 
-    # Check if task is complete
+
+def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict], Optional[str]]:
+    """Ask the LLM whether the overall task is finished after this step."""
     status_manager.update_status("Checking if task is complete...")
     completion_prompt = (
-        f"Is the task {repr(task)} now complete based on the work done?\n"
+        f"Is the task {repr(settings.task)} now complete based on the work done?\n"
         "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
         "You may not finish your response at 'I have to check ...' or 'I have to inspect files ...' - you must use your tools to check directly.\n"
         "The first line of your response must be:\n"
@@ -169,9 +456,9 @@ def _handle_successful_implementation(
         "  - CONTINUE CONTINUE CONTINUE if more work is needed.\n"
         "If 'continue', provide specific next steps to take, or objections to address.\n"
         "Here are the uncommitted changes:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
-        "Here is the diff of the changes made in previous commits:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
+        f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        "Here is the diff of the changes made in previous attempts:\n\n"
+        f"{format_tool_code_output(run(['git', 'diff', settings.base_attempt + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "To remind you: you *must* output the *final* verdict in the first line of your response.\n"
         "If you need to do any checks, do them before outputting the verdict.\n"
     )
@@ -179,13 +466,29 @@ def _handle_successful_implementation(
     if config.implement.completion.judge_extra_prompt:
         completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
 
-    completion_evaluation = llm.run(completion_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION)
-    completion_verdict = check_verdict(TaskCompletionVerdict, completion_evaluation or "")
+    completion_evaluation = settings.llm.run(
+        completion_prompt,
+        yolo=True,
+        cwd=settings.cwd,
+        response_type=LLMOutputType.EVALUATION,
+    )
+    completion_verdict = check_verdict(TaskVerdict, completion_evaluation or "")
+    return completion_verdict, completion_evaluation
 
+
+def _handle_successful_step(settings: Settings, attempt: int, steps_made: int) -> StepPhaseResult:
+    # 1. generate commit message and commit the step
+    commit_msg = _generate_commit_message(settings)
+    _commit_step(settings, commit_msg)
+
+    # 2. ask the LLM whether the task is done
+    completion_verdict, completion_evaluation = _evaluate_task_completion(settings)
+
+    # 3. interpret the verdict and produce a StepPhaseResult
     if not completion_evaluation:
         status_manager.update_status("Failed to get a task completion evaluation.", style="red")
         log("LLM provided no output", message_type=LLMOutputType.ERROR)
-        return ImplementationPhaseResult(
+        return StepPhaseResult(
             status="failed",
             feedback="Failed to get a task completion evaluation",
         )
@@ -196,279 +499,129 @@ def _handle_successful_implementation(
             f"Couldn't determine the verdict from the task completion evaluation. Evaluation was:\n\n{completion_evaluation}",
             message_type=LLMOutputType.ERROR,
         )
-        return ImplementationPhaseResult(
+        return StepPhaseResult(
             status="failed",
             feedback="Couldn't determine the verdict from the task completion evaluation",
         )
 
-    elif completion_verdict == TaskCompletionVerdict.COMPLETE:
-        status_manager.update_status("Task marked as complete.")
-        log("Task marked as complete", message_type=LLMOutputType.STATUS)
-        return ImplementationPhaseResult(
-            status="complete",
-            feedback=completion_evaluation,
-        )
+    match completion_verdict:
+        case TaskVerdict.COMPLETE:
+            status_manager.update_status("Task marked as complete.")
+            log("Task marked as complete", message_type=LLMOutputType.STATUS)
+            return StepPhaseResult(
+                status=TaskVerdict.COMPLETE,
+                feedback=completion_evaluation,
+                attempt=attempt,
+            )
 
-    elif completion_verdict == TaskCompletionVerdict.CONTINUE:
-        status_manager.update_status("Task not complete, continuing implementation.")
-        log("Task not complete, continuing implementation", message_type=LLMOutputType.STATUS)
-        return ImplementationPhaseResult(
-            status="in_progress",
-            feedback=completion_evaluation,
-        )
+        case TaskVerdict.CONTINUE:
+            status_manager.update_status("Task not complete, continuing step.")
+            log("Task not complete, continuing step", message_type=LLMOutputType.STATUS)
+            return StepPhaseResult(
+                status=TaskVerdict.CONTINUE,
+                feedback=completion_evaluation,
+                attempt=attempt,
+            )
 
-    else:
-        assert_never(completion_verdict)
+        case other:
+            assert_never(other)
+
+
+@dataclass(frozen=True)
+class ImplementationPhaseResult:
+    """
+    Result of the implementation phase.
+    Contains the status, feedback, and attempt number.
+    """
+
+    status: Literal["complete", "failed", "interrupted"]
+    feedback: Optional[str] = None
+    attempt: int = 0
 
 
 def implementation_phase(
     *,
     task: str,
     plan: str,
-    base_commit: str,
+    base_attempt: str,
     cwd: Path,
     llm: LLM,
 ) -> ImplementationPhaseResult:
     """
-    Manages the iterative implementation phase of a task.
-
-    This function guides the agent through generating code, executing commands,
-    and evaluating the results, with a mechanism for early bailout if progress
-    stalls.
-
-    The core loop involves:
-    1.  **Generating Implementation:** The LLM is prompted with the task, plan, and
-        previous feedback to generate the next implementation step. This prompt
-        (`impl_prompt`) includes details about the current attempt number and
-        expects a concise summary of the changes made.
-    2.  **Post-Implementation Hook (Optional):** If configured, a shell command
-        (`config.post_implementation_hook_command`) is executed after the LLM
-        provides an implementation summary. This can be used for automated
-        checks or actions.
-    3.  **Evaluating Implementation:** The LLM is then prompted to evaluate the
-        generated implementation. This evaluation prompt (`eval_prompt`) includes
-        the implementation summary, uncommitted changes (`git diff`), and changes
-        from previous commits (`git diff base_commit..HEAD`). The LLM is expected
-        to return a verdict (SUCCESS, PARTIAL, FAILURE) and corresponding feedback.
-    4.  **Handling Verdicts:**
-        *   **SUCCESS:** If the implementation is successful, a commit message is
-            generated by the LLM, and the changes are committed. Then, the LLM
-            is prompted to check if the overall task is complete (`completion_prompt`).
-            If complete, the phase ends; otherwise, the loop continues with the
-            new feedback.
-        *   **PARTIAL:** If the implementation makes partial progress, the loop
-            continues with the feedback provided by the LLM.
-        *   **FAILURE:** If the implementation fails, a consecutive failure counter
-            is incremented. If this counter reaches a threshold (`max_consecutive_failures`),
-            the implementation phase bails out. Otherwise, the loop continues with
-            the feedback.
-    5.  **Bailout Conditions:** The loop can bail out early due to:
-        *   Reaching `max_implementation_attempts`.
-        *   Reaching `max_consecutive_failures`.
-        *   No commits being made after a certain number of attempts (`attempts >= 5 and commits_made == 0`).
-        *   User interruption (KeyboardInterrupt).
-        *   Unhandled exceptions.
-
-    Finally, a cleanup step attempts to commit any remaining uncommitted changes.
-
-    **LLM Interactions:**
-    - **Implementation Summary Generation:** The `_get_implementation_summary` function
-      prompts the LLM to generate a summary of the implementation steps taken. This
-      is a free-form response from the LLM, intended to describe the changes it made.
-    - **Implementation Evaluation:** The `_evaluate_implementation` function prompts
-      the LLM to evaluate the generated implementation. The LLM is expected to
-      return a specific verdict (SUCCESS, PARTIAL, FAILURE) and provide feedback
-      based on the current state of the repository (uncommitted changes and
-      previous commits). This is a structured response that is parsed to determine
-      the next steps.
-    - **Commit Message Generation:** When an implementation step is successful, the
-      LLM is prompted to generate a concise commit message using `_handle_successful_implementation`.
-      This is a single-line, free-form response.
-    - **Task Completion Check:** After a successful implementation and commit, the
-      `_handle_successful_implementation` function prompts the LLM to determine
-      if the overall task is complete. The LLM is expected to return a specific
-      verdict (COMPLETE, CONTINUE) and provide reasoning. This is a structured
-      response that dictates whether the implementation phase should end or continue.
-
-    Args:
-        task: The description of the task being implemented.
-        plan: The implementation plan generated in the planning phase.
-        base_commit: The Git commit SHA to base the implementation branch on.
-        cwd: The current working directory for task execution as a Path.
-        llm: The LLM instance to use for interactions.
-
-    Returns:
-        A dictionary containing the status of the implementation and any feedback.
+    high‑level driver that repeatedly feeds events into the state‑machine
+    until a terminal state is reached
     """
-    status_manager.set_phase("Implementation")
-    print_formatted_message(f"Starting implementation phase for task: {task}", message_type=LLMOutputType.STATUS)
+    status_manager.set_phase("Step")
+    print_formatted_message(
+        f"Starting step phase for task: {task}",
+        message_type=LLMOutputType.STATUS,
+    )
 
-    max_implementation_attempts = 10
-    max_consecutive_failures = 3
-    consecutive_failures = 0
-    commits_made = 0
+    state: State = ReadyForWork()
+    settings = Settings(
+        task=task,
+        plan=plan,
+        base_attempt=base_attempt,
+        cwd=cwd,
+        llm=llm,
+    )
 
-    feedback: Optional[str] = None
-    result: Optional[ImplementationPhaseResult] = None
     try:
-        for attempt in range(1, max_implementation_attempts + 1):
-            status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
-            print_formatted_message(f"Implementation attempt {attempt}", message_type=LLMOutputType.STATUS)
+        # kick‑off
+        log(f"debug: transition {state} with Tick event", message_type=LLMOutputType.DEBUG)
+        state = transition(state, Tick(), settings)
 
-            implementation_summary = _get_and_process_implementation_summary(
-                llm=llm,
-                task=task,
-                attempt=attempt,
-                max_implementation_attempts=max_implementation_attempts,
-                plan=plan,
-                feedback=feedback,
-                cwd=cwd,
-            )
+        # main loop: keep working while we're in `Attempt`, `Evaluate`, or `ReviewCompletion`
+        while isinstance(state, (Attempt, Evaluate, ReviewCompletion)):
+            log(f"debug: transition {state} with Tick event", message_type=LLMOutputType.DEBUG)
+            state = transition(state, Tick(), settings)
 
-            if not implementation_summary:
-                consecutive_failures += 1
-                if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
-                    result = ImplementationPhaseResult(
-                        status="failed",
-                        feedback="Too many consecutive failures to get an implementation",
-                    )
-                    break
-                continue
-
-            verdict, evaluation = _evaluate_implementation(
-                llm=llm,
-                task=task,
-                implementation_summary=implementation_summary,
-                base_commit=base_commit,
-                cwd=cwd,
-            )
-
-            if not evaluation:
-                status_manager.update_status("Failed to get an evaluation.", style="red")
-                log("LLM provided no output", message_type=LLMOutputType.ERROR)
-
-            elif not verdict:
-                status_manager.update_status("Failed to get a verdict.", style="red")
-                log(
-                    f"Couldn't determine the verdict from the evaluation. Evaluation was:\n\n{evaluation}",
-                    message_type=LLMOutputType.ERROR,
-                )
-
-            if not verdict or not evaluation:
-                consecutive_failures += 1
-                # If we have too many consecutive failures, give up and exit the loop
-                if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
-                    result = ImplementationPhaseResult(
-                        status="failed",
-                        feedback="Too many consecutive failures to evaluate implementation",
-                    )
-                    break
-                else:
-                    # Ok let's try again, go back to the start of the loop
-                    continue
-
-            # We have our verdict
-            feedback = evaluation  # Store feedback for next iteration
-
-            if verdict == ImplementationVerdict.SUCCESS:
-                status_manager.update_status(f"Successful (attempt {attempt}).")
-                log(f"Implementation successful in attempt {attempt}", message_type=LLMOutputType.STATUS)
-                consecutive_failures = 0
-                commits_made += 1
-
-                completion_result = _handle_successful_implementation(
-                    llm=llm,
-                    task=task,
-                    cwd=cwd,
-                    base_commit=base_commit,
-                )
-                if completion_result.status == "complete":
-                    result = completion_result
-                    break
-                else:
-                    feedback = completion_result.feedback
-
-            elif verdict == ImplementationVerdict.PARTIAL:
-                status_manager.update_status(f"Partial progress (attempt {attempt}).")
-                log(f"Partial progress in attempt {attempt}", message_type=LLMOutputType.STATUS)
-
-            elif verdict == ImplementationVerdict.FAILURE:
-                status_manager.update_status(f"Failed (attempt {attempt}).", style="red")
-                log(f"Implementation failed in attempt {attempt}", message_type=LLMOutputType.ERROR)
-                consecutive_failures += 1
-                if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
-                    result = ImplementationPhaseResult(
-                        status="failed", feedback="Too many consecutive failures in implementation"
-                    )
-                    break
-
-            else:
-                # Typechecker will warn us if we miss a case
-                assert_never(verdict)
-
-            # Check if we've made no commits recently
-            bailout_check_result = _check_bailout_conditions(
-                attempt, commits_made, consecutive_failures, max_consecutive_failures
-            )
-            if bailout_check_result.bailout:
-                log(bailout_check_result.reason, message_type=LLMOutputType.ERROR)
-                result = ImplementationPhaseResult(status="failed", feedback=bailout_check_result.reason)
-                break
-        else:
-            # If we exit the loop without breaking, it means we reached max attempts
-            log(
-                f"Implementation incomplete after {max_implementation_attempts} attempts",
-                message_type=LLMOutputType.ERROR,
-            )
-            status_manager.update_status("Incomplete.", style="red")
-            return ImplementationPhaseResult(
-                status="incomplete", feedback="Implementation incomplete after maximum attempts"
-            )
+        log(f"debug: final state {state}", message_type=LLMOutputType.DEBUG)
 
     except KeyboardInterrupt:
-        log("Implementation interrupted by user (KeyboardInterrupt)", message_type=LLMOutputType.ERROR)
+        log(
+            "Step interrupted by user (KeyboardInterrupt)",
+            message_type=LLMOutputType.ERROR,
+        )
         status_manager.update_status("Interrupted by user.", style="red")
-        result = ImplementationPhaseResult(status="interrupted", feedback="Implementation interrupted by user")
-    except Exception as e:
-        log(f"Implementation failed: {e}", message_type=LLMOutputType.ERROR)
-        status_manager.update_status("Implementation failed.", style="red")
-        result = ImplementationPhaseResult(status="failed", feedback=str(e))
-    finally:
-        _perform_final_cleanup(cwd)
-    return result
+        return ImplementationPhaseResult(
+            status="interrupted",
+            feedback="Step interrupted by user",
+        )
 
-
-@dataclass(frozen=True)
-class BailoutCheckResult:
-    bailout: bool
-    reason: str
-
-
-def _check_bailout_conditions(
-    attempt: int,
-    commits_made: int,
-    consecutive_failures: int,
-    max_consecutive_failures: int,
-) -> BailoutCheckResult:
-    if consecutive_failures >= max_consecutive_failures:
-        return BailoutCheckResult(bailout=True, reason="Too many consecutive failures, giving up")
-    if attempt >= 5 and commits_made == 0:
-        return BailoutCheckResult(bailout=True, reason="No commits made in 5 attempts, giving up")
-    return BailoutCheckResult(bailout=False, reason="")
+    # collapse terminal states into a uniform result
+    if isinstance(state, Complete):
+        return ImplementationPhaseResult(
+            status="complete",
+            feedback=state.status,
+            attempt=state.attempt,
+        )
+    elif isinstance(state, Failed):
+        return ImplementationPhaseResult(
+            status="failed",
+            feedback=state.status,
+            attempt=state.attempt,
+        )
+    elif isinstance(state, ReadyForWork):
+        log("Step phase ended without any attempts made", message_type=LLMOutputType.ERROR)
+        return ImplementationPhaseResult(
+            status="failed",
+            feedback="No attempts made in step phase",
+            attempt=0,
+        )
+    else:
+        assert_never(state)
 
 
 def _perform_final_cleanup(cwd: Path):
     try:
         diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=cwd)
         if not diff["success"]:
-            run(["git", "add", "."], "Adding remaining files before final commit", directory=cwd)
+            run(["git", "add", "."], "Adding remaining files before final attempt", directory=cwd)
             run(
-                ["git", "commit", "-m", "Final commit (auto)"],
-                "Final commit after implementation phase",
+                ["git", "attempt", "-m", "Final attempt (auto)"],
+                "Final attempt after step phase",
                 directory=cwd,
             )
     except Exception as e:
-        log(f"Failed to make final commit: {e}", message_type=LLMOutputType.TOOL_ERROR)
+        log(f"Failed to make final attempt: {e}", message_type=LLMOutputType.TOOL_ERROR)
