@@ -105,23 +105,7 @@ def main() -> None:
     write_state({})
 
     base = cli_settings.base if cli_settings.base is not None else config.default_base or "main"
-
-    worktree_path = None
-    # Worktree is enabled by default unless --no-worktree is specified
-    if not cli_settings.no_worktree:
-        log(
-            "Temporary worktree mode enabled. Will create a git worktree for the task.",
-            LLMOutputType.STATUS,
-        )
-        worktree_path = Path(tempfile.mkdtemp(prefix="agent_worktree_"))
-        try:
-            git_utils.add_worktree(worktree_path, rev=base, cwd=effective_cwd)
-            work_dir = worktree_path
-        except Exception as e:
-            log(f"Failed to create temporary worktree: {e}", LLMOutputType.TOOL_ERROR)
-            exit(1)
-    else:
-        work_dir = effective_cwd
+    work_dir = effective_cwd
 
     log(f"Using working directory: {work_dir}", LLMOutputType.STATUS)
 
