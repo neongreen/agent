@@ -11,7 +11,7 @@ from .config import AgentConfig, TomlConfig
 from .constants import STATE_FILE
 from .gemini_agent import choose_tasks, discover_tasks
 from .state_manager import write_state
-from .task_processor import process_task
+from .task_orchestrator import process_task
 from .ui import status_manager
 from .utils import log
 
