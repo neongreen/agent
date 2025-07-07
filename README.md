@@ -1,0 +1,90 @@
+# Agent
+
+## Description
+
+This tool provides an agentic loop for processing tasks.
+
+## Features
+
+- Task discovery from prompts or files
+- Iterative planning phase with Gemini approval
+- Iterative implementation phase with Gemini evaluation
+- Git branch management for each task
+- Configurable via `.agent.toml`
+
+## Installation
+
+1. **Install `uv`**
+2. **Run:** `uv run python -m src.main`
+
+## Usage
+
+### Basic Usage
+
+To process a single task, provide the task description as a prompt:
+
+```bash
+uv run python -m src.main "Implement a new user authentication module"
+```
+
+### Multi-Task Mode
+
+If your prompt contains multiple distinct tasks, you can use the `--multi` flag to have the agent discover and allow you to select tasks:
+```bash
+uv run python -m src.main "Refactor the database layer, then add a new API endpoint for user profiles."
+
+```bash
+uv run python -m src.main --multi "Refactor the database layer, then add a new API endpoint for user profiles."
+```
+
+The agent will list the discovered tasks and prompt you to select which ones to process.
+Each task will be processed in its own git branch starting from the specified base.
+Tasks are *parallel*, not sequential.
+
+### Specifying Working Directory
+
+You can specify a different working directory for the agent to operate in using the `--cwd` flag:
+
+```bash
+uv run python -m src.main "Fix bug in login flow" --cwd /path/to/your/project
+```
+
+### Specifying Base Branch
+
+By default, the agent will create task branches from `main`. You can specify a different base branch, commit, or git specifier using the `--base` flag:
+
+```bash
+uv run python -m src.main "Add feature X" --base develop
+```
+
+### Suppressing Output
+
+To suppress informational output from the agent, use the `--quiet` flag:
+
+```bash
+uv run python -m src.main "Optimize image loading" --quiet
+```
+
+## Configuration
+
+The agent can be configured using a `.agent.toml` file in the project root directory.
+This file allows you to set default behaviors and provide additional instructions for the agent's planning phase.
+
+Sample `.agent.toml`:
+
+```toml
+# Specifies the default base branch, commit, or git specifier to use when creating task branches.
+# If not set, `main` is used as the default.
+default-base = "HEAD"
+
+[plan]
+# Provides an additional prompt to the Gemini model during the plan review process.
+# This can be used to enforce specific rules or guidelines for plans.
+judge-extra-prompt = """
+  You must reject the plan if it proposes writing tests.
+"""
+```
+
+## License
+
+This project is licensed under the MIT License.
