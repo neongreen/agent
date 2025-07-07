@@ -85,7 +85,8 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
             )
             return None
 
-        if current_review.upper().startswith("APPROVED"):
+        # Jul 2025: Opencode is special and outputs "VED" instead of "APPROVED" sometimes (...often)
+        if current_review.upper().startswith("APPROVED") or current_review.upper().startswith("VED"):
             status_manager.update_status(f"Approved in round {round_num}.")
             print_formatted_message(
                 format_llm_thought(f"Plan approved in round {round_num}"), message_type=LLMOutputType.THOUGHT
