@@ -10,5 +10,8 @@ class TaskState(Enum):
 
 
 # Constants
-LOG_FILE = ".agentic-log"
-STATE_FILE = Path(".agent_state.json")
+AGENT_TEMP_DIR = Path(".agent")
+LOG_FILE = AGENT_TEMP_DIR / ".agentic-log"
+STATE_FILE = AGENT_TEMP_DIR / ".agent_state.json"
+PLAN_FILE = AGENT_TEMP_DIR / "plan.md"
+TASK_META_DIR = AGENT_TEMP_DIR / "task_meta"

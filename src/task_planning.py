@@ -1,7 +1,7 @@
-import os
 from typing import Optional
 
 from .config import AgentConfig
+from .constants import AGENT_TEMP_DIR, PLAN_FILE
 from .gemini_agent import run_gemini
 from .ui import status_manager
 from .utils import log, run
@@ -74,8 +74,8 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
             plan = current_plan  # This is the approved plan
 
             # Commit the approved plan
-            plan_path = os.path.join(cwd, "plan.md") if cwd else "plan.md"
-            with open(plan_path, "w") as f:
+            PLAN_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(PLAN_FILE, "w") as f:
                 f.write(f"# Plan for {task}\n\n{plan}")
 
             # Generate commit message
@@ -86,9 +86,9 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
                 commit_msg = "Approved plan for task"
 
             status_manager.update_status("Committing approved plan")
-            run(["git", "add", "."], "Adding plan files", directory=cwd)
+            run(["git", "add", str(AGENT_TEMP_DIR)], "Adding plan files", directory=cwd)
             run(
-                ["git", "commit", "-m", f"[plan.md] {commit_msg[:100]}"],
+                ["git", "commit", "-m", f"[{PLAN_FILE.name}] {commit_msg[:100]}"],
                 "Committing approved plan",
                 directory=cwd,
             )

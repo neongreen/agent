@@ -1,9 +1,10 @@
 import json
-import os
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
+from .constants import TASK_META_DIR
 from .gemini_agent import run_gemini
 from .utils import log, run
 
@@ -109,7 +110,14 @@ def setup_task_branch(task, task_num, base: str, cwd=None) -> bool:
     # Write task metadata
     task_meta = {"number": task_num, "title": task, "timestamp": datetime.now().isoformat()}
 
-    task_meta_path = os.path.join(cwd, ".task-meta") if cwd else ".task-meta"
+    # Ensure the task_meta directory exists
+    if cwd:
+        full_task_meta_dir = Path(cwd) / TASK_META_DIR
+    else:
+        full_task_meta_dir = TASK_META_DIR
+    full_task_meta_dir.mkdir(parents=True, exist_ok=True)
+
+    task_meta_path = full_task_meta_dir / f"task-{task_num}.json"
     with open(task_meta_path, "w") as f:
         json.dump(task_meta, f, indent=2)
 
