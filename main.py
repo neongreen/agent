@@ -330,6 +330,8 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
     max_planning_rounds = 5
 
     plan: Optional[str] = None
+    previous_plan: Optional[str] = None
+    previous_review: Optional[str] = None
 
     for round_num in range(1, max_planning_rounds + 1):
         log(f"Planning round {round_num}", message_type="thought", indent_level=1)
@@ -342,25 +344,36 @@ You are granted access to tools, commands, and code execution for the *sole purp
 You *may not* use these tools to directly implement the task.
 Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.
 """.strip()
-
         else:
-            plan_prompt = f"Revise the plan for task {repr(task)} addressing the previous feedback. Create a better implementation plan."
+            plan_prompt = f"""
+Revise the following plan for task {repr(task)} based on the feedback provided:
 
-        plan = run_gemini(plan_prompt, yolo=True)
-        if not plan:
+Previous Plan:
+{previous_plan}
+
+Reviewer Feedback:
+{previous_review}
+
+Create a better implementation plan.
+Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.
+""".strip()
+
+        current_plan = run_gemini(plan_prompt, yolo=True)
+        if not current_plan:
             log("Failed to get plan from Gemini", message_type="tool_output_error", indent_level=2)
             return None
 
         # Ask Gemini to review the plan
-        review_prompt = f"Review this plan for task {repr(task)}:\n\n{plan}\n\nRespond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."
+        review_prompt = f"""Review this plan for task {repr(task)}:\n\n{current_plan}\n\nRespond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."""
 
-        review = run_gemini(review_prompt, yolo=True)
-        if not review:
+        current_review = run_gemini(review_prompt, yolo=True)
+        if not current_review:
             log("Failed to get plan review from Gemini", message_type="tool_output_error", indent_level=2)
             return None
 
-        if review.upper().startswith("APPROVED"):
+        if current_review.upper().startswith("APPROVED"):
             log(f"Plan approved in round {round_num}", message_type="thought", indent_level=2)
+            plan = current_plan  # This is the approved plan
 
             # Commit the approved plan
             plan_path = os.path.join(cwd, "plan.md") if cwd else "plan.md"
@@ -382,7 +395,13 @@ Output "PLAN_TEXT_END" after the plan. You may not output anything after that ma
 
             return plan
         else:
-            log(f"Plan rejected in round {round_num}: {review}", message_type="tool_output_error", indent_level=2)
+            log(
+                f"Plan rejected in round {round_num}: {current_review}",
+                message_type="tool_output_error",
+                indent_level=2,
+            )
+            previous_plan = current_plan  # Store for next round's prompt
+            previous_review = current_review  # Store for next round's prompt
 
     log(f"Planning failed after {max_planning_rounds} rounds", message_type="tool_output_error", indent_level=1)
     return None
