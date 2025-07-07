@@ -165,12 +165,12 @@ def choose_tasks(tasks):
             return []
 
 
-def setup_task_branch(task, task_num, cwd=None) -> bool:
+def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
     """Set up git branch for task."""
     log(f"Setting up branch for task {task_num}: {task}")
 
-    # Switch to main first
-    result = run(["git", "switch", "main"], "Switching to main branch", directory=cwd)
+    # Switch to base branch first
+    result = run(["git", "switch", base_branch], f"Switching to {base_branch} branch", directory=cwd)
     if not result["success"]:
         log("Failed to switch to main branch")
         return False
@@ -337,12 +337,12 @@ def implementation_phase(task, plan, cwd=None) -> bool:
     return False
 
 
-def process_task(task, task_num, cwd=None):
+def process_task(task: str, task_num: int, base_branch: str, cwd: Optional[str] = None) -> bool:
     """Process a single task through planning and implementation."""
     log(f"Processing task {task_num}: {task}")
 
     # Set up branch
-    if not setup_task_branch(task, task_num, cwd):
+    if not setup_task_branch(task, task_num, base_branch, cwd):
         log("Failed to set up task branch")
         return False
 
@@ -370,6 +370,9 @@ def main() -> None:
     parser.add_argument("prompt", help="Task source prompt or file path")
     parser.add_argument("--quiet", action="store_true", help="Suppress informational output")
     parser.add_argument("--cwd", help="Working directory for task execution")
+    parser.add_argument(
+        "--base", default="main", help="Base branch to switch to before creating a task branch (default: main)"
+    )
 
     args = parser.parse_args()
 
@@ -404,7 +407,7 @@ def main() -> None:
     # Process each selected task
     for i, task in enumerate(selected_tasks, 1):
         try:
-            process_task(task, i, cwd)
+            process_task(task, i, args.base, cwd)
         except Exception as e:
             log(f"Error processing task {i}: {e}")
 
