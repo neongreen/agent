@@ -13,6 +13,20 @@ run = "uv run agent"
 description = "Run all checks and tests"
 depends = ["lint", "pyright", "check-schema", "test"]
 
+# Note: this includes some formatting rules that are *not* checked by the linter.
+# This is because some of the linter warns are completely harmless.
+#
+# D213, D209 - format multiline docstrings
+# I, RUF022 - sort imports
+[tasks.format]
+description = "Format the Python files"
+run = """
+  ruff check --fix-only \
+    --extend-select D213,D209,I,RUF022 \
+    --config lint.isort.lines-after-imports=2; \
+  ruff format
+  """
+
 [tasks.generate-schema]
 description = "Generate config.schema.json from Pydantic"
 run = "uv run scripts/generate_schema.py"
@@ -31,15 +45,9 @@ run = """
   jj x 'fd .py | xargs uvx --isolated autoimport'
 """
 
-# D213, D209 - format multiline docstrings
-# I, RUF022 - sort imports
-[tasks.x-format]
-description = "Run ruff and other tools to format/ fix the Python files, across all commits"
-run = """
-  jj x -r 'mutable()' '\
-    ruff check --fix --extend-select D213,D209,I,RUF022; \
-    ruff format \
-  '"""
+[tasks.xformat]
+description = "Run 'format' across all commits"
+run = """jj x -r 'mutable()' 'MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run format'"""
 
 [tasks.clean-branches]
 description = "Remove all agent branches (bookmarks) below main"

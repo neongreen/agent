@@ -5,9 +5,8 @@
 default-base = "HEAD"
 
 post-implementation-hook-command = """
-  ruff format || true;
-  fd .py | xargs uvx --isolated autoimport;
-  """
+  MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run format
+"""
 
 [plan]
 planner-extra-prompt = """
@@ -15,21 +14,19 @@ planner-extra-prompt = """
   If you do, your plan will be rejected.
   The exception is if the **task** explicitly asks to write or run tests.
 
-  Please include these two checks:
-    - `ruff check` to check for syntax errors and lints
-    - `uv run pyright --project .` to typecheck
-  Both must pass before the task is considered complete.
+  Please include this step in your plan: `uv run pyright --project .`.
+  It must pass before the task is considered complete.
 """
 
 judge-extra-prompt = """
   You must reject the plan if:
-    - The plan proposes writing tests for anything other than pure functions that can be easily unit-tested.
-    - The plan proposes to run automatic tests or do testing manually, including "basic sanity checks" or "smoke testing".
-      Note that linters or type checkers *are allowed*.
-      Running tests written for pure functions is also allowed.
-    - The plan proposes to run the agent tool itself (src/agent/main.py).
-    - The plan proposes using `pip` or `poetry` (this project uses `uv`).
-    - The plan proposes pushing commits or creating pull requests.
+  - The plan proposes writing tests for anything other than pure functions that can be easily unit-tested.
+  - The plan proposes to run automatic tests or do testing manually, including "basic sanity checks" or "smoke testing".
+    Note that linters or type checkers *are allowed*.
+    Running tests written for pure functions is also allowed.
+  - The plan proposes to run the agent tool itself (src/agent/main.py).
+  - The plan proposes using `pip` or `poetry` (this project uses `uv`).
+  - The plan proposes pushing commits or creating pull requests.
 
   The exception is if the **task** explicitly asks to do any of these things.
   For example, if the task is "write a test for function Abc", then the plan can include writing and running a test for function `Abc`.

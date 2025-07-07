@@ -5,6 +5,4 @@ extend-select = [
   # "PTH", # Use pathlib
   "B", # Just nice rules, https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
   # "FBT", # Positional bools
-  "I", # Sort imports
 ]
-isort.lines-after-imports = 2
