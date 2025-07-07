@@ -110,7 +110,9 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
             # Generate commit message and commit
             status_manager.update_status("Generating commit message")
             commit_msg_prompt = (
-                f"Generate a concise commit message (max 15 words) for this implementation step: {repr(task)}"
+                f"Generate a concise commit message (max 15 words) for this implementation step: {repr(task)}.\n"
+                "You *may not* output Markdown, code blocks, or any other formatting.\n"
+                "You may only output a single line.\n"
             )
             commit_msg = run_llm(commit_msg_prompt, yolo=False)
             if not commit_msg:
