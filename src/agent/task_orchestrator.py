@@ -7,7 +7,7 @@ from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_br
 from .llm import LLM
 from .output_formatter import LLMOutputType, print_formatted_message
 from .state_manager import read_state, write_state
-from .task_implementation import implementation_phase
+from .task_implementation import ImplementationResult, implementation_phase
 from .task_planning import planning_phase
 from .ui import status_manager
 from .utils import log
@@ -20,7 +20,7 @@ def process_task(
     base_rev: str,
     cwd: Path,
     llm: LLM,
-) -> dict:
+) -> ImplementationResult:
     """
     Processes a single task through its planning and implementation phases.
 
@@ -31,7 +31,7 @@ def process_task(
         cwd: The current working directory for task execution as a Path.
 
     Returns:
-        True if the task is successfully completed, False otherwise.
+        Implementation status.
     """
     status_manager.set_phase(f"Task {task_num}")
     print_formatted_message((f"Processing task {task_num}: {task}"), message_type=LLMOutputType.STATUS)
@@ -107,13 +107,11 @@ def process_task(
 
     # Implementation phase
     assert plan is not None, "Plan should not be None at this point"
-    implementation_result = {"status": "failed", "feedback": "Implementation not attempted"}
+    result: ImplementationResult = {"status": "failed", "feedback": "Implementation not attempted"}
     if current_task_state() == TaskState.IMPLEMENT.value:
         assert resolved_base_commit_sha is not None, "resolved_base_commit_sha should not be None at this point"
-        implementation_result = implementation_phase(
-            task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd, llm=llm
-        )
-        if implementation_result["status"] == "completed":
+        result = implementation_phase(task=task, plan=plan, base_commit=resolved_base_commit_sha, cwd=cwd, llm=llm)
+        if result["status"] == "completed":
             if not has_tracked_diff(cwd=cwd):
                 print_formatted_message(
                     "No tracked changes after implementation, marking as DONE.",
@@ -134,9 +132,9 @@ def process_task(
             f"Task {task_num} already marked as DONE, skipping implementation.",
             message_type=LLMOutputType.STATUS,
         )
-        implementation_result = {"status": "completed", "feedback": "Task already marked as DONE"}
+        result = {"status": "completed", "feedback": "Task already marked as DONE"}
 
-    if implementation_result["status"] == "completed":
+    if result["status"] == "completed":
         print_formatted_message((f"Task {task_num} completed successfully"), message_type=LLMOutputType.STATUS)
         # Remove the agent state file after a task is done
         try:
@@ -151,4 +149,4 @@ def process_task(
         log(f"Task {task_num} failed or incomplete", message_type=LLMOutputType.TOOL_ERROR)
         status_manager.update_status(f"Task {task_num} failed or incomplete.", style="red")
 
-    return implementation_result
+    return result
