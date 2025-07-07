@@ -9,6 +9,8 @@ from .ui import status_manager
 from .utils import log, run
 
 
+# TODO: return feedback instead of bool.
+# We forget to use this feedback for the next iteration of the implementation phase, I think.
 def implementation_phase(
     *,
     task: str,

@@ -11,6 +11,7 @@ from rich.console import Console
 
 from .config import AGENT_SETTINGS as config
 from .constants import LOG_FILE
+from .ui import status_manager
 
 console = Console()
 
@@ -73,6 +74,7 @@ def run(
     command: str | list[str],
     description=None,
     command_human: Optional[list[str]] = None,
+    status_message: Optional[str] = None,
     *,
     directory: str,
     shell: bool = False,
@@ -90,6 +92,9 @@ def run(
 
     if description:
         log(f"Executing: {description}", message_type="tool_code")
+
+    if status_message:
+        status_manager.update_status(status_message)
 
     if isinstance(command, str):
         command_display = command

@@ -40,7 +40,7 @@ def set_llm_engine(engine: Literal["gemini", "claude", "codex", "openrouter"], m
     LLM_MODEL = model
 
 
-def run_claude(prompt: str, yolo: bool, *, cwd: str) -> Optional[str]:
+def run_claude(prompt: str, yolo: bool, *, cwd: str, phase: Optional[str] = None) -> Optional[str]:
     """
     Runs the Claude Code CLI with the given prompt.
 
@@ -56,8 +56,13 @@ def run_claude(prompt: str, yolo: bool, *, cwd: str) -> Optional[str]:
     command = ["claude", *(["--dangerously-skip-permissions"] if yolo else []), "-p", prompt]
 
     log(f"Claude prompt: {prompt}", message_type="thought")
-    status_manager.set_phase("Calling Claude")
-    result = run(command, "Calling Claude", command_human=command[:-1] + ["<prompt>"], directory=cwd)
+    result = run(
+        command,
+        "Calling Claude",
+        command_human=command[:-1] + ["<prompt>"],
+        directory=cwd,
+        status_message=phase or "Calling Claude",
+    )
 
     if result["success"]:
         response = result["stdout"].strip()
@@ -78,6 +83,7 @@ def run_codex(
     provider_url: Optional[str] = None,
     provider_env_key: Optional[str] = None,
     cwd: str,
+    phase: Optional[str] = None,
 ) -> Optional[str]:
     """
     Runs the Codex CLI with the given prompt.
@@ -120,8 +126,13 @@ def run_codex(
         ]
 
         log(f"Codex prompt: {prompt}", message_type="thought")
-        status_manager.set_phase("Calling Codex")
-        result = run(command, "Calling Codex", command_human=command[:-1] + ["<prompt>"], directory=cwd)
+        result = run(
+            command,
+            "Calling Codex",
+            command_human=command[:-1] + ["<prompt>"],
+            directory=cwd,
+            status_message=phase or "Calling Codex",
+        )
 
         if result["success"]:
             status_manager.update_status("Successful.")
@@ -133,7 +144,7 @@ def run_codex(
             return None
 
 
-def run_openrouter(prompt: str, yolo: bool, model: str, *, cwd: str) -> Optional[str]:
+def run_openrouter(prompt: str, yolo: bool, model: str, *, cwd: str, phase: Optional[str] = None) -> Optional[str]:
     """
     Runs OpenRouter via the Codex CLI with the given prompt.
 
@@ -148,10 +159,14 @@ def run_openrouter(prompt: str, yolo: bool, model: str, *, cwd: str) -> Optional
     """
     provider_url = "https://openrouter.ai/api/v1"
     provider_env_key = "OPENROUTER_API_KEY"
-    return run_codex(prompt, yolo, model=model, provider_url=provider_url, provider_env_key=provider_env_key, cwd=cwd)
+    return run_codex(
+        prompt, yolo, model=model, provider_url=provider_url, provider_env_key=provider_env_key, cwd=cwd, phase=phase
+    )
 
 
-def run_gemini(prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: str) -> Optional[str]:
+def run_gemini(
+    prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: str, phase: Optional[str] = None
+) -> Optional[str]:
     """
     Runs the Gemini CLI with the given prompt.
 
@@ -168,8 +183,13 @@ def run_gemini(prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: str
     command = ["gemini", "-m", gemini_model, *(["--yolo"] if yolo else []), "-p", prompt]
 
     log(f"Gemini prompt: {prompt}", message_type="thought")
-    status_manager.set_phase("Calling Gemini")
-    result = run(command, "Calling Gemini", command_human=command[:-1] + ["<prompt>"], directory=cwd)
+    result = run(
+        command,
+        phase or "Calling Gemini",
+        command_human=command[:-1] + ["<prompt>"],
+        directory=cwd,
+        status_message=phase or "Calling Gemini",
+    )
 
     if result["success"]:
         response = result["stdout"].strip()
@@ -181,18 +201,18 @@ def run_gemini(prompt: str, yolo: bool, model: Optional[str] = None, *, cwd: str
         return None
 
 
-def run_llm(prompt: str, yolo: bool, *, cwd: str) -> Optional[str]:
+def run_llm(prompt: str, yolo: bool, *, cwd: str, phase: Optional[str] = None) -> Optional[str]:
     """Run selected LLM CLI and return the response."""
     # Dispatch to the selected engine
     if LLM_ENGINE == "claude":
-        return run_claude(prompt, yolo, cwd=cwd)
+        return run_claude(prompt, yolo, cwd=cwd, phase=phase)
     elif LLM_ENGINE == "codex":
-        return run_codex(prompt, yolo, model=LLM_MODEL, cwd=cwd)
+        return run_codex(prompt, yolo, model=LLM_MODEL, cwd=cwd, phase=phase)
     elif LLM_ENGINE == "openrouter":
         if LLM_MODEL is None:
             raise ValueError("Model must be specified for OpenRouter")
-        return run_openrouter(prompt, yolo, model=LLM_MODEL, cwd=cwd)
+        return run_openrouter(prompt, yolo, model=LLM_MODEL, cwd=cwd, phase=phase)
     elif LLM_ENGINE == "gemini":
-        return run_gemini(prompt, yolo, model=LLM_MODEL, cwd=cwd)
+        return run_gemini(prompt, yolo, model=LLM_MODEL, cwd=cwd, phase=phase)
     else:
         raise ValueError(f"Unknown LLM engine: {LLM_ENGINE}. Supported engines: gemini, claude, codex, openrouter.")
