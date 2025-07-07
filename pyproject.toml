@@ -6,7 +6,7 @@ dependencies = ["rich", "pydantic"]
 requires-python = ">=3.13"
 
 [project.scripts]
-agent = "main:main"
+agent = "agent.main:main"
 
 [dependency-groups]
 dev = ["ruff>=0.12.2"]
@@ -14,9 +14,6 @@ dev = ["ruff>=0.12.2"]
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -117,7 +117,12 @@ judge-extra-prompt = ""
 
 ## Dev notes
 
-To run from source locally, get Mise and then `mise run run` will run the agent.
+To run from source locally, run:
+
+```bash
+uv sync
+uv run agent
+```
 
 ## License
 

@@ -5,7 +5,7 @@ uv = "0.7.18"
 
 [tasks.run]
 description = "Run the agent"
-run = "uv run python -m src.main"
+run = "uv run agent"
 
 [tasks.add-types]
 description = "Auto-add types to the Python files"

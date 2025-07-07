@@ -2,8 +2,7 @@ import os
 import tempfile
 from typing import Optional
 
-from src.constants import AGENT_TEMP_DIR
-
+from .constants import AGENT_TEMP_DIR
 from .ui import status_manager
 from .utils import log, run
 
