@@ -12,13 +12,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, TypedDict
 
-# ANSI escape codes for colors
-COLOR_RESET = "\033[0m"
-COLOR_GRAY = "\033[90m"
-COLOR_CYAN = "\033[96m"
-COLOR_GREEN = "\033[92m"
-COLOR_RED = "\033[91m"
-COLOR_YELLOW = "\033[93m"
+from rich.console import Console
+
+console = Console()
 
 
 class TaskState(Enum):
@@ -30,24 +26,24 @@ class TaskState(Enum):
 
 def _print_formatted(message, message_type="default", indent_level=0) -> None:
     indent = "  " * indent_level
-    color = ""
+    style = ""
     if message_type == "thought":
-        color = COLOR_GRAY
+        style = "dim"
         # Apply word wrapping for thought messages
-        terminal_width = os.get_terminal_size().columns
+        terminal_width = console.width
         # Adjust wrap_width based on indent_level
         wrap_width = terminal_width - len(indent)
         message = textwrap.fill(message, width=wrap_width, subsequent_indent=indent)
     elif message_type == "tool_code":
-        color = COLOR_CYAN
+        style = "cyan"
     elif message_type == "tool_output_stdout":
-        color = COLOR_GREEN
+        style = "green"
     elif message_type == "tool_output_stderr" or message_type == "tool_output_error":
-        color = COLOR_RED
+        style = "red"
     elif message_type == "file_path":
-        color = COLOR_YELLOW
+        style = "yellow"
 
-    print(f"{indent}{color}{message}{COLOR_RESET}")
+    console.print(f"{indent}{message}", style=style)
 
 
 STATE_FILE = Path(".agent_state.json")
