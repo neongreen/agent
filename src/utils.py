@@ -101,8 +101,8 @@ def run(
             log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error", config=config)
             log(f"Stderr: {result.stderr}", message_type="tool_output_stderr", config=config)
 
-        log(f"Stdout: {result.stdout}", message_type="tool_output_stdout", config=config)
-        log(f"Stderr: {result.stderr}", message_type="tool_output_stderr", config=config)
+        log(f"Stdout: {result.stdout or '<empty>'}", message_type="tool_output_stdout", config=config)
+        log(f"Stderr: {result.stderr or '<empty>'}", message_type="tool_output_stderr", config=config)
 
         return RunResult(
             exit_code=result.returncode,

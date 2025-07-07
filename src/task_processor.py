@@ -146,15 +146,6 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
         status_manager.update_status("Getting implementation from Gemini")
         implementation_summary = run_gemini(impl_prompt, yolo=True)
 
-        if config and config.post_implementation_hook_command:
-            log(f"Running post-implementation hook: {config.post_implementation_hook_command}", message_type="thought")
-            run(
-                config.post_implementation_hook_command,
-                "Running post-implementation hook command",
-                directory=cwd,
-                shell=True,
-            )
-
         if not implementation_summary:
             status_manager.update_status("Failed to get implementation from Gemini.", style="red")
             log("Failed to get implementation summary from Gemini", message_type="tool_output_error")
@@ -163,6 +154,15 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
                 log("Too many consecutive failures, giving up", message_type="tool_output_error")
                 return False
             continue
+
+        if config and config.post_implementation_hook_command:
+            log(f"Running post-implementation hook: {config.post_implementation_hook_command}", message_type="thought")
+            run(
+                config.post_implementation_hook_command,
+                "Running post-implementation hook command",
+                directory=cwd,
+                shell=True,
+            )
 
         # Evaluate if it seems reasonable
         log(
