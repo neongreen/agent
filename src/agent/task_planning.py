@@ -42,7 +42,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
                 f"Create a detailed implementation plan for this task: {repr(task)}. Break it down into specific, actionable steps.\n"
                 "You are granted access to tools, commands, and code execution for the *sole purpose* of gaining knowledge.\n"
                 "You *may not* use these tools to directly implement the task.\n"
-                'Output the text of the plan, and then "PLAN_END" on a new line. You may not output anything after that marker.'
+                'Output the text of the plan, and then "This is the end of the plan". You may not output anything after that.'
             ).strip()
         else:
             plan_prompt = (
@@ -52,7 +52,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
                 "Reviewer Feedback:\n"
                 f"{previous_review}\n\n"
                 "Create a better implementation plan.\n"
-                'Output the text of the plan, and then "PLAN_END" on a new line. You may not output anything after that marker.'
+                'Output the text of the plan, and then "This is the end of the plan". You may not output anything after that.'
             ).strip()
 
         if config.plan.planner_extra_prompt:
