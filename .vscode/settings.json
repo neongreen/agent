@@ -1,0 +1,9 @@
+{
+  "files.exclude": {
+    "**/.ruff_cache/": true,
+    "**/__pycache__/": true,
+    "**/.pytest_cache/": true,
+    "**/.mypy_cache/": true,
+    "**/.venv/": true,
+  }
+}
