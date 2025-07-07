@@ -1,0 +1,90 @@
+import datetime
+import json
+import shlex
+import subprocess
+from typing import Optional, TypedDict
+
+from rich.console import Console
+
+from .constants import LOG_FILE, QUIET_MODE
+
+console = Console()
+
+
+def _print_formatted(message, message_type="default") -> None:
+    style = ""
+    if message_type == "thought":
+        style = "dim"
+    elif message_type == "tool_code":
+        style = "cyan"
+    elif message_type == "tool_output_stdout":
+        style = "green"
+    elif message_type == "tool_output_stderr" or message_type == "tool_output_error":
+        style = "red"
+    elif message_type == "file_path":
+        style = "yellow"
+
+    console.print(message, style=style)
+
+
+def log(message: str, message_human: Optional[str] = None, quiet=None, message_type="default") -> None:
+    """Simple logging function that respects quiet mode."""
+    if quiet is None:
+        quiet = QUIET_MODE
+
+    log_entry = {"timestamp": datetime.datetime.now().isoformat(), "message": message}
+
+    if not quiet:
+        _print_formatted(message_human or message, message_type=message_type)
+
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+
+class RunResult(TypedDict):
+    exit_code: int
+    stdout: str
+    stderr: str
+    success: bool
+
+
+def run(command: list[str], description=None, command_human: Optional[list[str]] = None, directory=None) -> RunResult:
+    """
+    Run command and log it.
+
+    Args:
+        command: Command to run as a list of arguments.
+        description: Optional description of the command for logging.
+        directory: Optional working directory to run the command in.
+        command_human: If present, will be used in console output instead of the full command.
+    """
+
+    if description:
+        log(f"Executing: {description}", message_type="tool_code")
+
+    log(
+        f"Running command: {shlex.join(command)}",
+        message_human=f"Running command: {shlex.join(command_human or command)}",
+        message_type="tool_code",
+    )
+
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory)
+
+        if result.returncode != 0:
+            log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error")
+            log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
+
+        log(f"Stdout: {result.stdout}", message_type="tool_output_stdout")
+        log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
+
+        return {
+            "exit_code": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "success": result.returncode == 0,
+        }
+
+    except Exception as e:
+        log(f"Error running command: {e}", message_type="tool_output_error")
+        return {"exit_code": -1, "stdout": "", "stderr": str(e), "success": False}
