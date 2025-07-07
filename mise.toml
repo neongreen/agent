@@ -29,7 +29,12 @@ run = """
 
 [tasks.cleanup]
 run = [
-  "jj x rm -rf .agent_state.json .agent/ plan.md",
   "jj x 'ruff check --fix; ruff format'",
   "jj abandon 'mutable() & empty()'",
 ]
+
+[tasks.clean-branches]
+description = "Remove all branches below main/dev"
+run = '''
+  jj bookmark list -r '::(main|dev)' -T'self++"\n"' | grep -Ev '^(main|dev)$' | xargs jj bookmark delete
+'''
