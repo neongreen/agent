@@ -17,6 +17,8 @@ class LLMOutputType(Enum):
     """Evaluation by the judge."""
     STATUS = auto()
     """Some kind of status message."""
+    ERROR = auto()
+    """Error message."""
     PROMPT = auto()
     """The prompt sent to the LLM."""
     LLM_RESPONSE = auto()
@@ -50,9 +52,9 @@ def print_formatted_message(message: str, message_type: LLMOutputType):
         elif message_type == LLMOutputType.TOOL_OUTPUT:
             console.print(Panel(Markdown(message), title="Tool output", title_align="left", border_style="white"))
         elif message_type == LLMOutputType.TOOL_ERROR:
-            console.print(
-                Panel(Markdown(message), title="Tool execution failure", title_align="left", border_style="red")
-            )
+            console.print(Panel(Markdown(message), title="Tool error", title_align="left", border_style="red"))
+        elif message_type == LLMOutputType.ERROR:
+            console.print(Panel(Markdown(message), title="Error", title_align="left", border_style="red"))
         elif message_type == LLMOutputType.PROMPT:
             console.print(Panel(Markdown(message), title="Prompt", title_align="left", border_style="bright_blue"))
         elif message_type == LLMOutputType.LLM_RESPONSE:
@@ -71,7 +73,7 @@ def display_task_summary(task_results: list):
     """
     Displays a summary of all executed tasks.
     """
-    table = Table(title="Task Execution Summary")
+    table = Table(title="Task Execution Summary", title_justify="left")
     table.add_column("Task Prompt", style="cyan", no_wrap=False)
     table.add_column("Status", style="magenta")
     table.add_column("Worktree", style="green")
@@ -88,3 +90,4 @@ def display_task_summary(task_results: list):
         table.add_row(prompt, status, worktree, commit_hash, error)
 
     console.print(table)
+    console.print("\n\n", end="")

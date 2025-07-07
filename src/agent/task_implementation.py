@@ -77,11 +77,10 @@ def implementation_phase(
 
             if not implementation_summary:
                 status_manager.update_status("Failed to get implementation.", style="red")
-                # TODO: this is just an error, not a tool error
-                log("Failed to get implementation", message_type=LLMOutputType.TOOL_ERROR)
+                log("Failed to get implementation", message_type=LLMOutputType.ERROR)
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.TOOL_ERROR)
+                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
                     result = {
                         "status": "failed",
                         "feedback": "Too many consecutive failures to get implementation from Gemini",
@@ -90,10 +89,6 @@ def implementation_phase(
                 continue
 
             if config.post_implementation_hook_command:
-                log(
-                    f"Running post-implementation hook: {config.post_implementation_hook_command}",
-                    message_type=LLMOutputType.TOOL_EXECUTION,
-                )
                 run(
                     config.post_implementation_hook_command,
                     "Running post-implementation hook command",
@@ -115,9 +110,9 @@ def implementation_phase(
                 "Here is the summary of the implementation:\n\n"
                 f"{implementation_summary}\n\n"
                 "Here are the uncommitted changes:\n\n"
-                f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd))}\n\n"
+                f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
                 "Here is the diff of the changes made in previous commits:\n\n"
-                f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd))}"
+                f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}"
             )
 
             if config.implement.judge_extra_prompt:
@@ -132,14 +127,14 @@ def implementation_phase(
                 if evaluation:
                     log(
                         f"Couldn't determine the verdict from the evaluation. Evaluation was:\n\n{evaluation}",
-                        message_type=LLMOutputType.TOOL_ERROR,
+                        message_type=LLMOutputType.ERROR,
                     )
                 else:
-                    log("LLM provided no output", message_type=LLMOutputType.TOOL_ERROR)
+                    log("LLM provided no output", message_type=LLMOutputType.ERROR)
                 consecutive_failures += 1
                 # If we have too many consecutive failures, give up and exit the loop
                 if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.TOOL_ERROR)
+                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
                     result = {
                         "status": "failed",
                         "feedback": "Too many consecutive failures to get evaluation from Gemini",
@@ -188,9 +183,9 @@ def implementation_phase(
                     "  - CONTINUE CONTINUE CONTINUE if more work is needed.\n"
                     "If 'continue', provide specific next steps to take, or objections to address.\n"
                     "Here are the uncommitted changes:\n\n"
-                    f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd))}\n\n"
+                    f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
                     "Here is the diff of the changes made in previous commits:\n\n"
-                    f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd))}"
+                    f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}"
                 )
 
                 if config.implement.completion.judge_extra_prompt:
@@ -203,13 +198,13 @@ def implementation_phase(
 
                 if not completion_evaluation:
                     status_manager.update_status("Failed to get a task completion evaluation.", style="red")
-                    log("LLM provided no output", message_type=LLMOutputType.TOOL_ERROR)
+                    log("LLM provided no output", message_type=LLMOutputType.ERROR)
 
                 elif not completion_verdict:
                     status_manager.update_status("Failed to get a task completion verdict.", style="red")
                     log(
                         f"Couldn't determine the verdict from the task completion evaluation. Evaluation was:\n\n{completion_evaluation}",
-                        message_type=LLMOutputType.TOOL_ERROR,
+                        message_type=LLMOutputType.ERROR,
                     )
 
                 elif completion_verdict == TaskCompletionVerdict.COMPLETE:
@@ -232,10 +227,10 @@ def implementation_phase(
 
             elif verdict == ImplementationVerdict.FAILURE:
                 status_manager.update_status(f"Failed (attempt {attempt}).", style="red")
-                log(f"Implementation failed in attempt {attempt}", message_type=LLMOutputType.TOOL_ERROR)
+                log(f"Implementation failed in attempt {attempt}", message_type=LLMOutputType.ERROR)
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
-                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.TOOL_ERROR)
+                    log("Too many consecutive failures, giving up", message_type=LLMOutputType.ERROR)
                     result = {"status": "failed", "feedback": "Too many consecutive failures in implementation"}
                     break
 
@@ -245,24 +240,24 @@ def implementation_phase(
 
             # Check if we've made no commits recently
             if attempt >= 5 and commits_made == 0:
-                log("No commits made in 5 attempts, giving up", message_type=LLMOutputType.TOOL_ERROR)
+                log("No commits made in 5 attempts, giving up", message_type=LLMOutputType.ERROR)
                 result = {"status": "failed", "feedback": "No commits made in 5 attempts"}
                 break
         else:
             # If we exit the loop without breaking, it means we reached max attempts
             log(
                 f"Implementation incomplete after {max_implementation_attempts} attempts",
-                message_type=LLMOutputType.TOOL_ERROR,
+                message_type=LLMOutputType.ERROR,
             )
             status_manager.update_status("Incomplete.", style="red")
             return {"status": "incomplete", "feedback": "Implementation incomplete after maximum attempts"}
 
     except KeyboardInterrupt:
-        log("Implementation interrupted by user (KeyboardInterrupt)", message_type=LLMOutputType.TOOL_ERROR)
+        log("Implementation interrupted by user (KeyboardInterrupt)", message_type=LLMOutputType.ERROR)
         status_manager.update_status("Interrupted by user.", style="red")
         result = {"status": "interrupted", "feedback": "Implementation interrupted by user"}
     except Exception as e:
-        log(f"Implementation failed: {e}", message_type=LLMOutputType.TOOL_ERROR)
+        log(f"Implementation failed: {e}", message_type=LLMOutputType.ERROR)
         status_manager.update_status("Implementation failed.", style="red")
         result = {"status": "failed", "feedback": str(e)}
     finally:

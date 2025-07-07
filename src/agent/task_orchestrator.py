@@ -83,7 +83,7 @@ def process_task(
     if current_task_state() == TaskState.PLAN.value:
         plan = planning_phase(task, cwd=cwd, llm=llm)
         if not plan:
-            print_formatted_message("Planning phase failed", message_type=LLMOutputType.TOOL_ERROR)
+            print_formatted_message("Planning phase failed", message_type=LLMOutputType.ERROR)
             status_manager.update_status("Failed.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
@@ -98,7 +98,7 @@ def process_task(
             print_formatted_message(f"Resuming from existing {PLAN_FILE.name}", message_type=LLMOutputType.STATUS)
         else:
             print_formatted_message(
-                f"No {PLAN_FILE.name} found for resuming, aborting task.", message_type=LLMOutputType.TOOL_ERROR
+                f"No {PLAN_FILE.name} found for resuming, aborting task.", message_type=LLMOutputType.ERROR
             )
             status_manager.update_status("No plan found for resuming.", style="red")
             state[task_id] = TaskState.ABORT.value
@@ -143,10 +143,10 @@ def process_task(
                 print_formatted_message(("Agent state file removed."), message_type=LLMOutputType.STATUS)
                 status_manager.update_status("Agent state file removed.")
         except OSError as e:
-            log(f"Error removing agent state file: {e}", message_type=LLMOutputType.TOOL_ERROR)
+            log(f"Error removing agent state file: {e}", message_type=LLMOutputType.ERROR)
             status_manager.update_status("Error removing agent state file.", style="red")
     else:
-        log(f"Task {task_num} failed or incomplete", message_type=LLMOutputType.TOOL_ERROR)
+        log(f"Task {task_num} failed or incomplete", message_type=LLMOutputType.ERROR)
         status_manager.update_status(f"Task {task_num} failed or incomplete.", style="red")
 
     return result

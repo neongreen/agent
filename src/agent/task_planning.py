@@ -62,7 +62,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
         current_plan = llm.run(plan_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.PLAN)
         if not current_plan:
             status_manager.update_status("Failed to get a plan.", style="red")
-            print_formatted_message("Failed to get a plan", message_type=LLMOutputType.TOOL_ERROR)
+            print_formatted_message("Failed to get a plan", message_type=LLMOutputType.ERROR)
             return None
 
         # Ask Gemini to review the plan
@@ -86,13 +86,13 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
 
         if not current_review:
             status_manager.update_status("Failed to get a plan evaluation.", style="red")
-            log("LLM provided no output", message_type=LLMOutputType.TOOL_ERROR)
+            log("LLM provided no output", message_type=LLMOutputType.ERROR)
 
         elif not current_verdict:
             status_manager.update_status("Failed to get a plan verdict.", style="red")
             log(
                 f"Couldn't determine the verdict from the plan evaluation. Evaluation was:\n\n{current_review}",
-                message_type=LLMOutputType.TOOL_ERROR,
+                message_type=LLMOutputType.ERROR,
             )
 
         elif current_verdict == PlanVerdict.APPROVED:
@@ -118,7 +118,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
         else:
             assert_never(current_verdict)
 
-    log(f"Planning failed after {max_planning_rounds} rounds", message_type=LLMOutputType.TOOL_ERROR)
+    log(f"Planning failed after {max_planning_rounds} rounds", message_type=LLMOutputType.ERROR)
     status_manager.update_status("Planning failed.", style="red")
     return None
 
