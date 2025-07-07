@@ -13,7 +13,6 @@ from .utils import log, run
 def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) -> Optional[str]:
     """Iterative planning phase with Gemini approval."""
     status_manager.set_phase("Planning")
-    status_manager.update_status(f"Task: {task}")
     log(f"Starting planning phase for task: {task}", message_type="thought", config=config)
 
     max_planning_rounds = 5
@@ -23,7 +22,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
     previous_review: Optional[str] = None
 
     for round_num in range(1, max_planning_rounds + 1):
-        status_manager.update_status(f"Round {round_num}/{max_planning_rounds}")
+        status_manager.set_phase("Planning", f"{round_num}/{max_planning_rounds}")
         log(f"Planning round {round_num}", message_type="thought", config=config)
 
         # Ask Gemini to create/revise plan
@@ -120,7 +119,6 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
         base_commit: *commit* to switch to before starting the implementation.
     """
     status_manager.set_phase("Implementation")
-    status_manager.update_status(f"Task: {task}")
     log(f"Starting implementation phase for task: {task}", message_type="thought", config=config)
 
     max_implementation_attempts = 10
@@ -129,7 +127,7 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
     commits_made = 0
 
     for attempt in range(1, max_implementation_attempts + 1):
-        status_manager.update_status(f"Attempt {attempt}/{max_implementation_attempts}")
+        status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
         log(f"Implementation attempt {attempt}", message_type="thought")
 
         # Ask Gemini to implement next step
@@ -272,7 +270,6 @@ def process_task(
 ) -> bool:
     """Process a single task through planning and implementation."""
     status_manager.set_phase(f"Task {task_num}")
-    status_manager.update_status(f"Processing: {task}")
     log(f"Processing task {task_num}: {task}", message_type="thought", config=config)
 
     task_id = f"task_{task_num}"
@@ -282,7 +279,6 @@ def process_task(
         return state.get(task_id, TaskState.PLAN.value)
 
     log(f"Current state for {task_id}: {current_task_state()}", message_type="thought")
-    status_manager.update_status(f"State: {current_task_state()}")
 
     # Set up branch
     if current_task_state() == TaskState.PLAN.value:
@@ -321,7 +317,6 @@ def process_task(
             with open(plan_path, "r") as f:
                 plan = f.read()
             log("Resuming from existing plan.md", message_type="thought")
-            status_manager.update_status("Resuming from existing plan")
         else:
             log("No plan.md found for resuming, aborting task.", message_type="tool_output_error")
             status_manager.update_status("No plan found for resuming.", style="red")
@@ -352,8 +347,6 @@ def process_task(
 
     if success:
         log(f"Task {task_num} completed successfully")
-        status_manager.set_phase(f"Task {task_num} completed")
-        status_manager.update_status("Successfully.")
         # Remove the agent state file after a task is done
         try:
             if STATE_FILE.exists():
