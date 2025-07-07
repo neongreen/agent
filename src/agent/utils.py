@@ -78,6 +78,7 @@ def run(
     *,
     directory: str,
     shell: bool = False,
+    log_stdout: bool = True,
 ) -> RunResult:
     """
     Run command and log it.
@@ -121,7 +122,8 @@ def run(
             log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error")
             log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
 
-        log(f"Stdout: {result.stdout or '<empty>'}", message_type="tool_output_stdout")
+        if log_stdout:
+            log(f"Stdout: {result.stdout or '<empty>'}", message_type="tool_output_stdout")
         log(f"Stderr: {result.stderr or '<empty>'}", message_type="tool_output_stderr")
 
         return RunResult(

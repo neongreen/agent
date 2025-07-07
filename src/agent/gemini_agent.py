@@ -62,6 +62,7 @@ def run_claude(prompt: str, yolo: bool, *, cwd: str, phase: Optional[str] = None
         command_human=command[:-1] + ["<prompt>"],
         directory=cwd,
         status_message=phase or "Calling Claude",
+        log_stdout=False,
     )
 
     if result["success"]:
@@ -132,6 +133,7 @@ def run_codex(
             command_human=command[:-1] + ["<prompt>"],
             directory=cwd,
             status_message=phase or "Calling Codex",
+            log_stdout=False,
         )
 
         if result["success"]:
@@ -189,6 +191,7 @@ def run_gemini(
         command_human=command[:-1] + ["<prompt>"],
         directory=cwd,
         status_message=phase or "Calling Gemini",
+        log_stdout=False,
     )
 
     if result["success"]:
