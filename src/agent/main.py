@@ -4,7 +4,7 @@ import os
 import rich
 
 from .config import AGENT_SETTINGS as config
-from .constants import AGENT_TEMP_DIR, STATE_FILE
+from .constants import AGENT_TEMP_DIR
 from .gemini_agent import set_llm_engine
 from .state_manager import write_state
 from .task_orchestrator import process_task
@@ -72,9 +72,10 @@ def main() -> None:
         log(f"Creating agent directory at {AGENT_TEMP_DIR}", message_type="thought")
         AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Initialize state file if it doesn't exist
-    if not STATE_FILE.exists():
-        write_state({})
+    # XXX: Initialize state file if it doesn't exist.
+    # But actually, always erase the state. We don't have proper resumability yet since we don't save evaluations, etc.
+    # if not STATE_FILE.exists():
+    write_state({})
 
     # Use the effective working directory
     cwd = effective_cwd
