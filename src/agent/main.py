@@ -7,7 +7,6 @@ and orchestration of the agent's task processing.
 
 import argparse
 import os
-import shutil
 import tempfile
 
 import rich
@@ -105,10 +104,8 @@ def main() -> None:
     if args.worktree:
         log("Temporary worktree mode enabled. Will create a git worktree for the task.", message_type="thought")
         worktree_path = tempfile.mkdtemp(prefix="agent_worktree_")
-        log(f"Temporary worktree path: {worktree_path}", message_type="thought")
         try:
             git_utils.add_worktree(worktree_path, rev=args.base, cwd=effective_cwd)
-            log(f"Temporary worktree created at {worktree_path}", message_type="thought")
             work_dir = worktree_path
         except Exception as e:
             log(f"Failed to create temporary worktree: {e}", message_type="tool_output_error")
@@ -139,11 +136,8 @@ def main() -> None:
     finally:
         status_manager.cleanup_status_bar()
         if worktree_path:
-            log(f"Cleaning up temporary worktree at {worktree_path}", message_type="thought")
             try:
                 git_utils.remove_worktree(worktree_path, cwd=work_dir)
-                shutil.rmtree(worktree_path)
-                log("Temporary worktree cleaned up successfully.", message_type="thought")
             except Exception as e:
                 log(f"Error cleaning up temporary worktree: {e}", message_type="tool_output_error")
 
