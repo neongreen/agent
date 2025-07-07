@@ -4,6 +4,10 @@
 
 Added:
 - Gemini: Tell the user whether `GEMINI_API_KEY` is set
+- `--model` option to specify the model
+
+Changed:
+- `--openrouter` is now a boolean flag. The model for OpenRouter is now specified using the `--model` argument.
 
 Fixed:
 - Better prompts for judge verdicts to work around GPT 4.1 issues

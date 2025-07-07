@@ -38,9 +38,17 @@ class LLM:
                     message_type=LLMOutputType.STATUS,
                 )
 
-        if engine == "openrouter" and model is None:
-            raise ValueError("Model must be specified for OpenRouter engine.")
+        if engine == "openrouter":
+            if model is None:
+                raise ValueError("Model must be specified for OpenRouter.")
+            if "OPENROUTER_API_KEY" not in os.environ:
+                raise ValueError("OPENROUTER_API_KEY must be set for OpenRouter.")
+
         if engine == "opencode" and model is None:
+            log(
+                "Defaulting to GitHub Copilot GPT-4.1 model for Opencode",
+                message_type=LLMOutputType.STATUS,
+            )
             self.model = "github-copilot/gpt-4.1"
 
     def run(
