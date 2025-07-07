@@ -2,14 +2,15 @@
 This module provides an object for interacting with various LLM engines.
 
 It includes methods to set the LLM engine, and to run prompts against
-Claude, Codex, OpenRouter, and Gemini CLIs.
+Claude, Codex, OpenRouter, Opencode, and Gemini CLIs.
 """
 
 import os
 import shlex
 import tempfile
+from enum import Enum
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, Type
 
 from .constants import AGENT_STATE_BASE_DIR, AGENT_TEMP_DIR
 from .ui import status_manager
@@ -184,3 +185,27 @@ class LLM:
         else:
             log(f"Opencode call failed: {result['stderr']}", message_type="tool_output_error")
             return None
+
+
+### Utils ###
+
+
+def check_verdict[T: Enum](verdict_type: Type[T], judgment: str) -> T | None:
+    """
+    Checks judge's verdict based on a list of possible verdicts/statuses from an Enum.
+
+    This function assumes you asked the LLM to repeat the verdict several times in the first line.
+    This is necessary because Opencode sometimes outputs misspelled verdicts.
+
+    Args:
+        verdict_type: An Enum class containing possible status values (e.g. ImplementationVerdict).
+        judgment: A string with the entire judgment from the LLM.
+
+    Returns:
+        An Enum member indicating the verdict, or None if not found.
+    """
+    first_line = judgment.split("\n", 1)[0].upper()
+    for verdict in verdict_type:
+        if verdict.value in first_line:
+            return verdict
+    return None

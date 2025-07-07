@@ -1,11 +1,12 @@
 """Manages the iterative implementation phase of a task, including code generation, execution, and evaluation."""
 
+from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, assert_never
 
 from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE
-from .llm import LLM
+from .llm import LLM, check_verdict
 from .output_formatter import LLMOutputType, print_formatted_message
 from .ui import status_manager
 from .utils import format_tool_code_output, log, run
@@ -104,11 +105,16 @@ def implementation_phase(
                 f"Judging the implementation based on the diff. LLM provided this explanation along with its implementation:\n{implementation_summary}",
                 message_type="thought",
             )
+            # SUCCESS, PARTIAL, FAILURE correspond to the 'ImplementationVerdict' enum
             eval_prompt = (
                 f"Evaluate if this implementation makes progress on the task {repr(task)}.\n"
-                "Respond with 'SUCCESS' if it's a good step forward, 'PARTIAL' if it's somewhat helpful, or 'FAILURE' if it's not useful.\n"
-                "For 'PARTIAL', provide specific feedback on what could be improved or what remains to be done.\n"
-                "For 'FAILURE', list specific reasons why the implementation is inadequate.\n"
+                "The first line of your response must be:\n"
+                "  - SUCCESS SUCCESS SUCCESS if it's a good step forward;\n"
+                "  - PARTIAL PARTIAL PARTIAL if it's somewhat helpful;\n"
+                "  - FAILURE FAILURE FAILURE if it's not useful.\n"
+                "For the 'success' verdict, provide a brief comment on the implementation.\n"
+                "For the 'partial' verdict, provide specific feedback on what could be improved or what remains to be done.\n"
+                "For the 'failure' verdict, list specific reasons why the implementation is inadequate.\n"
                 "The implementation is either in the uncommitted changes, in the previous commits, or both.\n"
                 "Here is the summary of the implementation:\n\n"
                 f"{implementation_summary}\n\n"
@@ -123,10 +129,19 @@ def implementation_phase(
 
             status_manager.update_status("Evaluating implementation")
             evaluation = llm.run(eval_prompt, yolo=True, cwd=cwd)
-            if not evaluation:
-                status_manager.update_status("Failed to get evaluation from Gemini.", style="red")
-                log("Failed to get evaluation from Gemini", message_type="tool_output_error")
+            verdict = check_verdict(ImplementationVerdict, evaluation or "")
+
+            if not evaluation or verdict is None:
+                status_manager.update_status("Failed to get a verdict.", style="red")
+                if evaluation:
+                    log(
+                        f"Couldn't determine the verdict from the evaluation. Evaluation was:\n\n{evaluation}",
+                        message_type="tool_output_error",
+                    )
+                else:
+                    log("LLM provided no output", message_type="tool_output_error")
                 consecutive_failures += 1
+                # If we have too many consecutive failures, give up and exit the loop
                 if consecutive_failures >= max_consecutive_failures:
                     log("Too many consecutive failures, giving up", message_type="tool_output_error")
                     result = {
@@ -134,12 +149,15 @@ def implementation_phase(
                         "feedback": "Too many consecutive failures to get evaluation from Gemini",
                     }
                     break
-                continue
+                else:
+                    # Ok let's try again, go back to the start of the loop
+                    continue
 
+            # We have our verdict
             print_formatted_message(evaluation, message_type=LLMOutputType.IMPLEMENTATION_JUDGE)
             feedback = evaluation  # Store feedback for next iteration
 
-            if evaluation.upper().startswith("SUCCESS"):
+            if verdict == ImplementationVerdict.SUCCESS:
                 status_manager.update_status(f"Successful (attempt {attempt}).")
                 log(f"Implementation successful in attempt {attempt}", message_type="thought")
                 consecutive_failures = 0
@@ -170,8 +188,10 @@ def implementation_phase(
                     f"Is the task {repr(task)} now complete based on the work done?\n"
                     "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
                     "You may not finish your response at 'I have to check ...' or 'I have to inspect files ...' - you must use your tools to check directly.\n"
-                    "Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed.\n"
-                    "If 'CONTINUE', provide specific next steps to take, or objections to address.\n"
+                    "The first line of your response must be:\n"
+                    "  - COMPLETE COMPLETE COMPLETE if the task is fully done;\n"
+                    "  - CONTINUE CONTINUE CONTINUE if more work is needed.\n"
+                    "If 'continue', provide specific next steps to take, or objections to address.\n"
                     "Here are the uncommitted changes:\n\n"
                     f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd))}\n\n"
                     "Here is the diff of the changes made in previous commits:\n\n"
@@ -181,22 +201,39 @@ def implementation_phase(
                 if config.implement.completion.judge_extra_prompt:
                     completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
 
-                completion_check = llm.run(completion_prompt, yolo=True, cwd=cwd)
+                completion_evaluation = llm.run(completion_prompt, yolo=True, cwd=cwd)
+                completion_verdict = check_verdict(TaskCompletionVerdict, completion_evaluation or "")
 
-                if completion_check and completion_check.upper().startswith("COMPLETE"):
+                if not completion_evaluation:
+                    status_manager.update_status("Failed to get a task completion evaluation.", style="red")
+                    log("LLM provided no output", message_type="tool_output_error")
+
+                elif not completion_verdict:
+                    status_manager.update_status("Failed to get a task completion verdict.", style="red")
+                    log(
+                        f"Couldn't determine the verdict from the task completion evaluation. Evaluation was:\n\n{completion_evaluation}",
+                        message_type="tool_output_error",
+                    )
+
+                elif completion_verdict == TaskCompletionVerdict.COMPLETE:
                     status_manager.update_status("Task marked as complete.")
                     log("Task marked as complete", message_type="thought")
-                    result = {"status": "completed", "feedback": completion_check}
+                    result = {"status": "completed", "feedback": completion_evaluation}
                     break
-                else:
+
+                elif completion_verdict == TaskCompletionVerdict.CONTINUE:
                     status_manager.update_status("Task not complete, continuing implementation.")
                     log("Task not complete, continuing implementation", message_type="thought")
-                    feedback = completion_check
+                    feedback = completion_evaluation
 
-            elif evaluation.upper().startswith("PARTIAL"):
+                else:
+                    assert_never(completion_verdict)
+
+            elif verdict == ImplementationVerdict.PARTIAL:
                 status_manager.update_status(f"Partial progress (attempt {attempt}).")
                 log(f"Partial progress in attempt {attempt}", message_type="thought")
-            else:
+
+            elif verdict == ImplementationVerdict.FAILURE:
                 status_manager.update_status(f"Failed (attempt {attempt}).", style="red")
                 log(f"Implementation failed in attempt {attempt}", message_type="tool_output_error")
                 consecutive_failures += 1
@@ -205,11 +242,16 @@ def implementation_phase(
                     result = {"status": "failed", "feedback": "Too many consecutive failures in implementation"}
                     break
 
+            else:
+                # Typechecker will warn us if we miss a case
+                assert_never(verdict)
+
             # Check if we've made no commits recently
             if attempt >= 5 and commits_made == 0:
                 log("No commits made in 5 attempts, giving up", message_type="tool_output_error")
                 result = {"status": "failed", "feedback": "No commits made in 5 attempts"}
                 break
+
     except KeyboardInterrupt:
         log("Implementation interrupted by user (KeyboardInterrupt)", message_type="tool_output_error")
         status_manager.update_status("Interrupted by user.", style="red")
@@ -236,3 +278,20 @@ def implementation_phase(
         except Exception as e:
             log(f"Failed to make final commit: {e}", message_type="tool_output_error")
     return result or {}
+
+
+class ImplementationVerdict(Enum):
+    """Enum for possible verdicts from the implementation judge."""
+
+    SUCCESS = "SUCCESS"
+    PARTIAL = "PARTIAL"
+    FAILURE = "FAILURE"
+
+
+class TaskCompletionVerdict(Enum):
+    """Enum for possible verdicts from the task completion judge."""
+
+    COMPLETE = "COMPLETE"
+    """Task is fully completed."""
+    CONTINUE = "CONTINUE"
+    """More work is needed."""

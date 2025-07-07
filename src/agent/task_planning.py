@@ -1,11 +1,12 @@
 """Handles the planning phase of the agent's execution, including iterative plan generation and review."""
 
+from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, assert_never
 
 from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE
-from .llm import LLM
+from .llm import LLM, check_verdict
 from .output_formatter import LLMOutputType, format_llm_thought, format_reviewer_feedback, print_formatted_message
 from .ui import status_manager
 from .utils import log
@@ -70,23 +71,33 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
         review_prompt = (
             f"Review this plan for task {repr(task)}:\n\n"
             f"{current_plan}\n\n"
-            "Respond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."
+            "The first line of your response should be the verdict:\n"
+            "  - APPROVED APPROVED APPROVED if the plan is good enough to implement (even if minor improvements are possible);\n"
+            "  - REJECTED REJECTED REJECTED if the plan must be revised.\n"
+            "If you approve the plan, provide a brief, one sentence comment on the plan.\n"
+            "If you reject the plan, provide detailed feedback on what needs to be improved.\n"
         )
 
         if config.plan.judge_extra_prompt:
             review_prompt += f"\n\n{config.plan.judge_extra_prompt}"
 
         status_manager.update_status("Reviewing plan")
-        current_review = llm.run(review_prompt, yolo=True, cwd=cwd)
-        if not current_review:
-            status_manager.update_status("Failed to get plan review from Gemini.", style="red")
-            print_formatted_message(
-                "Failed to get plan review from Gemini", message_type=LLMOutputType.TOOL_OUTPUT_ERROR
-            )
-            return None
 
-        # Jul 2025: Opencode is special and outputs "VED" instead of "APPROVED" sometimes (...often)
-        if current_review.upper().startswith("APPROVED") or current_review.upper().startswith("VED"):
+        current_review = llm.run(review_prompt, yolo=True, cwd=cwd)
+        current_verdict = check_verdict(PlanVerdict, current_review or "")
+
+        if not current_review:
+            status_manager.update_status("Failed to get a plan evaluation.", style="red")
+            log("LLM provided no output", message_type=LLMOutputType.TOOL_OUTPUT_ERROR)
+
+        elif not current_verdict:
+            status_manager.update_status("Failed to get a plan verdict.", style="red")
+            log(
+                f"Couldn't determine the verdict from the plan evaluation. Evaluation was:\n\n{current_review}",
+                message_type=LLMOutputType.TOOL_OUTPUT_ERROR,
+            )
+
+        elif current_verdict == PlanVerdict.APPROVED:
             status_manager.update_status(f"Approved in round {round_num}.")
             print_formatted_message(
                 format_llm_thought(f"Plan approved in round {round_num}"), message_type=LLMOutputType.THOUGHT
@@ -101,7 +112,8 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
                 f.write(f"# Plan for {task}\n\n{plan}")
 
             return plan
-        else:
+
+        elif current_verdict == PlanVerdict.REJECTED:
             status_manager.update_status(f"Plan rejected in round {round_num}. Reviewing feedback...")
             print_formatted_message(
                 format_reviewer_feedback(f"Plan rejected in round {round_num}: {current_review}"),
@@ -110,6 +122,18 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
             previous_plan = current_plan  # Store for next round's prompt
             previous_review = current_review  # Store for next round's prompt
 
+        else:
+            assert_never(current_verdict)
+
     log(f"Planning failed after {max_planning_rounds} rounds", message_type="tool_output_error")
     status_manager.update_status("Planning failed.", style="red")
     return None
+
+
+class PlanVerdict(Enum):
+    """
+    Enum for verdicts from the plan evaluation judge.
+    """
+
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
