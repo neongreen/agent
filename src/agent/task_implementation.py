@@ -179,6 +179,10 @@ def implementation_phase(
                 status_manager.update_status("Task marked as complete.")
                 log("Task marked as complete", message_type="thought")
                 return {"status": "completed", "feedback": completion_check}
+            else:
+                status_manager.update_status("Task not complete, continuing implementation.")
+                log("Task not complete, continuing implementation", message_type="thought")
+                feedback = completion_check
 
         elif evaluation.upper().startswith("PARTIAL"):
             status_manager.update_status(f"Partial progress (attempt {attempt}).")
