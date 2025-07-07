@@ -473,6 +473,9 @@ def main() -> None:
     parser.add_argument(
         "--base", default="main", help="Base branch to switch to before creating a task branch (default: main)"
     )
+    parser.add_argument(
+        "--multi", action="store_true", help="Treat prompt as an instruction to find task, rather than a single task"
+    )
 
     args = parser.parse_args()
 
@@ -492,17 +495,19 @@ def main() -> None:
 
     log("Starting agentic loop", message_type="thought")
 
-    # Discover tasks
-    tasks = discover_tasks(args.prompt, cwd)
-    if not tasks:
-        log("No tasks discovered", message_type="thought")
-        sys.exit(1)
-
-    # Let user choose tasks
-    selected_tasks = choose_tasks(tasks)
-    if not selected_tasks:
-        log("No tasks selected", message_type="thought")
-        sys.exit(0)
+    if args.multi:
+        # Find tasks
+        log("Treating prompt as an instruction to discover tasks", message_type="thought")
+        tasks = discover_tasks(args.prompt, cwd)
+        if not tasks:
+            log("No tasks discovered", message_type="thought")
+            sys.exit(1)
+        selected_tasks = choose_tasks(tasks)
+        if not selected_tasks:
+            log("No tasks selected", message_type="thought")
+            sys.exit(0)
+    else:
+        selected_tasks = [args.prompt]
 
     # Process each selected task
     for i, task in enumerate(selected_tasks, 1):
