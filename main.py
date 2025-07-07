@@ -144,10 +144,9 @@ def run(command: list[str], description=None, command_human: Optional[list[str]]
         return {"exit_code": -1, "stdout": "", "stderr": str(e), "success": False}
 
 
-def run_gemini(prompt) -> str | None:
+def run_gemini(prompt: str, yolo: bool) -> str | None:
     """Run gemini CLI and return the response."""
-    escaped_prompt = prompt.replace('"', '\\"')
-    command = ["gemini", "-m", "gemini-2.5-flash", "-y", "-p", f"{escaped_prompt}"]
+    command = ["gemini", "-m", "gemini-2.5-flash", *(["--yolo"] if yolo else []), "-p", prompt]
 
     log(f"Gemini prompt: {prompt}", message_type="thought", indent_level=1)
     result = run(command, "Calling Gemini", command_human=command[:-1] + ["<prompt>"])
@@ -185,7 +184,7 @@ If it explicitly mentions multiple separate tasks, list each one.
 
 Return as a numbered list with clear task descriptions."""
 
-    response = run_gemini(gemini_prompt)
+    response = run_gemini(gemini_prompt, yolo=True)
     if not response:
         return []
 
@@ -266,7 +265,7 @@ def setup_task_branch(task, task_num, base_branch, cwd=None) -> bool:
 
     # Get branch name suggestions from Gemini
     branch_prompt = f"Generate 5 short, descriptive, and valid git branch names for the task: '{task}'. The names should be lowercase, use hyphens instead of spaces, and avoid special characters. Example: 'feature/add-login', 'bugfix/fix-auth-flow'. Return as a comma-separated list."
-    suggestions_response = run_gemini(branch_prompt)
+    suggestions_response = run_gemini(branch_prompt, yolo=False)
     suggestions = []
     if suggestions_response:
         suggestions = [s.strip() for s in suggestions_response.split(",") if s.strip()]
@@ -304,19 +303,19 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
 
         # Ask Gemini to create/revise plan
         if round_num == 1:
-            plan_prompt = f"Create a detailed implementation plan for this task: {task}. Break it down into specific, actionable steps."
+            plan_prompt = f"Create a detailed implementation plan for this task: {repr(task)}. Break it down into specific, actionable steps."
         else:
-            plan_prompt = f"Revise the plan for task '{task}' addressing the previous feedback. Create a better implementation plan."
+            plan_prompt = f"Revise the plan for task {repr(task)} addressing the previous feedback. Create a better implementation plan."
 
-        plan = run_gemini(plan_prompt)
+        plan = run_gemini(plan_prompt, yolo=True)
         if not plan:
             log("Failed to get plan from Gemini", message_type="tool_output_error", indent_level=2)
             return None
 
         # Ask Gemini to review the plan
-        review_prompt = f"Review this plan for task '{task}':\n\n{plan}\n\nRespond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."
+        review_prompt = f"Review this plan for task {repr(task)}:\n\n{plan}\n\nRespond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."
 
-        review = run_gemini(review_prompt)
+        review = run_gemini(review_prompt, yolo=True)
         if not review:
             log("Failed to get plan review from Gemini", message_type="tool_output_error", indent_level=2)
             return None
@@ -331,7 +330,7 @@ def planning_phase(task: str, cwd=None) -> Optional[str]:
 
             # Generate commit message
             commit_msg_prompt = f"Generate a concise commit message (max 15 words) for approving this plan: {task}"
-            commit_msg = run_gemini(commit_msg_prompt)
+            commit_msg = run_gemini(commit_msg_prompt, yolo=False)
             if not commit_msg:
                 commit_msg = "Approved plan for task"
 
@@ -363,24 +362,39 @@ def implementation_phase(task, plan, cwd=None) -> bool:
         log(f"Implementation attempt {attempt}", message_type="thought", indent_level=1)
 
         # Ask Gemini to implement next step
-        impl_prompt = f"Based on this plan:\n\n{plan}\n\nImplement the next step for task '{task}'. Provide specific code, commands, or files to create. Be concrete and actionable."
+        impl_prompt = f"""
+Execution phase. Based on this plan:\n\n{plan}\n
+Implement the next step for task {repr(task)}.
+Create files, run commands, and/or write code as needed.
+When done, provide a concise summary of what you did.
+Your response will help the reviewer of your implementation understand the changes made.
+""".strip()
 
-        implementation = run_gemini(impl_prompt)
-        if not implementation:
-            log("Failed to get implementation from Gemini", message_type="tool_output_error", indent_level=2)
+        implementation_summary = run_gemini(impl_prompt, yolo=True)
+        if not implementation_summary:
+            log("Failed to get implementation summary from Gemini", message_type="tool_output_error", indent_level=2)
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
                 log("Too many consecutive failures, giving up", message_type="tool_output_error", indent_level=1)
                 return False
             continue
 
-        # Try to execute the implementation
-        log(f"Attempting to execute implementation: {implementation}", message_type="thought", indent_level=2)
-
         # Evaluate if it seems reasonable
-        eval_prompt = f"Evaluate if this implementation makes progress on the task '{task}':\n\n{implementation}\n\nRespond with 'SUCCESS' if it's a good step forward, 'PARTIAL' if it's somewhat helpful, or 'FAILURE' if it's not useful."
+        log(
+            f"Judging the implementation based on the diff. Gemini provided this explanation along with its implementation:\n{implementation_summary}",
+            message_type="thought",
+            indent_level=2,
+        )
+        eval_prompt = f"""
+Evaluate if this implementation makes progress on the task {repr(task)}.
+Respond with 'SUCCESS' if it's a good step forward, 'PARTIAL' if it's somewhat helpful, or 'FAILURE' if it's not useful.
+For 'PARTIAL', provide specific feedback on what could be improved or what remains to be done.
+For 'FAILURE', list specific reasons why the implementation is inadequate.
+Here is the summary of the implementation:\n\n{implementation_summary}\n
+Here is the diff of the changes made:\n\n{run(["git", "diff"], directory=cwd)["stdout"]}
+"""
 
-        evaluation = run_gemini(eval_prompt)
+        evaluation = run_gemini(eval_prompt, yolo=True)
         if not evaluation:
             log("Failed to get evaluation from Gemini", message_type="tool_output_error", indent_level=2)
             consecutive_failures += 1
@@ -395,8 +409,10 @@ def implementation_phase(task, plan, cwd=None) -> bool:
             commits_made += 1
 
             # Generate commit message and commit
-            commit_msg_prompt = f"Generate a concise commit message (max 15 words) for this implementation step: {task}"
-            commit_msg = run_gemini(commit_msg_prompt)
+            commit_msg_prompt = (
+                f"Generate a concise commit message (max 15 words) for this implementation step: {repr(task)}"
+            )
+            commit_msg = run_gemini(commit_msg_prompt, yolo=False)
             if not commit_msg:
                 commit_msg = "Implementation step for task"
 
@@ -408,8 +424,8 @@ def implementation_phase(task, plan, cwd=None) -> bool:
             )
 
             # Check if task is complete
-            completion_prompt = f"Is the task '{task}' now complete based on the work done? Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed."
-            completion_check = run_gemini(completion_prompt)
+            completion_prompt = f"Is the task {repr(task)} now complete based on the work done? Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed."
+            completion_check = run_gemini(completion_prompt, yolo=True)
 
             if completion_check and completion_check.upper().startswith("COMPLETE"):
                 log("Task marked as complete", message_type="thought", indent_level=2)
