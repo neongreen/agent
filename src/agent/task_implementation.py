@@ -17,6 +17,34 @@ class ImplementationResult(TypedDict):
     feedback: str
 
 
+def _get_implementation_summary(
+    llm: LLM,
+    task: str,
+    attempt: int,
+    max_implementation_attempts: int,
+    plan: str,
+    feedback: Optional[str],
+    cwd: Path,
+) -> Optional[str]:
+    impl_prompt = (
+        f"Execution phase. You are implementing this task: {repr(task)}. This is your attempt #{attempt} out of {max_implementation_attempts}.\n\n"
+        "Based on this plan:\n\n"
+        f"{plan}\n\n"
+        f"{f'And the feedback about your previous attempt:\n\n{feedback}\n\n' if feedback else ''}"
+        f"Implement the next step for task {repr(task)}.\n"
+        "Create files, run commands, and/or write code as needed.\n"
+        "When done, output a concise summary of what you did, starting with 'My summary of the implementation:'.\n"
+        "Your response will help the reviewer of your implementation understand the changes made.\n"
+        "Finish your response with 'This is the end of the implementation summary'.\n"
+    )
+
+    if config.implement.extra_prompt:
+        impl_prompt += f"\n\n{config.implement.extra_prompt}"
+
+    status_manager.update_status("Getting implementation")
+    return llm.run(impl_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
+
+
 def implementation_phase(
     *,
     task: str,
@@ -91,24 +119,15 @@ def implementation_phase(
             status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
             print_formatted_message(f"Implementation attempt {attempt}", message_type=LLMOutputType.STATUS)
 
-            # Ask Gemini to implement next step
-            impl_prompt = (
-                f"Execution phase. You are implementing this task: {repr(task)}. This is your attempt #{attempt} out of {max_implementation_attempts}.\n\n"
-                "Based on this plan:\n\n"
-                f"{plan}\n\n"
-                f"{f'And the feedback about your previous attempt:\n\n{feedback}\n\n' if feedback else ''}"
-                f"Implement the next step for task {repr(task)}.\n"
-                "Create files, run commands, and/or write code as needed.\n"
-                "When done, output a concise summary of what you did, starting with 'My summary of the implementation:'.\n"
-                "Your response will help the reviewer of your implementation understand the changes made.\n"
-                "Finish your response with 'This is the end of the implementation summary'.\n"
+            implementation_summary = _get_implementation_summary(
+                llm=llm,
+                task=task,
+                attempt=attempt,
+                max_implementation_attempts=max_implementation_attempts,
+                plan=plan,
+                feedback=feedback,
+                cwd=cwd,
             )
-
-            if config.implement.extra_prompt:
-                impl_prompt += f"\n\n{config.implement.extra_prompt}"
-
-            status_manager.update_status("Getting implementation")
-            implementation_summary = llm.run(impl_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
 
             if not implementation_summary:
                 status_manager.update_status("Failed to get implementation.", style="red")
