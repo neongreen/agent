@@ -14,9 +14,9 @@ def _update_display() -> None:
     global live_display, _current_phase, _last_message
     if live_display is not None:
         if _current_phase:
-            live_display.update(Text(_current_phase, style="bold green"))
+            live_display.update(Text(f"\n\n>>> {_current_phase} <<<\n\n", style="bold black on grey23"))
         elif _last_message:
-            live_display.update(Text(_last_message, style="dim"))
+            live_display.update(Text(f"\n\n>>> {_last_message} <<<\n\n", style="bold black on grey23"))
 
 
 def init_status_bar() -> None:
