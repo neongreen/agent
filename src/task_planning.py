@@ -1,10 +1,10 @@
 from typing import Optional
 
 from .config import AgentConfig
-from .constants import AGENT_TEMP_DIR, PLAN_FILE
+from .constants import PLAN_FILE
 from .gemini_agent import run_gemini
 from .ui import status_manager
-from .utils import log, run
+from .utils import log
 
 
 def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) -> Optional[str]:
@@ -73,25 +73,10 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
             log(f"Plan approved in round {round_num}", message_type="thought")
             plan = current_plan  # This is the approved plan
 
-            # Commit the approved plan
+            # Write the approved plan to a file (not committed)
             PLAN_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(PLAN_FILE, "w") as f:
                 f.write(f"# Plan for {task}\n\n{plan}")
-
-            # Generate commit message
-            status_manager.update_status("Generating commit message")
-            commit_msg_prompt = f"Generate a concise commit message (max 15 words) for approving this plan: {task}"
-            commit_msg = run_gemini(commit_msg_prompt, yolo=False)
-            if not commit_msg:
-                commit_msg = "Approved plan for task"
-
-            status_manager.update_status("Committing approved plan")
-            run(["git", "add", str(AGENT_TEMP_DIR)], "Adding plan files", directory=cwd)
-            run(
-                ["git", "commit", "-m", f"[{PLAN_FILE.name}] {commit_msg[:100]}"],
-                "Committing approved plan",
-                directory=cwd,
-            )
 
             return plan
         else:
