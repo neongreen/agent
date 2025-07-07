@@ -1,0 +1,5 @@
+.agentic-log
+.agent_state.json
+.task-meta
+.ruff_cache/
+__pycache__/
