@@ -11,7 +11,7 @@ from typing import Optional, TypedDict
 from rich.console import Console
 
 from .config import AGENT_SETTINGS as config
-from .constants import AGENT_TEMP_DIR
+from .constants import AGENT_TEMP_DIR, LLMOutputType
 from .ui import status_manager
 
 
@@ -30,7 +30,7 @@ def get_session_log_file_path() -> Path:
     return _session_log_file_path
 
 
-def _print_formatted(message, message_type="default") -> None:
+def _print_formatted(message, message_type: LLMOutputType | str = "default") -> None:
     """
     Prints a formatted message to the console based on message type.
 
@@ -57,7 +57,7 @@ def log(
     message: str,
     message_human: Optional[str] = None,
     quiet=None,
-    message_type="default",
+    message_type: LLMOutputType | str = "default",
 ) -> None:
     """Simple logging function that respects quiet mode."""
     if quiet is None:
@@ -83,6 +83,10 @@ class RunResult(TypedDict):
     stdout: str
     stderr: str
     success: bool
+    error: Optional[str]
+    signal: Optional[int]
+    background_pids: Optional[list[int]]
+    process_group_pgid: Optional[int]
 
 
 def run(
@@ -146,8 +150,21 @@ def run(
             stdout=result.stdout,
             stderr=result.stderr,
             success=result.returncode == 0,
+            error=None,
+            signal=None,
+            background_pids=None,
+            process_group_pgid=None,
         )
 
     except Exception as e:
         log(f"Error running command: {e}", message_type="tool_output_error")
-        return RunResult(exit_code=-1, stdout="", stderr=str(e), success=False)
+        return RunResult(
+            exit_code=-1,
+            stdout="",
+            stderr=str(e),
+            success=False,
+            error=str(e),
+            signal=None,
+            background_pids=None,
+            process_group_pgid=None,
+        )

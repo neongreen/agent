@@ -1,6 +1,6 @@
 """Orchestrates the execution of tasks, managing their planning and implementation phases."""
 
-from .constants import PLAN_FILE, STATE_FILE, TaskState
+from .constants import PLAN_FILE, STATE_FILE, LLMOutputType, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
 from .output_formatter import format_llm_thought, print_formatted_message
 from .state_manager import read_state, write_state
@@ -30,7 +30,9 @@ def process_task(
         True if the task is successfully completed, False otherwise.
     """
     status_manager.set_phase(f"Task {task_num}")
-    print_formatted_message(format_llm_thought(f"Processing task {task_num}: {task}"), message_type="thought")
+    print_formatted_message(
+        format_llm_thought(f"Processing task {task_num}: {task}"), message_type=LLMOutputType.THOUGHT
+    )
 
     task_id = f"task_{task_num}"
     state = read_state()
@@ -40,7 +42,7 @@ def process_task(
         return state.get(task_id, TaskState.PLAN.value)
 
     print_formatted_message(
-        format_llm_thought(f"Current state for {task_id}: {current_task_state()}"), message_type="thought"
+        format_llm_thought(f"Attempting to set up task branch for task {task_num}"), message_type=LLMOutputType.THOUGHT
     )
 
     resolved_base_commit_sha = None
@@ -49,13 +51,15 @@ def process_task(
         # Resolve the base_branch to a commit SHA before setting up the task branch
         resolved_base_commit_sha = resolve_commit_specifier(base_rev, cwd=cwd)
         if not resolved_base_commit_sha:
-            print_formatted_message(f"Failed to resolve base specifier: {base_rev}", message_type="tool_output_error")
+            print_formatted_message(
+                f"Failed to resolve base specifier: {base_rev}", message_type=LLMOutputType.TOOL_OUTPUT_ERROR
+            )
             state[task_id] = TaskState.ABORT.value
             write_state(state)
             return {"status": "failed", "feedback": "Failed to resolve base specifier"}
 
         if not setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd):
-            print_formatted_message("Failed to set up task branch", message_type="tool_output_error")
+            print_formatted_message("Failed to set up task branch", message_type=LLMOutputType.TOOL_OUTPUT_ERROR)
             status_manager.update_status("Failed to set up task branch.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
@@ -66,7 +70,8 @@ def process_task(
         resolved_base_commit_sha = resolve_commit_specifier(base_rev, cwd=cwd)
         if not resolved_base_commit_sha:
             print_formatted_message(
-                f"Failed to resolve base specifier: {base_rev} for resuming task", message_type="tool_output_error"
+                f"Failed to resolve base specifier: {base_rev} for resuming task",
+                message_type=LLMOutputType.TOOL_OUTPUT_ERROR,
             )
             state[task_id] = TaskState.ABORT.value
             write_state(state)
@@ -76,7 +81,7 @@ def process_task(
     if current_task_state() == TaskState.PLAN.value:
         plan = planning_phase(task, cwd=cwd)
         if not plan:
-            print_formatted_message("Planning phase failed", message_type="tool_output_error")
+            print_formatted_message("Planning phase failed", message_type=LLMOutputType.TOOL_OUTPUT_ERROR)
             status_manager.update_status("Failed.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
@@ -89,11 +94,11 @@ def process_task(
             with open(PLAN_FILE, "r") as f:
                 plan = f.read()
             print_formatted_message(
-                format_llm_thought(f"Resuming from existing {PLAN_FILE.name}"), message_type="thought"
+                format_llm_thought(f"Resuming from existing {PLAN_FILE.name}"), message_type=LLMOutputType.THOUGHT
             )
         else:
             print_formatted_message(
-                f"No {PLAN_FILE.name} found for resuming, aborting task.", message_type="tool_output_error"
+                f"No {PLAN_FILE.name} found for resuming, aborting task.", message_type=LLMOutputType.TOOL_OUTPUT_ERROR
             )
             status_manager.update_status("No plan found for resuming.", style="red")
             state[task_id] = TaskState.ABORT.value
@@ -112,13 +117,13 @@ def process_task(
             if not has_tracked_diff(cwd=cwd):
                 print_formatted_message(
                     format_llm_thought("No tracked changes after implementation, marking as DONE."),
-                    message_type="thought",
+                    message_type=LLMOutputType.THOUGHT,
                 )
                 state[task_id] = TaskState.DONE.value
             else:
                 print_formatted_message(
                     format_llm_thought("Tracked changes remain after implementation, keeping in IMPLEMENT state."),
-                    message_type="thought",
+                    message_type=LLMOutputType.THOUGHT,
                 )
                 state[task_id] = TaskState.IMPLEMENT.value  # Keep in IMPLEMENT if changes exist
         else:
@@ -127,20 +132,24 @@ def process_task(
     elif current_task_state() == TaskState.DONE.value:
         print_formatted_message(
             format_llm_thought(f"Task {task_num} already marked as DONE, skipping implementation."),
-            message_type="thought",
+            message_type=LLMOutputType.THOUGHT,
         )
         implementation_result = {"status": "completed", "feedback": "Task already marked as DONE"}
 
     if implementation_result["status"] == "completed":
-        print_formatted_message(format_llm_thought(f"Task {task_num} completed successfully"), message_type="thought")
+        print_formatted_message(
+            format_llm_thought(f"Task {task_num} completed successfully"), message_type=LLMOutputType.THOUGHT
+        )
         # Remove the agent state file after a task is done
         try:
             if STATE_FILE.exists():
                 STATE_FILE.unlink()
-                print_formatted_message(format_llm_thought("Agent state file removed."), message_type="thought")
+                print_formatted_message(
+                    format_llm_thought("Agent state file removed."), message_type=LLMOutputType.THOUGHT
+                )
                 status_manager.update_status("Agent state file removed.")
         except OSError as e:
-            log(f"Error removing agent state file: {e}", message_type="tool_output_error")
+            log(f"Error removing agent state file: {e}", message_type=LLMOutputType.TOOL_OUTPUT_ERROR.value)
             status_manager.update_status("Error removing agent state file.", style="red")
     else:
         log(f"Task {task_num} failed or incomplete")

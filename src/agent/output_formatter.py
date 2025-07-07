@@ -5,20 +5,23 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from agent.constants import LLMOutputType
+from agent.utils import RunResult
+
 
 console = Console()
 
 
-def print_formatted_message(message: str, message_type: str):
+def print_formatted_message(message: str, message_type: LLMOutputType):
     """
     Prints a formatted message to the console based on its type.
     """
     try:
-        if message_type == "thought":
+        if message_type == LLMOutputType.THOUGHT:
             console.print(Panel(Markdown(message), title="LLM Thought", title_align="left", border_style="magenta"))
-        elif message_type == "plan":
+        elif message_type == LLMOutputType.PLAN:
             console.print(Panel(Markdown(message), title="Proposed Plan", title_align="left", border_style="green"))
-        elif message_type == "reviewer_feedback":
+        elif message_type == LLMOutputType.FEEDBACK:
             console.print(
                 Panel(Markdown(message), title="Reviewer Feedback", title_align="left", border_style="yellow")
             )
@@ -70,3 +73,25 @@ def display_task_summary(task_results: list):
         table.add_row(prompt, status, worktree, commit_hash, error)
 
     console.print(table)
+
+
+def format_tool_code_output(tool_output: RunResult) -> str:
+    """
+    Formats the output of a tool code execution.
+    """
+    formatted_output = ""
+    if tool_output["stdout"] and tool_output["stdout"] != "(empty)":
+        formatted_output += f"stdout: {tool_output['stdout']}\n"
+    if tool_output["stderr"] and tool_output["stderr"] != "(empty)":
+        formatted_output += f"stderr: {tool_output['stderr']}\n"
+    if tool_output["error"]:
+        formatted_output += f"error: {tool_output['error']}\n"
+    if tool_output["exit_code"] is not None:
+        formatted_output += f"exit_code: {tool_output['exit_code']}\n"
+    if tool_output["signal"] is not None:
+        formatted_output += f"signal: {tool_output['signal']}\n"
+    if tool_output["background_pids"]:
+        formatted_output += f"background_pids: {tool_output['background_pids']}\n"
+    if tool_output["process_group_pgid"] is not None:
+        formatted_output += f"process_group_pgid: {tool_output['process_group_pgid']}\n"
+    return formatted_output

@@ -3,9 +3,9 @@
 from typing import Optional
 
 from .config import AGENT_SETTINGS as config
-from .constants import PLAN_FILE
+from .constants import PLAN_FILE, LLMOutputType
 from .gemini_agent import run_llm
-from .output_formatter import print_formatted_message
+from .output_formatter import format_tool_code_output, print_formatted_message
 from .ui import status_manager
 from .utils import log, run
 
@@ -34,7 +34,7 @@ def implementation_phase(
         A dictionary containing the status of the implementation and any feedback.
     """
     status_manager.set_phase("Implementation")
-    print_formatted_message(f"Starting implementation phase for task: {task}", message_type="thought")
+    print_formatted_message(f"Starting implementation phase for task: {task}", message_type=LLMOutputType.THOUGHT)
 
     max_implementation_attempts = 10
     max_consecutive_failures = 3
@@ -46,7 +46,7 @@ def implementation_phase(
 
     for attempt in range(1, max_implementation_attempts + 1):
         status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
-        print_formatted_message(f"Implementation attempt {attempt}", message_type="thought")
+        print_formatted_message(f"Implementation attempt {attempt}", message_type=LLMOutputType.THOUGHT)
 
         # Ask Gemini to implement next step
         impl_prompt = (
@@ -69,9 +69,12 @@ def implementation_phase(
 
         if not implementation_summary:
             status_manager.update_status("Failed to get implementation from Gemini.", style="red")
-            print_formatted_message(
-                "Failed to get implementation summary from Gemini", message_type="tool_output_error"
-            )
+            try:
+                raise Exception("Failed to get implementation from Gemini")
+            except Exception as e:
+                print_formatted_message(
+                    f"Error during implementation: {e}", message_type=LLMOutputType.TOOL_OUTPUT_ERROR
+                )
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
                 log("Too many consecutive failures, giving up", message_type="tool_output_error")
@@ -104,9 +107,9 @@ def implementation_phase(
             "Here is the summary of the implementation:\n\n"
             f"{implementation_summary}\n\n"
             "Here are the uncommitted changes:\n\n"
-            f"{run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}\n\n"
+            f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd))}\n\n"
             "Here is the diff of the changes made in previous commits:\n\n"
-            f"{run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}"
+            f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd))}"
         )
 
         if config.implement.judge_extra_prompt:
@@ -159,9 +162,9 @@ def implementation_phase(
                 "Respond with 'COMPLETE' if fully done, or 'CONTINUE' if more work is needed.\n"
                 "If 'CONTINUE', provide specific next steps to take, or objections to address.\n"
                 "Here are the uncommitted changes:\n\n"
-                f"{run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}\n\n"
+                f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd))}\n\n"
                 "Here is the diff of the changes made in previous commits:\n\n"
-                f"{run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}"
+                f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd))}"
             )
 
             if config.implement.completion.judge_extra_prompt:
