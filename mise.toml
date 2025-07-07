@@ -9,8 +9,8 @@ description = "Run the agent"
 run = "uv run agent"
 
 [tasks.check]
-description = "Run all checks on the Python files"
-depends = ["lint", "pyright", "check-schema"]
+description = "Run all checks and tests"
+depends = ["lint", "pyright", "check-schema", "test"]
 
 [tasks.generate-schema]
 description = "Generate config.schema.json from Pydantic"
@@ -47,6 +47,10 @@ run = '''
 '''
 
 # Checks
+
+[tasks.test]
+description = "Run all tests"
+run = ["uv run pytest -v"]
 
 [tasks.check-schema]
 description = "Check that the checked-in schema matches Pydantic and the current .agent.toml"

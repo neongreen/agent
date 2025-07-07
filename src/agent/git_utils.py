@@ -21,6 +21,8 @@ def sanitize_branch_name(name: str) -> str:
     Returns:
         A sanitized string suitable for a Git branch name.
     """
+    if not name.strip():
+        return "no-name"
     name = name.lower()
     name = re.sub(r"[^a-z0-9/.]+", "-", name)  # Replace invalid characters with a single hyphen
     name = name.strip("-")  # Remove leading/trailing hyphens
