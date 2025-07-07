@@ -251,14 +251,15 @@ def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
 
     Args:
         path: The path where the worktree should be added.
-        rev: The revision to base the worktree on.
+        rev: The revision (commit-ish) to base the worktree on.
         cwd: The current working directory.
 
     Returns:
         True if the worktree was added successfully, False otherwise.
     """
     log(f"Adding worktree at {path} for revision {rev}", LLMOutputType.STATUS)
-    command = ["git", "worktree", "add", str(path), rev]
+    commit = resolve_commit_specifier(rev, cwd=cwd)
+    command = ["git", "worktree", "add", str(path), commit]
     result = run(command, f"Adding worktree {path}", directory=cwd)
     if result["success"]:
         log(f"Successfully added worktree at {path}", message_type=LLMOutputType.STATUS)

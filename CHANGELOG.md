@@ -7,6 +7,7 @@ Added:
 
 Fixed:
 - Better prompts for judge verdicts to work around GPT 4.1 issues
+- Worktree creation no longer fails when basing off the currently checked-out branch
 - Miscellaneous logging fixes
 
 ## v0-2025.07.06
