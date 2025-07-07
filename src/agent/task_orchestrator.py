@@ -1,6 +1,5 @@
 from typing import Optional
 
-from .config import AgentConfig
 from .constants import PLAN_FILE, STATE_FILE, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
 from .state_manager import read_state, write_state
@@ -11,11 +10,14 @@ from .utils import log
 
 
 def process_task(
-    task: str, task_num: int, base_specifier: str, cwd: Optional[str] = None, config: Optional[AgentConfig] = None
+    task: str,
+    task_num: int,
+    base_specifier: str,
+    cwd: Optional[str] = None,
 ) -> bool:
     """Process a single task through planning and implementation."""
     status_manager.set_phase(f"Task {task_num}")
-    log(f"Processing task {task_num}: {task}", message_type="thought", config=config)
+    log(f"Processing task {task_num}: {task}", message_type="thought")
 
     task_id = f"task_{task_num}"
     state = read_state()
@@ -46,9 +48,9 @@ def process_task(
     # Planning phase
     plan = None
     if current_task_state() == TaskState.PLAN.value:
-        plan = planning_phase(task, cwd, config)
+        plan = planning_phase(task, cwd)
         if not plan:
-            log("Planning phase failed", config=config)
+            log("Planning phase failed")
             status_manager.update_status("Failed.", style="red")
             state[task_id] = TaskState.ABORT.value
             write_state(state)
@@ -71,7 +73,7 @@ def process_task(
     # Implementation phase
     success = False
     if current_task_state() == TaskState.IMPLEMENT.value:
-        success = implementation_phase(task, plan, resolved_base_commit_sha, cwd, config)
+        success = implementation_phase(task, plan, resolved_base_commit_sha, cwd=cwd)
         if success:
             if not has_tracked_diff(cwd):
                 log("No tracked changes after implementation, marking as DONE.", message_type="thought")

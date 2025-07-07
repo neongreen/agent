@@ -9,46 +9,46 @@
       "description": "The schema URL for validation."
     },
     "default-base": {
-      "type": ["string", "null"],
+    "type": "string",
       "description": "The default base for the agent."
     },
     "quiet-mode": {
-      "type": ["boolean", "null"],
+      "type": "boolean",
       "description": "Whether the agent should run in quiet mode."
     },
     "plan": {
-      "type": ["object", "null"],
+      "type": "object",
       "description": "Configuration for the planning phase.",
       "properties": {
         "judge-extra-prompt": {
-          "type": ["string", "null"],
+          "type": "string",
           "description": "Extra prompt for the judge in the planning phase."
         },
         "planner-extra-prompt": {
-          "type": ["string", "null"],
+          "type": "string",
           "description": "Extra prompt for the planner in the planning phase."
         }
       },
       "additionalProperties": false
     },
     "implement": {
-      "type": ["object", "null"],
+      "type": "object",
       "description": "Configuration for the implementation phase.",
       "properties": {
         "extra-prompt": {
-          "type": ["string", "null"],
+          "type": "string",
           "description": "Extra prompt for the implementation phase."
         },
         "judge-extra-prompt": {
-          "type": ["string", "null"],
+          "type": "string",
           "description": "Extra prompt for the judge in the implementation phase."
         },
         "completion": {
-          "type": ["object", "null"],
+          "type": "object",
           "description": "Configuration for the implementation completion phase.",
           "properties": {
             "judge-extra-prompt": {
-              "type": ["string", "null"],
+              "type": "string",
               "description": "Extra prompt for the judge in the implementation completion phase."
             }
           },
@@ -58,7 +58,7 @@
       "additionalProperties": false
     },
     "post-implementation-hook-command": {
-      "type": ["string", "null"],
+    "type": "string",
       "description": "Command to execute after each implementation phase."
     }
   },

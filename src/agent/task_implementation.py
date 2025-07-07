@@ -1,13 +1,18 @@
 from typing import Optional
 
-from .config import AgentConfig
+from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE
 from .gemini_agent import run_llm
 from .ui import status_manager
 from .utils import log, run
 
 
-def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optional[AgentConfig] = None) -> bool:
+def implementation_phase(
+    task,
+    plan,
+    base_commit: str,
+    cwd=None,
+) -> bool:
     """
     Iterative implementation phase with early bailout.
 
@@ -15,7 +20,7 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
         base_commit: *commit* to switch to before starting the implementation.
     """
     status_manager.set_phase("Implementation")
-    log(f"Starting implementation phase for task: {task}", message_type="thought", config=config)
+    log(f"Starting implementation phase for task: {task}", message_type="thought")
 
     max_implementation_attempts = 10
     max_consecutive_failures = 3
@@ -42,8 +47,8 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
             "Finish your response with 'IMPLEMENTATION_SUMMARY_END'.\n"
         )
 
-        if config and config.implement_extra_prompt:
-            impl_prompt += f"\n\n{config.implement_extra_prompt}"
+        if config.implement.extra_prompt:
+            impl_prompt += f"\n\n{config.implement.extra_prompt}"
 
         status_manager.update_status("Getting implementation from Gemini")
         implementation_summary = run_llm(impl_prompt, yolo=True)
@@ -57,7 +62,7 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
                 return False
             continue
 
-        if config and config.post_implementation_hook_command:
+        if config.post_implementation_hook_command:
             log(f"Running post-implementation hook: {config.post_implementation_hook_command}", message_type="thought")
             run(
                 config.post_implementation_hook_command,
@@ -85,8 +90,8 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
             f"{run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}"
         )
 
-        if config and config.implement_judge_extra_prompt:
-            eval_prompt += f"\n\n{config.implement_judge_extra_prompt}"
+        if config.implement.judge_extra_prompt:
+            eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
 
         status_manager.update_status("Evaluating implementation")
         evaluation = run_llm(eval_prompt, yolo=True)
@@ -140,8 +145,8 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
                 f"{run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd)['stdout']}"
             )
 
-            if config and config.implement_completion_judge_extra_prompt:
-                completion_prompt += f"\n\n{config.implement_completion_judge_extra_prompt}"
+            if config.implement.completion.judge_extra_prompt:
+                completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
 
             completion_check = run_llm(completion_prompt, yolo=True)
 

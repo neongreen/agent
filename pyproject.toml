@@ -2,7 +2,7 @@
 name = "agent"
 version = "99.0.0"
 description = "Agentic loop"
-dependencies = ["rich", "pydantic"]
+dependencies = ["rich", "pydantic", "pydantic-settings>=2.10.1"]
 requires-python = ">=3.13"
 
 [project.scripts]

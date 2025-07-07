@@ -1,16 +1,16 @@
 from typing import Optional
 
-from .config import AgentConfig
+from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE
 from .gemini_agent import run_llm
 from .ui import status_manager
 from .utils import log
 
 
-def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) -> Optional[str]:
+def planning_phase(task: str, cwd=None) -> Optional[str]:
     """Iterative planning phase with Gemini approval."""
     status_manager.set_phase("Planning")
-    log(f"Starting planning phase for task: {task}", message_type="thought", config=config)
+    log(f"Starting planning phase for task: {task}", message_type="thought")
 
     max_planning_rounds = 5
 
@@ -20,7 +20,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
 
     for round_num in range(1, max_planning_rounds + 1):
         status_manager.set_phase("Planning", f"{round_num}/{max_planning_rounds}")
-        log(f"Planning round {round_num}", message_type="thought", config=config)
+        log(f"Planning round {round_num}", message_type="thought")
 
         # Ask Gemini to create/revise plan
         if round_num == 1:
@@ -41,8 +41,8 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
                 'Output the text of the plan, and then "PLAN_END" on a new line. You may not output anything after that marker.'
             ).strip()
 
-        if config and config.plan_planner_extra_prompt:
-            plan_prompt += f"\n\n{config.plan_planner_extra_prompt}"
+        if config.plan.planner_extra_prompt:
+            plan_prompt += f"\n\n{config.plan.planner_extra_prompt}"
 
         status_manager.update_status("Getting plan from Gemini")
         current_plan = run_llm(plan_prompt, yolo=True)
@@ -58,8 +58,8 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
             "Respond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."
         )
 
-        if config and config.plan_judge_extra_prompt:
-            review_prompt += f"\n\n{config.plan_judge_extra_prompt}"
+        if config.plan.judge_extra_prompt:
+            review_prompt += f"\n\n{config.plan.judge_extra_prompt}"
 
         status_manager.update_status("Reviewing plan")
         current_review = run_llm(review_prompt, yolo=True)

@@ -1,65 +1,88 @@
-from dataclasses import dataclass
-from typing import Optional
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import AliasGenerator, BaseModel, Field, model_validator
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
+
+# TODO: idk how to allow env vars, I get "extra inputs are not permitted"
+
+kebab_alias_generator = AliasGenerator(
+    validation_alias=lambda field_name: field_name.replace("_", "-"),
+    serialization_alias=lambda field_name: field_name.replace("_", "-"),
+)
 
 
 class PlanConfig(BaseModel):
-    judge_extra_prompt: Optional[str] = Field(None, alias="judge-extra-prompt")
-    planner_extra_prompt: Optional[str] = Field(None, alias="planner-extra-prompt")
+    judge_extra_prompt: str = Field(default="")
+    planner_extra_prompt: str = Field(default="")
+
+    model_config = SettingsConfigDict(
+        alias_generator=kebab_alias_generator,
+        populate_by_name=True,
+    )
 
 
 class ImplementCompletionConfig(BaseModel):
-    judge_extra_prompt: Optional[str] = Field(None, alias="judge-extra-prompt")
+    judge_extra_prompt: str = Field(default="")
+
+    model_config = SettingsConfigDict(
+        alias_generator=kebab_alias_generator,
+        populate_by_name=True,
+    )
 
 
 class ImplementConfig(BaseModel):
-    extra_prompt: Optional[str] = Field(None, alias="extra-prompt")
-    judge_extra_prompt: Optional[str] = Field(None, alias="judge-extra-prompt")
-    completion: Optional[ImplementCompletionConfig] = None
+    extra_prompt: str = Field(default="")
+    judge_extra_prompt: str = Field(default="")
+    completion: ImplementCompletionConfig = ImplementCompletionConfig()
+
+    model_config = SettingsConfigDict(
+        alias_generator=kebab_alias_generator,
+        populate_by_name=True,
+    )
 
 
-class TomlConfig(BaseModel):
-    default_base: Optional[str] = Field(None, alias="default-base")
-    quiet_mode: Optional[bool] = Field(None, alias="quiet-mode")
-    plan: Optional[PlanConfig] = None
-    implement: Optional[ImplementConfig] = None
-    post_implementation_hook_command: Optional[str] = Field(None, alias="post-implementation-hook-command")
+class AgentSettings(BaseSettings):
+    default_base: str = Field(
+        default="main",
+        description="Default base branch, commit, or git specifier to switch to before creating a task branch",
+    )
+    quiet_mode: bool = Field(default=False, description="Suppress informational output")
+    plan: PlanConfig = Field(default_factory=PlanConfig)
+    implement: ImplementConfig = Field(default_factory=ImplementConfig)
+    post_implementation_hook_command: str = Field(
+        default="",
+        description="Shell command to run after each implementation step, e.g. 'ruff format'",
+    )
+
+    model_config = SettingsConfigDict(
+        populate_by_name=True,
+        alias_generator=kebab_alias_generator,
+        toml_file=".agent.toml",
+    )
+
+    # This method removes the $schema field from the settings - it's used in TOML to validate the file
+    @model_validator(mode="before")
+    @classmethod
+    def remove_schema_field(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            values.pop("$schema", None)
+        return values
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Settings priority:
+        # 1. TOML file (config.toml)
+        # 2. Default values
+        return TomlConfigSettingsSource(settings_cls), init_settings
 
 
-@dataclass
-class AgentConfig:
-    """Configuration for the agent."""
-
-    default_base: Optional[str] = None
-    quiet_mode: bool = False
-    plan_judge_extra_prompt: str = ""
-    plan_planner_extra_prompt: str = ""
-    implement_extra_prompt: str = ""
-    implement_judge_extra_prompt: str = ""
-    implement_completion_judge_extra_prompt: str = ""
-    # Command to execute after each implementation phase.
-    post_implementation_hook_command: Optional[str] = None
-
-    def update_from_toml(self, config: TomlConfig) -> None:
-        """Update the agent configuration from a TOML config object."""
-        if config.default_base is not None:
-            self.default_base = config.default_base
-        if config.quiet_mode is not None:
-            self.quiet_mode = config.quiet_mode
-        if config.plan and config.plan.judge_extra_prompt is not None:
-            self.plan_judge_extra_prompt = config.plan.judge_extra_prompt
-        if config.plan and config.plan.planner_extra_prompt is not None:
-            self.plan_planner_extra_prompt = config.plan.planner_extra_prompt
-        if config.implement and config.implement.extra_prompt is not None:
-            self.implement_extra_prompt = config.implement.extra_prompt
-        if config.implement and config.implement.judge_extra_prompt is not None:
-            self.implement_judge_extra_prompt = config.implement.judge_extra_prompt
-        if (
-            config.implement
-            and config.implement.completion
-            and config.implement.completion.judge_extra_prompt is not None
-        ):
-            self.implement_completion_judge_extra_prompt = config.implement.completion.judge_extra_prompt
-        if config.post_implementation_hook_command is not None:
-            self.post_implementation_hook_command = config.post_implementation_hook_command
+# Instantiate once and reuse everywhere
+__all__ = ["AGENT_SETTINGS", "AgentSettings"]
+AGENT_SETTINGS: AgentSettings = AgentSettings()

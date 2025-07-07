@@ -6,7 +6,7 @@ from typing import Optional, TypedDict
 
 from rich.console import Console
 
-from .config import AgentConfig
+from .config import AGENT_SETTINGS as config
 from .constants import LOG_FILE
 
 console = Console()
@@ -33,11 +33,10 @@ def log(
     message_human: Optional[str] = None,
     quiet=None,
     message_type="default",
-    config: Optional[AgentConfig] = None,
 ) -> None:
     """Simple logging function that respects quiet mode."""
     if quiet is None:
-        quiet = config.quiet_mode if config else False
+        quiet = config.quiet_mode
 
     log_entry = {"timestamp": datetime.datetime.now().isoformat(), "message": message}
 
@@ -60,7 +59,6 @@ def run(
     description=None,
     command_human: Optional[list[str]] = None,
     directory=None,
-    config: Optional[AgentConfig] = None,
     shell: bool = False,
 ) -> RunResult:
     """
@@ -75,7 +73,7 @@ def run(
     """
 
     if description:
-        log(f"Executing: {description}", message_type="tool_code", config=config)
+        log(f"Executing: {description}", message_type="tool_code")
 
     if isinstance(command, str):
         command_display = command
@@ -91,18 +89,17 @@ def run(
         f"Running command: {command_display}",
         message_human=f"Running command: {command_human_display}",
         message_type="tool_code",
-        config=config,
     )
 
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory, shell=shell)
 
         if result.returncode != 0:
-            log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error", config=config)
-            log(f"Stderr: {result.stderr}", message_type="tool_output_stderr", config=config)
+            log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error")
+            log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
 
-        log(f"Stdout: {result.stdout or '<empty>'}", message_type="tool_output_stdout", config=config)
-        log(f"Stderr: {result.stderr or '<empty>'}", message_type="tool_output_stderr", config=config)
+        log(f"Stdout: {result.stdout or '<empty>'}", message_type="tool_output_stdout")
+        log(f"Stderr: {result.stderr or '<empty>'}", message_type="tool_output_stderr")
 
         return RunResult(
             exit_code=result.returncode,
@@ -112,5 +109,5 @@ def run(
         )
 
     except Exception as e:
-        log(f"Error running command: {e}", message_type="tool_output_error", config=config)
+        log(f"Error running command: {e}", message_type="tool_output_error")
         return RunResult(exit_code=-1, stdout="", stderr=str(e), success=False)
