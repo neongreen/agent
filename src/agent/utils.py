@@ -4,16 +4,29 @@ import datetime
 import json
 import shlex
 import subprocess
+from pathlib import Path
 from posixpath import abspath
 from typing import Optional, TypedDict
 
 from rich.console import Console
 
 from .config import AGENT_SETTINGS as config
-from .constants import LOG_FILE
+from .constants import AGENT_TEMP_DIR
 from .ui import status_manager
 
 console = Console()
+
+_session_log_file_path: Optional[Path] = None
+
+
+def get_session_log_file_path() -> Path:
+    global _session_log_file_path
+    if _session_log_file_path is None:
+        log_dir = AGENT_TEMP_DIR / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        _session_log_file_path = log_dir / f"agent_log_{timestamp}.log"
+    return _session_log_file_path
 
 
 def _print_formatted(message, message_type="default") -> None:
@@ -54,10 +67,11 @@ def log(
     if not quiet:
         _print_formatted(message_human or message, message_type=message_type)
 
-    if not LOG_FILE.exists():
-        with open(LOG_FILE, "w", encoding="utf-8") as f:
+    session_log_file = get_session_log_file_path()
+    if not session_log_file.exists():
+        with open(session_log_file, "w", encoding="utf-8") as f:
             f.write("")
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
+    with open(session_log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_entry) + "\n")
 
 
