@@ -68,13 +68,13 @@ def main() -> None:
     )
     parser.add_argument("prompt", nargs="*", help="Task(s) to do")
 
-    args = parser.parse_args()
+    cli_settings = parser.parse_args()
 
     # Create the agent dir before even doing any logging
     if not AGENT_TEMP_DIR.exists():
         AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    if args.show_config:
+    if cli_settings.show_config:
         rich.print(config.model_dump_json(indent=2))
         exit(0)
 
@@ -89,22 +89,22 @@ def main() -> None:
     )
 
     # Set LLM engine if requested
-    if [args.claude, args.codex, args.openrouter is not None].count(True) > 1:
+    if [cli_settings.claude, cli_settings.codex, cli_settings.openrouter is not None].count(True) > 1:
         parser.error("Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, or --openrouter.")
 
     # This is the only place where LLM() should be instantiated.
-    if args.claude:
+    if cli_settings.claude:
         llm = LLM(engine="claude", model=None)
-    elif args.codex:
+    elif cli_settings.codex:
         llm = LLM(engine="codex", model=None)
-    elif args.openrouter is not None:
-        llm = LLM(engine="openrouter", model=args.openrouter)
-    elif args.opencode:
+    elif cli_settings.openrouter is not None:
+        llm = LLM(engine="openrouter", model=cli_settings.openrouter)
+    elif cli_settings.opencode:
         llm = LLM(engine="opencode", model=None)  # The default is set in the LLM class
     else:
         llm = LLM(engine="gemini", model=None)
 
-    effective_cwd = Path(os.path.abspath(str(args.cwd) if args.cwd else os.getcwd()))
+    effective_cwd = Path(os.path.abspath(str(cli_settings.cwd) if cli_settings.cwd else os.getcwd()))
 
     # Ensure the .agent directory exists
     if not AGENT_TEMP_DIR.exists():
@@ -117,16 +117,16 @@ def main() -> None:
     write_state({})
 
     # Determine base branch from args or config
-    if args.base is None:
-        args.base = config.default_base or "main"
+    if cli_settings.base is None:
+        cli_settings.base = config.default_base or "main"
 
     worktree_path = None
     # Worktree is enabled by default unless --no-worktree is specified
-    if not args.no_worktree:
+    if not cli_settings.no_worktree:
         log("Temporary worktree mode enabled. Will create a git worktree for the task.", message_type="thought")
         worktree_path = Path(tempfile.mkdtemp(prefix="agent_worktree_"))
         try:
-            git_utils.add_worktree(worktree_path, rev=args.base, cwd=effective_cwd)
+            git_utils.add_worktree(worktree_path, rev=cli_settings.base, cwd=effective_cwd)
             work_dir = worktree_path
         except Exception as e:
             log(f"Failed to create temporary worktree: {e}", message_type="tool_output_error")
@@ -142,7 +142,7 @@ def main() -> None:
         status_manager.init_status_bar()
         status_manager.set_phase("Agent initialized")
 
-        selected_tasks = args.prompt
+        selected_tasks = cli_settings.prompt
         task_results = []
 
         for i, task_prompt in enumerate(selected_tasks, 1):
@@ -155,12 +155,12 @@ def main() -> None:
             try:
                 # Create a new worktree for each task
                 current_worktree_path = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
-                git_utils.add_worktree(current_worktree_path, rev=args.base, cwd=effective_cwd)
+                git_utils.add_worktree(current_worktree_path, rev=cli_settings.base, cwd=effective_cwd)
 
                 # Change to the new worktree directory
                 os.chdir(current_worktree_path)
 
-                process_task(task_prompt, i, base_rev=args.base, cwd=current_worktree_path, llm=llm)
+                process_task(task_prompt, i, base_rev=cli_settings.base, cwd=current_worktree_path, llm=llm)
                 task_status = "Success"
                 task_commit_hash = git_utils.get_current_commit_hash(cwd=current_worktree_path)
 
