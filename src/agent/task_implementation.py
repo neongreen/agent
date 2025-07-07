@@ -113,7 +113,9 @@ def _evaluate_implementation(
         "Here are the uncommitted changes:\n\n"
         f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
         "Here is the diff of the changes made in previous commits:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}"
+        f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
+        "To remind you: you *must* output the *final* verdict in the first line of your response.\n"
+        "If you need to do any checks, do them before outputting the verdict.\n"
     )
 
     if config.implement.judge_extra_prompt:
@@ -169,7 +171,9 @@ def _handle_successful_implementation(
         "Here are the uncommitted changes:\n\n"
         f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
         "Here is the diff of the changes made in previous commits:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}"
+        f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
+        "To remind you: you *must* output the *final* verdict in the first line of your response.\n"
+        "If you need to do any checks, do them before outputting the verdict.\n"
     )
 
     if config.implement.completion.judge_extra_prompt:
