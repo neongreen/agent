@@ -13,6 +13,7 @@ from pathlib import Path
 import rich
 
 from . import git_utils
+from .cli_settings import CLISettings
 from .config import AGENT_SETTINGS as config
 from .constants import AGENT_TEMP_DIR
 from .llm import LLM
@@ -39,36 +40,35 @@ def display_task_summary(task_results: list) -> None:
 
 def main() -> None:
     """
-    Main function to run the agent.
+    Main entry point for the agent application.
+
+    This module handles command-line argument parsing, configuration loading,
+    and orchestration of the agent's task processing.
 
     Parses command-line arguments, sets up the environment, and initiates
     the agentic loop for task processing.
     """
-    parser = argparse.ArgumentParser(description="Agentic task processing tool")
+    parser = argparse.ArgumentParser(description="Agentic loop")
     parser.add_argument("--quiet", action="store_true", help="Suppress informational output")
-    parser.add_argument("--cwd", help="Working directory for task execution")
-    parser.add_argument(
-        "--base",
-        default=None,
-        help="Base branch, commit, or git specifier to switch to before creating a task branch (default: main or from config)",
-    )
+    parser.add_argument("--cwd", type=str, default=None, help="Working directory for task execution")
+    parser.add_argument("--base", type=str, default=None, help="Base branch, commit, or git specifier")
     parser.add_argument("--claude", action="store_true", help="Use Claude Code CLI instead of Gemini for LLM calls")
     parser.add_argument("--codex", action="store_true", help="Use Codex CLI instead of Gemini for LLM calls")
-    parser.add_argument("--openrouter", default=None, help="Use OpenRouter (via Codex); specify the model name")
-    parser.add_argument("--opencode", action="store_true", help="Use Opencode CLI instead of Gemini for LLM calls")
     parser.add_argument(
-        "--show-config",
-        action="store_true",
-        help="Show the current configuration and exit",
+        "--openrouter", type=str, default=None, help="Use OpenRouter (via Codex); specify the model name"
     )
+    parser.add_argument("--opencode", action="store_true", help="Use Opencode CLI instead of Gemini for LLM calls")
+    parser.add_argument("--show-config", action="store_true", help="Show the current configuration and exit")
     parser.add_argument(
         "--no-worktree",
         action="store_true",
         help="Work directly in the target directory rather than in a temporary Git worktree.",
     )
-    parser.add_argument("prompt", nargs="*", help="Task(s) to do")
+    parser.add_argument("prompt", nargs="*", default=None, help="Task(s) to do")
+    args = parser.parse_args()
 
-    cli_settings = parser.parse_args()
+    # Populate CLISettings from parsed args, following pydantic-settings docs
+    cli_settings = CLISettings.model_validate(vars(args))
 
     # Create the agent dir before even doing any logging
     if not AGENT_TEMP_DIR.exists():
@@ -81,16 +81,18 @@ def main() -> None:
     if config.quiet_mode:
         # If quiet mode is enabled, suppress informational output
         # This needs to be handled early, before any logging occurs
-        pass  # Actual suppression logic would go here or be handled by the logger itself
+        # Actual suppression logic would go here or be handled by the logger itself
+        pass
 
     log(
         f"Configuration loaded:\n{config.model_dump_json(indent=2)}",
         message_type="thought",
     )
 
-    # Set LLM engine if requested
     if [cli_settings.claude, cli_settings.codex, cli_settings.openrouter is not None].count(True) > 1:
-        parser.error("Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, or --openrouter.")
+        raise ValueError(
+            "Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, --openrouter, or --opencode."
+        )
 
     # This is the only place where LLM() should be instantiated.
     if cli_settings.claude:
@@ -100,7 +102,7 @@ def main() -> None:
     elif cli_settings.openrouter is not None:
         llm = LLM(engine="openrouter", model=cli_settings.openrouter)
     elif cli_settings.opencode:
-        llm = LLM(engine="opencode", model=None)  # The default is set in the LLM class
+        llm = LLM(engine="opencode", model=None)
     else:
         llm = LLM(engine="gemini", model=None)
 
@@ -116,9 +118,7 @@ def main() -> None:
     # if not STATE_FILE.exists():
     write_state({})
 
-    # Determine base branch from args or config
-    if cli_settings.base is None:
-        cli_settings.base = config.default_base or "main"
+    base = cli_settings.base if cli_settings.base is not None else config.default_base or "main"
 
     worktree_path = None
     # Worktree is enabled by default unless --no-worktree is specified
@@ -126,7 +126,7 @@ def main() -> None:
         log("Temporary worktree mode enabled. Will create a git worktree for the task.", message_type="thought")
         worktree_path = Path(tempfile.mkdtemp(prefix="agent_worktree_"))
         try:
-            git_utils.add_worktree(worktree_path, rev=cli_settings.base, cwd=effective_cwd)
+            git_utils.add_worktree(worktree_path, rev=base, cwd=effective_cwd)
             work_dir = worktree_path
         except Exception as e:
             log(f"Failed to create temporary worktree: {e}", message_type="tool_output_error")
@@ -142,7 +142,7 @@ def main() -> None:
         status_manager.init_status_bar()
         status_manager.set_phase("Agent initialized")
 
-        selected_tasks = cli_settings.prompt
+        selected_tasks = cli_settings.prompt or []
         task_results = []
 
         for i, task_prompt in enumerate(selected_tasks, 1):
@@ -155,15 +155,13 @@ def main() -> None:
             try:
                 # Create a new worktree for each task
                 current_worktree_path = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
-                git_utils.add_worktree(current_worktree_path, rev=cli_settings.base, cwd=effective_cwd)
+                git_utils.add_worktree(current_worktree_path, rev=base, cwd=effective_cwd)
 
                 # Change to the new worktree directory
                 os.chdir(current_worktree_path)
-
-                process_task(task_prompt, i, base_rev=cli_settings.base, cwd=current_worktree_path, llm=llm)
+                process_task(task_prompt, i, base_rev=base, cwd=current_worktree_path, llm=llm)
                 task_status = "Success"
                 task_commit_hash = git_utils.get_current_commit_hash(cwd=current_worktree_path)
-
             except Exception as e:
                 task_error = str(e)
                 log(f"Error processing task {i}: {e}", message_type="tool_output_error")
