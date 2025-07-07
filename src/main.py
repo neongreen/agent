@@ -4,14 +4,12 @@ import sys
 import tomllib
 from pathlib import Path
 
+from .config import AgentConfig
 from .constants import STATE_FILE
 from .gemini_agent import choose_tasks, discover_tasks
 from .state_manager import write_state
 from .task_processor import process_task
 from .utils import log
-
-QUIET_MODE = False
-JUDGE_EXTRA_PROMPT = ""
 
 
 def main() -> None:
@@ -34,7 +32,8 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    QUIET_MODE = args.quiet
+    # Create configuration object
+    agent_config = AgentConfig(quiet_mode=args.quiet)
 
     # Determine effective working directory
     effective_cwd = args.cwd if args.cwd else os.getcwd()
@@ -46,7 +45,7 @@ def main() -> None:
 
     # Use the effective working directory
     cwd = effective_cwd
-    log(f"Using working directory: {cwd}", message_type="thought")
+    log(f"Using working directory: {cwd}", message_type="thought", config=agent_config)
 
     # Update default_base_from_toml from .agent.toml if it exists in the effective_cwd
     agent_toml_path = Path(effective_cwd) / ".agent.toml"
@@ -59,38 +58,40 @@ def main() -> None:
                 log(
                     f"Using default-base from .agent.toml: {default_base_from_toml}",
                     message_type="thought",
+                    config=agent_config,
                 )
             if "plan" in config and "judge-extra-prompt" in config["plan"]:
                 judge_extra_prompt_from_toml = config["plan"]["judge-extra-prompt"]
                 log(
                     f"Using plan.judge-extra-prompt from .agent.toml: {judge_extra_prompt_from_toml}",
                     message_type="thought",
+                    config=agent_config,
                 )
             else:
                 judge_extra_prompt_from_toml = ""
         except Exception as e:
-            log(f"Error reading or parsing .agent.toml: {e}", message_type="tool_output_error")
+            log(f"Error reading or parsing .agent.toml: {e}", message_type="tool_output_error", config=agent_config)
 
     # Re-set the default for --base argument if it was not explicitly provided by the user
     # and a value was found in .agent.toml
     if "base" not in args or args.base == "main":  # Check if --base was not provided or is still default 'main'
         args.base = default_base_from_toml
 
-    global JUDGE_EXTRA_PROMPT
-    JUDGE_EXTRA_PROMPT = judge_extra_prompt_from_toml
+    # Update agent config with judge extra prompt
+    agent_config.judge_extra_prompt = judge_extra_prompt_from_toml
 
-    log("Starting agentic loop", message_type="thought")
+    log("Starting agentic loop", message_type="thought", config=agent_config)
 
     if args.multi:
         # Find tasks
-        log("Treating prompt as an instruction to discover tasks", message_type="thought")
+        log("Treating prompt as an instruction to discover tasks", message_type="thought", config=agent_config)
         tasks = discover_tasks(args.prompt, cwd)
         if not tasks:
-            log("No tasks discovered", message_type="thought")
+            log("No tasks discovered", message_type="thought", config=agent_config)
             sys.exit(1)
         selected_tasks = choose_tasks(tasks)
         if not selected_tasks:
-            log("No tasks selected", message_type="thought")
+            log("No tasks selected", message_type="thought", config=agent_config)
             sys.exit(0)
     else:
         selected_tasks = [args.prompt]
@@ -98,11 +99,11 @@ def main() -> None:
     # Process each selected task
     for i, task in enumerate(selected_tasks, 1):
         try:
-            process_task(task, i, args.base, cwd)
+            process_task(task, i, args.base, cwd, agent_config)
         except Exception as e:
-            log(f"Error processing task {i}: {e}", message_type="tool_output_error")
+            log(f"Error processing task {i}: {e}", message_type="tool_output_error", config=agent_config)
 
-    log("Agentic loop completed")
+    log("Agentic loop completed", config=agent_config)
 
 
 if __name__ == "__main__":

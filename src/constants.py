@@ -9,8 +9,6 @@ class TaskState(Enum):
     ABORT = "ABORT"
 
 
-# Global variables
+# Constants
 LOG_FILE = ".agentic-log"
-QUIET_MODE = False
-JUDGE_EXTRA_PROMPT = ""
 STATE_FILE = Path(".agent_state.json")

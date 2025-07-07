@@ -6,7 +6,8 @@ from typing import Optional, TypedDict
 
 from rich.console import Console
 
-from .constants import LOG_FILE, QUIET_MODE
+from .config import AgentConfig
+from .constants import LOG_FILE
 
 console = Console()
 
@@ -27,10 +28,16 @@ def _print_formatted(message, message_type="default") -> None:
     console.print(message, style=style)
 
 
-def log(message: str, message_human: Optional[str] = None, quiet=None, message_type="default") -> None:
+def log(
+    message: str,
+    message_human: Optional[str] = None,
+    quiet=None,
+    message_type="default",
+    config: Optional[AgentConfig] = None,
+) -> None:
     """Simple logging function that respects quiet mode."""
     if quiet is None:
-        quiet = QUIET_MODE
+        quiet = config.quiet_mode if config else False
 
     log_entry = {"timestamp": datetime.datetime.now().isoformat(), "message": message}
 
@@ -48,7 +55,13 @@ class RunResult(TypedDict):
     success: bool
 
 
-def run(command: list[str], description=None, command_human: Optional[list[str]] = None, directory=None) -> RunResult:
+def run(
+    command: list[str],
+    description=None,
+    command_human: Optional[list[str]] = None,
+    directory=None,
+    config: Optional[AgentConfig] = None,
+) -> RunResult:
     """
     Run command and log it.
 
@@ -57,26 +70,28 @@ def run(command: list[str], description=None, command_human: Optional[list[str]]
         description: Optional description of the command for logging.
         directory: Optional working directory to run the command in.
         command_human: If present, will be used in console output instead of the full command.
+        config: Agent configuration for logging settings.
     """
 
     if description:
-        log(f"Executing: {description}", message_type="tool_code")
+        log(f"Executing: {description}", message_type="tool_code", config=config)
 
     log(
         f"Running command: {shlex.join(command)}",
         message_human=f"Running command: {shlex.join(command_human or command)}",
         message_type="tool_code",
+        config=config,
     )
 
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=directory)
 
         if result.returncode != 0:
-            log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error")
-            log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
+            log(f"Command failed with exit code {result.returncode}", message_type="tool_output_error", config=config)
+            log(f"Stderr: {result.stderr}", message_type="tool_output_stderr", config=config)
 
-        log(f"Stdout: {result.stdout}", message_type="tool_output_stdout")
-        log(f"Stderr: {result.stderr}", message_type="tool_output_stderr")
+        log(f"Stdout: {result.stdout}", message_type="tool_output_stdout", config=config)
+        log(f"Stderr: {result.stderr}", message_type="tool_output_stderr", config=config)
 
         return {
             "exit_code": result.returncode,
@@ -86,5 +101,5 @@ def run(command: list[str], description=None, command_human: Optional[list[str]]
         }
 
     except Exception as e:
-        log(f"Error running command: {e}", message_type="tool_output_error")
+        log(f"Error running command: {e}", message_type="tool_output_error", config=config)
         return {"exit_code": -1, "stdout": "", "stderr": str(e), "success": False}
