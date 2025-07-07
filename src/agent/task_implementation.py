@@ -17,6 +17,23 @@ class ImplementationResult(TypedDict):
     feedback: str
 
 
+class ImplementationVerdict(Enum):
+    """Enum for possible verdicts from the implementation judge."""
+
+    SUCCESS = "SUCCESS"
+    PARTIAL = "PARTIAL"
+    FAILURE = "FAILURE"
+
+
+class TaskCompletionVerdict(Enum):
+    """Enum for possible verdicts from the task completion judge."""
+
+    COMPLETE = "COMPLETE"
+    """Task is fully completed."""
+    CONTINUE = "CONTINUE"
+    """More work is needed."""
+
+
 def _get_implementation_summary(
     llm: LLM,
     task: str,
@@ -43,6 +60,40 @@ def _get_implementation_summary(
 
     status_manager.update_status("Getting implementation")
     return llm.run(impl_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
+
+
+def _evaluate_implementation(
+    llm: LLM,
+    task: str,
+    implementation_summary: str,
+    base_commit: str,
+    cwd: Path,
+) -> tuple[Optional[ImplementationVerdict], Optional[str]]:
+    eval_prompt = (
+        f"Evaluate if this implementation makes progress on the task {repr(task)}.\n"
+        "The first line of your response must be:\n"
+        "  - SUCCESS SUCCESS SUCCESS if it's a good step forward;\n"
+        "  - PARTIAL PARTIAL PARTIAL if it's somewhat helpful;\n"
+        "  - FAILURE FAILURE FAILURE if it's not useful.\n"
+        "For the 'success' verdict, provide a brief comment on the implementation.\n"
+        "For the 'partial' verdict, provide specific feedback on what could be improved or what remains to be done.\n"
+        "For the 'failure' verdict, list specific reasons why the implementation is inadequate.\n"
+        "The implementation is either in the uncommitted changes, in the previous commits, or both.\n"
+        "Here is the summary of the implementation:\n\n"
+        f"{implementation_summary}\n\n"
+        "Here are the uncommitted changes:\n\n"
+        f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
+        "Here is the diff of the changes made in previous commits:\n\n"
+        f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}"
+    )
+
+    if config.implement.judge_extra_prompt:
+        eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
+
+    status_manager.update_status("Evaluating implementation")
+    evaluation = llm.run(eval_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION)
+    verdict = check_verdict(ImplementationVerdict, evaluation or "")
+    return verdict, evaluation
 
 
 def implementation_phase(
@@ -150,31 +201,13 @@ def implementation_phase(
                     shell=True,
                 )
 
-            # SUCCESS, PARTIAL, FAILURE correspond to the 'ImplementationVerdict' enum
-            eval_prompt = (
-                f"Evaluate if this implementation makes progress on the task {repr(task)}.\n"
-                "The first line of your response must be:\n"
-                "  - SUCCESS SUCCESS SUCCESS if it's a good step forward;\n"
-                "  - PARTIAL PARTIAL PARTIAL if it's somewhat helpful;\n"
-                "  - FAILURE FAILURE FAILURE if it's not useful.\n"
-                "For the 'success' verdict, provide a brief comment on the implementation.\n"
-                "For the 'partial' verdict, provide specific feedback on what could be improved or what remains to be done.\n"
-                "For the 'failure' verdict, list specific reasons why the implementation is inadequate.\n"
-                "The implementation is either in the uncommitted changes, in the previous commits, or both.\n"
-                "Here is the summary of the implementation:\n\n"
-                f"{implementation_summary}\n\n"
-                "Here are the uncommitted changes:\n\n"
-                f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}\n\n"
-                "Here is the diff of the changes made in previous commits:\n\n"
-                f"{format_tool_code_output(run(['git', 'diff', base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=cwd), 'diff')}"
+            verdict, evaluation = _evaluate_implementation(
+                llm=llm,
+                task=task,
+                implementation_summary=implementation_summary,
+                base_commit=base_commit,
+                cwd=cwd,
             )
-
-            if config.implement.judge_extra_prompt:
-                eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
-
-            status_manager.update_status("Evaluating implementation")
-            evaluation = llm.run(eval_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION)
-            verdict = check_verdict(ImplementationVerdict, evaluation or "")
 
             if not evaluation or verdict is None:
                 status_manager.update_status("Failed to get a verdict.", style="red")
@@ -327,20 +360,3 @@ def implementation_phase(
         except Exception as e:
             log(f"Failed to make final commit: {e}", message_type=LLMOutputType.TOOL_ERROR)
     return result
-
-
-class ImplementationVerdict(Enum):
-    """Enum for possible verdicts from the implementation judge."""
-
-    SUCCESS = "SUCCESS"
-    PARTIAL = "PARTIAL"
-    FAILURE = "FAILURE"
-
-
-class TaskCompletionVerdict(Enum):
-    """Enum for possible verdicts from the task completion judge."""
-
-    COMPLETE = "COMPLETE"
-    """Task is fully completed."""
-    CONTINUE = "CONTINUE"
-    """More work is needed."""
