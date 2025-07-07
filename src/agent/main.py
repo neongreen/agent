@@ -105,9 +105,8 @@ def main() -> None:
     write_state({})
 
     base = cli_settings.base if cli_settings.base is not None else config.default_base or "main"
-    work_dir = effective_cwd
 
-    log(f"Using working directory: {work_dir}", LLMOutputType.STATUS)
+    log(f"Repo directory: {effective_cwd}", LLMOutputType.STATUS)
 
     log("Starting agentic loop", LLMOutputType.STATUS)
 
@@ -120,21 +119,30 @@ def main() -> None:
 
         for i, task_prompt in enumerate(selected_tasks, 1):
             log(f"Processing task {i}/{len(selected_tasks)}: '{task_prompt}'", LLMOutputType.STATUS)
-            current_worktree_path: Path | None = None
+            work_dir: Path | None = None
+            using_worktree: bool = False
             task_status = "Failed"
             task_commit_hash = "N/A"
             task_error = None
 
             try:
-                # Create a new worktree for each task
-                current_worktree_path = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
-                git_utils.add_worktree(current_worktree_path, rev=base, cwd=effective_cwd)
+                if cli_settings.no_worktree:
+                    # If no worktree is specified, use the effective_cwd directly
+                    work_dir = effective_cwd
+                    log(
+                        f"Worktrees disabled, using working directory for the task: {work_dir}",
+                        LLMOutputType.STATUS,
+                    )
+                else:
+                    # Create a new worktree for each task
+                    work_dir = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
+                    git_utils.add_worktree(work_dir, rev=base, cwd=effective_cwd)
+                    using_worktree = True
 
-                # Change to the new worktree directory
-                os.chdir(current_worktree_path)
-                process_task(task_prompt, i, base_rev=base, cwd=current_worktree_path, llm=llm)
+                os.chdir(work_dir)
+                process_task(task_prompt, i, base_rev=base, cwd=work_dir, llm=llm)
                 task_status = "Success"
-                task_commit_hash = git_utils.get_current_commit_hash(cwd=current_worktree_path)
+                task_commit_hash = git_utils.get_current_commit_hash(cwd=work_dir)
             except Exception as e:
                 task_error = str(e)
                 log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
@@ -143,20 +151,20 @@ def main() -> None:
                     {
                         "prompt": task_prompt,
                         "status": task_status,
-                        "worktree": str(current_worktree_path) if current_worktree_path else None,
+                        "work_dir": str(work_dir) if work_dir else None,
                         "commit_hash": task_commit_hash,
                         "error": task_error,
                     }
                 )
                 # Clean up worktree and return to original directory
-                if current_worktree_path and current_worktree_path.exists():
+                if using_worktree and work_dir and work_dir.exists():
                     try:
-                        # Change back to the original working directory before removing worktree
+                        # Change back to the original directory before removing worktree
                         os.chdir(effective_cwd)
-                        git_utils.remove_worktree(current_worktree_path, cwd=effective_cwd)
+                        git_utils.remove_worktree(work_dir, cwd=effective_cwd)
                     except Exception as e:
                         log(
-                            f"Error cleaning up temporary worktree {current_worktree_path}: {e}",
+                            f"Error cleaning up temporary worktree {work_dir}: {e}",
                             LLMOutputType.TOOL_ERROR,
                         )
 
