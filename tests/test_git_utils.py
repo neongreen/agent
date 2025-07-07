@@ -165,3 +165,20 @@ def test_add_and_remove_worktree(git_repo: Path, tmp_path: Path) -> None:
     removed: bool = remove_worktree(worktree_path, cwd=git_repo)
     assert removed
     assert not (worktree_path / ".git").exists()
+
+
+def test_add_worktree_with_main_revision(git_repo: Path, tmp_path: Path) -> None:
+    """
+    Test what happens if we have a repo at main and create a worktree with revision=main.
+
+    This will fail if the `add_worktree` uses the provided revision directly without resolving it to a commit.
+    """
+
+    # Ensure 'main' branch exists (or skip if not)
+    branches = get_existing_branch_names(cwd=git_repo)
+    if "main" not in branches:
+        pytest.fail("No 'main' branch available in the fixture repo")
+
+    worktree_path = tmp_path / "worktree_main"
+    added: bool = add_worktree(worktree_path, rev="main", cwd=git_repo)
+    assert added
