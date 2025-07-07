@@ -13,7 +13,10 @@ post-implementation-hook-command = """
 planner-extra-prompt = """
   Note: do not propose writing tests, running automatic tests, or doing testing manually.
   If you do, your plan will be rejected.
-  However, please include typechecking the code with `uv run pyright --project .` in your plan.
+  However, please include these two checks:
+    - `fd .py | xargs uv run python -m py_compile` to check for syntax errors
+    - `uv run pyright --project .` to typecheck
+  Both must pass before the task is considered complete.
 """
 
 judge-extra-prompt = """
