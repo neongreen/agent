@@ -35,15 +35,13 @@ def discover_tasks(prompt_text, cwd=None):
             log(f"Error reading file {prompt_text}: {e}", message_type="tool_output_error")
             return []
     else:
-        gemini_prompt = f"""Analyze this instruction and identify distinct independent tasks: {prompt_text}
-
-If the instruction references external resources (like git commits, files, APIs, etc.) that you need to examine to identify the actual tasks, do the exploration and then identify the tasks.
-
-If it's a simple direct instruction (like 'create a hello world program'), return exactly one task.
-
-If it explicitly mentions multiple separate tasks, list each one.
-
-Return as a numbered list with clear task descriptions."""
+        gemini_prompt = (
+            f"Analyze this instruction and identify distinct independent tasks: {prompt_text}\n"
+            "If the instruction references external resources (like git commits, files, APIs, etc.) that you need to examine to identify the actual tasks, do the exploration and then identify the tasks.\n"
+            "If it's a simple direct instruction (like 'create a hello world program'), return exactly one task.\n"
+            "If it explicitly mentions multiple separate tasks, list each one.\n"
+            "Return as a numbered list with clear task descriptions."
+        )
 
     response = run_gemini(gemini_prompt, yolo=True)
     if not response:

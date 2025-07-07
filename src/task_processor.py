@@ -24,25 +24,22 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
 
         # Ask Gemini to create/revise plan
         if round_num == 1:
-            plan_prompt = f"""
-Create a detailed implementation plan for this task: {repr(task)}. Break it down into specific, actionable steps.
-You are granted access to tools, commands, and code execution for the *sole purpose* of gaining knowledge.
-You *may not* use these tools to directly implement the task.
-Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.
-""".strip()
+            plan_prompt = (
+                f"Create a detailed implementation plan for this task: {repr(task)}. Break it down into specific, actionable steps.\n"
+                "You are granted access to tools, commands, and code execution for the *sole purpose* of gaining knowledge.\n"
+                "You *may not* use these tools to directly implement the task.\n"
+                'Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.'
+            ).strip()
         else:
-            plan_prompt = f"""
-Revise the following plan for task {repr(task)} based on the feedback provided:
-
-Previous Plan:
-{previous_plan}
-
-Reviewer Feedback:
-{previous_review}
-
-Create a better implementation plan.
-Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.
-""".strip()
+            plan_prompt = (
+                f"Revise the following plan for task {repr(task)} based on the feedback provided:\n\n"
+                "Previous Plan:\n"
+                f"{previous_plan}\n\n"
+                "Reviewer Feedback:\n"
+                f"{previous_review}\n\n"
+                "Create a better implementation plan.\n"
+                'Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.'
+            ).strip()
 
         current_plan = run_gemini(plan_prompt, yolo=True)
         if not current_plan:
@@ -50,11 +47,11 @@ Output "PLAN_TEXT_END" after the plan. You may not output anything after that ma
             return None
 
         # Ask Gemini to review the plan
-        review_prompt = f"""Review this plan for task {repr(task)}:
-
-{current_plan}
-
-Respond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."""
+        review_prompt = (
+            f"Review this plan for task {repr(task)}:\n\n"
+            f"{current_plan}\n\n"
+            "Respond with either 'APPROVED' if the plan is good enough to implement (even if minor improvements are possible), or 'REJECTED' followed by a list of specific blockers that must be addressed."
+        )
 
         if config and config.judge_extra_prompt:
             review_prompt += f"\n\n{config.judge_extra_prompt}"
@@ -112,16 +109,14 @@ def implementation_phase(task, plan, cwd=None, config: Optional[AgentConfig] = N
         log(f"Implementation attempt {attempt}", message_type="thought")
 
         # Ask Gemini to implement next step
-        impl_prompt = f"""
-Execution phase. Based on this plan:
-
-{plan}
-
-Implement the next step for task {repr(task)}.
-Create files, run commands, and/or write code as needed.
-When done, provide a concise summary of what you did.
-Your response will help the reviewer of your implementation understand the changes made.
-""".strip()
+        impl_prompt = (
+            f"Execution phase. Based on this plan:\n\n"
+            f"{plan}\n\n"
+            f"Implement the next step for task {repr(task)}.\n"
+            "Create files, run commands, and/or write code as needed.\n"
+            "When done, provide a concise summary of what you did.\n"
+            "Your response will help the reviewer of your implementation understand the changes made.\n"
+        ).strip()
 
         implementation_summary = run_gemini(impl_prompt, yolo=True)
         if not implementation_summary:
@@ -137,19 +132,16 @@ Your response will help the reviewer of your implementation understand the chang
             f"Judging the implementation based on the diff. Gemini provided this explanation along with its implementation:\n{implementation_summary}",
             message_type="thought",
         )
-        eval_prompt = f"""
-Evaluate if this implementation makes progress on the task {repr(task)}.
-Respond with 'SUCCESS' if it's a good step forward, 'PARTIAL' if it's somewhat helpful, or 'FAILURE' if it's not useful.
-For 'PARTIAL', provide specific feedback on what could be improved or what remains to be done.
-For 'FAILURE', list specific reasons why the implementation is inadequate.
-Here is the summary of the implementation:
-
-{implementation_summary}
-
-Here is the diff of the changes made:
-
-{run(["git", "diff"], directory=cwd)["stdout"]}
-"""
+        eval_prompt = (
+            f"Evaluate if this implementation makes progress on the task {repr(task)}.\n"
+            "Respond with 'SUCCESS' if it's a good step forward, 'PARTIAL' if it's somewhat helpful, or 'FAILURE' if it's not useful.\n"
+            "For 'PARTIAL', provide specific feedback on what could be improved or what remains to be done.\n"
+            "For 'FAILURE', list specific reasons why the implementation is inadequate.\n"
+            "Here is the summary of the implementation:\n\n"
+            f"{implementation_summary}\n\n"
+            "Here is the diff of the changes made:\n\n"
+            f"{run(['git', 'diff'], directory=cwd)['stdout']}"
+        )
 
         evaluation = run_gemini(eval_prompt, yolo=True)
         if not evaluation:
