@@ -62,6 +62,7 @@ def write_state(state: dict) -> None:
 # Global variables
 LOG_FILE = ".agentic-log"
 QUIET_MODE = False
+JUDGE_EXTRA_PROMPT = ""
 
 
 def sanitize_branch_name(name: str) -> str:
@@ -469,6 +470,9 @@ Here is the summary of the implementation:\n\n{implementation_summary}\n
 Here is the diff of the changes made:\n\n{run(["git", "diff"], directory=cwd)["stdout"]}
 """
 
+        if JUDGE_EXTRA_PROMPT:
+            eval_prompt += f"\n\n{JUDGE_EXTRA_PROMPT}"
+
         evaluation = run_gemini(eval_prompt, yolo=True)
         if not evaluation:
             log("Failed to get evaluation from Gemini", message_type="tool_output_error", indent_level=2)
@@ -661,6 +665,15 @@ def main() -> None:
                     message_type="thought",
                     indent_level=1,
                 )
+            if "plan" in config and "judge-extra-prompt" in config["plan"]:
+                judge_extra_prompt_from_toml = config["plan"]["judge-extra-prompt"]
+                log(
+                    f"Using plan.judge-extra-prompt from .agent.toml: {judge_extra_prompt_from_toml}",
+                    message_type="thought",
+                    indent_level=1,
+                )
+            else:
+                judge_extra_prompt_from_toml = ""
         except Exception as e:
             log(f"Error reading or parsing .agent.toml: {e}", message_type="tool_output_error", indent_level=1)
 
@@ -668,6 +681,9 @@ def main() -> None:
     # and a value was found in .agent.toml
     if "base" not in args or args.base == "main":  # Check if --base was not provided or is still default 'main'
         args.base = default_base_from_toml
+
+    global JUDGE_EXTRA_PROMPT
+    JUDGE_EXTRA_PROMPT = judge_extra_prompt_from_toml
 
     log("Starting agentic loop", message_type="thought")
 
