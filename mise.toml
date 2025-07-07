@@ -1,6 +1,7 @@
 [tools]
 python = "3.13.5"
+uv = "0.7.18"
 
 [tasks.run]
-run = "mise x -- python main.py"
+run = "uv run main.py"
 description = "Run the agent"
