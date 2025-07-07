@@ -14,6 +14,7 @@ from .config import AGENT_SETTINGS as config
 from .constants import AGENT_TEMP_DIR
 from .ui import status_manager
 
+
 console = Console()
 
 _session_log_file_path: Optional[Path] = None

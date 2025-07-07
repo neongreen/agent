@@ -18,27 +18,28 @@ run = "uv run scripts/generate_schema.py"
 
 # Cleanup / autofix
 
-[tasks.add-types]
-description = "Auto-add types to the Python files"
+[tasks.x-add-types]
+description = "Auto-add types to the Python files, across all commits"
 run = [
   'jj x fd .py -x uv run --with=autotyping --isolated python -m autotyping {} --safe',
 ]
 
-[tasks.autoimport]
+[tasks.x-autoimport]
 description = "Add missing imports to the Python files, across all commits"
 run = """
   jj x 'fd .py | xargs uvx --isolated autoimport'
 """
 
 # D213, D209 - format multiline docstrings
-[tasks.ruff-fix]
+# I, RUF022 - sort imports
+[tasks.x-format]
+description = "Run ruff and other tools to format/ fix the Python files, across all commits"
 run = """
   jj x -r 'mutable()' '\
-    ruff check --fix --extend-select D213,D209 ; \
+    ruff check --fix --extend-select D213,D209,I,RUF022; \
     ruff format \
   '"""
 
-description = "Run ruff to fix the Python files, including some fixes that are not linted"
 [tasks.clean-branches]
 description = "Remove all branches below main/dev"
 run = '''

@@ -13,6 +13,7 @@ from .constants import AGENT_TEMP_DIR
 from .ui import status_manager
 from .utils import log, run
 
+
 LLM_ENGINE = os.getenv("LLM_ENGINE", "gemini")
 """The globally selected LLM engine, defaults to 'gemini'."""
 LLM_MODEL = None

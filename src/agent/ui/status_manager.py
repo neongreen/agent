@@ -9,6 +9,7 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.text import Text
 
+
 console = Console()
 live_display: Optional[Live] = None
 _current_phase: Optional[str] = None

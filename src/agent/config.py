@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import AliasGenerator, BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
+
 # TODO: idk how to allow env vars, I get "extra inputs are not permitted"
 
 kebab_alias_generator = AliasGenerator(
