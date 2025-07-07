@@ -59,9 +59,9 @@ def implementation_phase(
                 f"{f'And the feedback about your previous attempt:\n\n{feedback}\n\n' if feedback else ''}"
                 f"Implement the next step for task {repr(task)}.\n"
                 "Create files, run commands, and/or write code as needed.\n"
-                "When done, output 'IMPLEMENTATION_SUMMARY_START' and then a concise summary of what you did.\n"
+                "When done, output a concise summary of what you did, starting with 'My summary of the implementation:'.\n"
                 "Your response will help the reviewer of your implementation understand the changes made.\n"
-                "Finish your response with 'IMPLEMENTATION_SUMMARY_END'.\n"
+                "Finish your response with 'This is the end of the implementation summary'.\n"
             )
 
             if config.implement.extra_prompt:
