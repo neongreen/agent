@@ -11,10 +11,12 @@ post-implementation-hook-command = """
 
 [plan]
 planner-extra-prompt = """
-  Note: do not propose writing tests, running automatic tests, or doing testing manually.
+  Do not propose writing tests, running automatic tests, or doing testing manually.
   If you do, your plan will be rejected.
-  However, please include these two checks:
-    - `fd .py | xargs uv run python -m py_compile` to check for syntax errors
+  The exception is if the **task** explicitly asks to write or run tests.
+
+  Please include these two checks:
+    - `ruff check` to check for syntax errors and lints
     - `uv run pyright --project .` to typecheck
   Both must pass before the task is considered complete.
 """
@@ -27,10 +29,10 @@ judge-extra-prompt = """
     - The plan proposes to run the agent tool itself (src/agent/main.py).
     - The plan proposes using `pip` or `poetry` (this project uses `uv`).
     - The plan proposes pushing commits or creating pull requests.
-  
+
+  The exception is if the **task** explicitly asks to do any of these things.
+  For example, if the task is "write a test for function Abc", then the plan can include writing and running a test for function `Abc`.
+
   If rejecting the plan, you must explain in detail why you are rejecting it.
   You must also give the planner the entire rejection criteria from the above, so that it will adhere to all of them in the next planning round.
 """
-
-[implement.completion]
-judge-extra-prompt = ""
