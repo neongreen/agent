@@ -33,8 +33,15 @@ def main() -> None:
     parser.add_argument(
         "--multi", action="store_true", help="Treat prompt as an instruction to find task, rather than a single task"
     )
+    parser.add_argument("--claude", action="store_true", help="Use Claude Code CLI instead of Gemini for LLM calls")
 
     args = parser.parse_args()
+
+    # Set LLM engine if requested
+    from .gemini_agent import set_llm_engine
+
+    if args.claude:
+        set_llm_engine("claude")
 
     # Create configuration object
     config = AgentConfig(quiet_mode=args.quiet)
