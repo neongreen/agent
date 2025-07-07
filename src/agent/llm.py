@@ -26,6 +26,18 @@ class LLM:
         self.engine = engine
         self.model = model
 
+        if engine == "gemini":
+            if "GEMINI_API_KEY" in os.environ:
+                log(
+                    "GEMINI_API_KEY is set; gemini-cli will be using the provided key",
+                    message_type=LLMOutputType.STATUS,
+                )
+            else:
+                log(
+                    "GEMINI_API_KEY not found in environment; gemini-cli will be using whatever auth it uses by default",
+                    message_type=LLMOutputType.STATUS,
+                )
+
         if engine == "openrouter" and model is None:
             raise ValueError("Model must be specified for OpenRouter engine.")
         if engine == "opencode" and model is None:
