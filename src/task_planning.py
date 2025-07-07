@@ -28,7 +28,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
                 f"Create a detailed implementation plan for this task: {repr(task)}. Break it down into specific, actionable steps.\n"
                 "You are granted access to tools, commands, and code execution for the *sole purpose* of gaining knowledge.\n"
                 "You *may not* use these tools to directly implement the task.\n"
-                'Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.'
+                'Output the text of the plan, and then "PLAN_END" on a new line. You may not output anything after that marker.'
             ).strip()
         else:
             plan_prompt = (
@@ -38,7 +38,7 @@ def planning_phase(task: str, cwd=None, config: Optional[AgentConfig] = None) ->
                 "Reviewer Feedback:\n"
                 f"{previous_review}\n\n"
                 "Create a better implementation plan.\n"
-                'Output "PLAN_TEXT_END" after the plan. You may not output anything after that marker.'
+                'Output the text of the plan, and then "PLAN_END" on a new line. You may not output anything after that marker.'
             ).strip()
 
         if config and config.plan_planner_extra_prompt:
