@@ -22,14 +22,18 @@ def format_llm_thought(thought_text: str) -> str:
     """
     Formats LLM thoughts for aesthetic output.
     """
-    return thought_text
+    return f"""```
+{thought_text}
+```"""
 
 
 def format_reviewer_feedback(feedback_text: str) -> str:
     """
     Formats reviewer feedback for aesthetic output.
     """
-    return feedback_text
+    return f"""```
+{feedback_text}
+```"""
 
 
 def format_plan(plan_text: str) -> str:
