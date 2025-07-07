@@ -2,7 +2,7 @@
 
 from enum import Enum
 from pathlib import Path
-from typing import Optional, assert_never
+from typing import Optional, TypedDict, assert_never
 
 from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE
@@ -12,6 +12,11 @@ from .ui import status_manager
 from .utils import format_tool_code_output, log, run
 
 
+class ImplementationResult(TypedDict):
+    status: str
+    feedback: str
+
+
 def implementation_phase(
     *,
     task: str,
@@ -19,7 +24,7 @@ def implementation_phase(
     base_commit: str,
     cwd: Path,
     llm: LLM,
-) -> dict:
+) -> ImplementationResult:
     """
     Manages the iterative implementation phase of a task.
 
@@ -45,7 +50,7 @@ def implementation_phase(
     commits_made = 0
 
     feedback: Optional[str] = None
-    result = None
+    result: Optional[ImplementationResult] = None
     try:
         for attempt in range(1, max_implementation_attempts + 1):
             status_manager.set_phase("Implementation", f"{attempt}/{max_implementation_attempts}")
@@ -243,13 +248,14 @@ def implementation_phase(
                 log("No commits made in 5 attempts, giving up", message_type=LLMOutputType.TOOL_ERROR)
                 result = {"status": "failed", "feedback": "No commits made in 5 attempts"}
                 break
-
-        log(
-            f"Implementation incomplete after {max_implementation_attempts} attempts",
-            message_type=LLMOutputType.TOOL_ERROR,
-        )
-        status_manager.update_status("Incomplete.", style="red")
-        return {"status": "incomplete", "feedback": "Implementation incomplete after maximum attempts"}
+        else:
+            # If we exit the loop without breaking, it means we reached max attempts
+            log(
+                f"Implementation incomplete after {max_implementation_attempts} attempts",
+                message_type=LLMOutputType.TOOL_ERROR,
+            )
+            status_manager.update_status("Incomplete.", style="red")
+            return {"status": "incomplete", "feedback": "Implementation incomplete after maximum attempts"}
 
     except KeyboardInterrupt:
         log("Implementation interrupted by user (KeyboardInterrupt)", message_type=LLMOutputType.TOOL_ERROR)
@@ -276,7 +282,7 @@ def implementation_phase(
                 )
         except Exception as e:
             log(f"Failed to make final commit: {e}", message_type=LLMOutputType.TOOL_ERROR)
-    return result or {}
+    return result
 
 
 class ImplementationVerdict(Enum):
