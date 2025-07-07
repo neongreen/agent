@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from .constants import TASK_META_DIR
-from .gemini_agent import run_llm
+from .llm import run_llm
 from .utils import log, run
 
 

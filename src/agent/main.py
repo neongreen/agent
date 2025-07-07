@@ -15,7 +15,7 @@ import rich
 from . import git_utils
 from .config import AGENT_SETTINGS as config
 from .constants import AGENT_TEMP_DIR
-from .gemini_agent import set_llm_engine
+from .llm import set_llm_engine
 from .state_manager import write_state
 from .task_orchestrator import process_task
 from .ui import status_manager

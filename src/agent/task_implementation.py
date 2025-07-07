@@ -5,7 +5,7 @@ from typing import Optional
 
 from .config import AGENT_SETTINGS as config
 from .constants import PLAN_FILE, LLMOutputType
-from .gemini_agent import run_llm
+from .llm import run_llm
 from .output_formatter import format_tool_code_output, print_formatted_message
 from .ui import status_manager
 from .utils import log, run
