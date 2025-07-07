@@ -2,8 +2,11 @@
 
 from typing import Optional
 
+from rich.columns import Columns
 from rich.console import Console
 from rich.live import Live
+from rich.panel import Panel
+from rich.spinner import Spinner
 from rich.text import Text
 
 console = Console()
@@ -11,6 +14,7 @@ live_display: Optional[Live] = None
 _current_phase: Optional[str] = None
 _current_attempt_info: Optional[str] = None
 _last_message: Optional[str] = None
+_is_active: bool = False
 
 
 def _update_display() -> None:
@@ -32,7 +36,20 @@ def _update_display() -> None:
                 display_text += f"{_last_message}"
 
         if display_text:
-            live_display.update(Text(f">>> {display_text} <<<", style="bold black on grey23"))
+            spinner = Spinner("dots", style="green")
+            phase_text = Text(_current_phase, style="bold magenta") if _current_phase else Text("")
+            attempt_text = (
+                Text(f" (attempt {_current_attempt_info})", style="cyan") if _current_attempt_info else Text("")
+            )
+            message_text = Text(f": {_last_message}", style="green") if _last_message else Text("")
+
+            # Combine into columns for better layout
+            content_elements = []
+            if _is_active:
+                content_elements.append(spinner)
+            content_elements.extend([phase_text, attempt_text, message_text])
+            content = Columns(content_elements)
+            live_display.update(Panel(content, border_style="dim"))
 
 
 def init_status_bar() -> None:
@@ -47,8 +64,9 @@ def init_status_bar() -> None:
 
 
 def update_status(message: str, style: str = "dim") -> None:
-    global _last_message
+    global _last_message, _is_active
     _last_message = message
+    _is_active = True
     _update_display()
 
 
