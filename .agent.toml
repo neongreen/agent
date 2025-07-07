@@ -2,6 +2,8 @@
 
 default-base = "HEAD"
 
+post-implementation-hook-command = "ruff format || true"
+
 [plan]
 judge-extra-prompt = """
   You must reject the plan if:

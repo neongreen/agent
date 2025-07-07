@@ -80,12 +80,21 @@ default-base = "HEAD"
 # If set to true, suppresses informational output from the agent.
 quiet-mode = false
 
+# Specifies a shell command to execute after each implementation phase round.
+# This command will be executed after Gemini provides an implementation, but before it is evaluated.
+# This can be used for custom hooks, like running linters or tests.
+post-implementation-hook-command = ''
+# Example:
+# post-implementation-hook-command = "echo 'Hook executed!'"
+# post-implementation-hook-command = "npm test"
+# post-implementation-hook-command = "ruff check ."
+
 [plan]
 # Provides an additional prompt to the Gemini model during the plan review process.
 # This can be used to enforce specific rules or guidelines for plans.
 judge-extra-prompt = """
   You must reject the plan if it proposes writing tests.
-"""
+  """
 
 # Provides an additional prompt to the Gemini model during the planning phase.
 # This can be used to guide the agent's planning process.

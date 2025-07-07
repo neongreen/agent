@@ -148,7 +148,12 @@ def implementation_phase(task, plan, base_commit: str, cwd=None, config: Optiona
 
         if config and config.post_implementation_hook_command:
             log(f"Running post-implementation hook: {config.post_implementation_hook_command}", message_type="thought")
-            run([config.post_implementation_hook_command], "Running post-implementation hook command", directory=cwd)
+            run(
+                config.post_implementation_hook_command,
+                "Running post-implementation hook command",
+                directory=cwd,
+                shell=True,
+            )
 
         if not implementation_summary:
             status_manager.update_status("Failed to get implementation from Gemini.", style="red")
