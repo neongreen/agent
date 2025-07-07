@@ -17,3 +17,6 @@ judge-extra-prompt = """
   If rejecting the plan, you must explain in detail why you are rejecting it.
   You must also give the planner the entire rejection criteria from the above, so that it will adhere to all of them in the next planning round.
 """
+
+[implement.completion]
+judge-extra-prompt = ""
