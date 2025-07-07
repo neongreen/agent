@@ -84,37 +84,4 @@ run = "ty check"
 description = "Build a specific commit of Opencode CLI and install it to ~/.agent/bin/opencode"
 tools.bun = "1.2.18"
 tools.go = "1.24.4"
-run = """
-  set -euo pipefail
-
-  bun_bin=$(which bun)
-  go_bin=$(which go)
-
-  cd ~/.agent/
-  COMMIT=a60697ce1fd0d1e0f2c4f930a456b8fe73ccbeda
-  if [ -d opencode ]; then rm -rf opencode; fi
-  git clone https://github.com/sst/opencode.git --depth 1 --revision $COMMIT
-
-  version=custom
-
-  cd ~/.agent/opencode/packages/tui
-
-  mkdir -p dist/bin
-  CGO_ENABLED=0 $go_bin build -ldflags="-s -w -X main.Version=${version}" -o ../opencode/dist/bin/tui ../tui/cmd/opencode/main.go
-
-  cd ~/.agent/opencode/packages/opencode
-
-  $bun_bin install
-  $bun_bin build --define OPENCODE_VERSION="'${version}'" --compile --minify --outfile=dist/bin/opencode ./src/index.ts ./dist/bin/tui
-  rm -rf ./dist/bin/tui
-
-  # Copy the built files to the agent's bin directory
-  mkdir -p ~/.agent/bin
-  cp dist/bin/opencode ~/.agent/bin/
-  chmod +x ~/.agent/bin/opencode
-
-  # Clean up
-  rm -rf ~/.agent/opencode-
-
-  echo "Opencode built and installed to ~/.agent/bin/opencode"
-"""
+run = "uv run scripts/build_opencode.py"
