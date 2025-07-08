@@ -134,12 +134,19 @@ type Event = Tick
 @dataclass(frozen=True, slots=True)
 class Settings:
     task: str
+    """The description of the task to be performed."""
     plan: str
+    """The detailed plan for completing the task."""
     base_attempt: str
+    """The base Git commit hash or reference from which the current attempt's changes are diffed."""
     cwd: Path
+    """The current working directory for the task execution."""
     llm: LLM
+    """The Language Model (LLM) instance used for generating responses and evaluations."""
     max_step_attempts: int = 10
+    """The maximum number of attempts allowed for a single step before it's considered failed. If the number of attempts exceeds this, the step will be marked as failed."""
     max_consecutive_failures: int = 3
+    """The maximum number of consecutive failures allowed before the task is considered failed. This applies to both step evaluation failures and attempt summary generation failures."""
 
 
 def transition(
