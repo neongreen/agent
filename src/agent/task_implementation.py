@@ -171,57 +171,16 @@ def transition(
             return _handle_ready_for_work_state()
 
         # ─────────────────────────────── main work loop ──────────────────────────────
-        case Attempt(
-            attempt=attempt,
-            consecutive_failed_attempts=consecutive_failed_attempts,
-            consecutive_failed_steps=consecutive_failed_steps,
-            steps_made=steps_made,
-            feedback=feedback,
-        ), Tick():
-            return _handle_attempt_state(
-                attempt,
-                consecutive_failed_attempts,
-                consecutive_failed_steps,
-                steps_made,
-                feedback,
-                settings,
-            )
+        case Attempt() as state, Tick():
+            return _handle_attempt_state(state, settings)
 
         # ────────────────────────────── evaluation loop ──────────────────────────────
-        case Evaluate(
-            attempt=attempt,
-            consecutive_failed_attempts=consecutive_failed_attempts,
-            consecutive_failed_steps=consecutive_failed_steps,
-            steps_made=steps_made,
-            feedback=feedback,
-            step_summary=step_summary,
-        ), Tick():
-            return _handle_evaluate_state(
-                attempt,
-                consecutive_failed_attempts,
-                consecutive_failed_steps,
-                steps_made,
-                feedback,
-                step_summary,
-                settings,
-            )
+        case Evaluate() as state, Tick():
+            return _handle_evaluate_state(state, settings)
 
         # ─────────────────── completion‑review loop ───────────────────
-        case ReviewCompletion(
-            attempt=attempt,
-            consecutive_failed_attempts=consecutive_failed_attempts,
-            consecutive_failed_steps=consecutive_failed_steps,
-            steps_made=steps_made,
-            feedback=feedback,
-        ), Tick():
-            return _handle_review_completion_state(
-                attempt,
-                consecutive_failed_attempts,
-                consecutive_failed_steps,
-                steps_made,
-                feedback,
-                settings,
-            )
+        case ReviewCompletion() as state, Tick():
+            return _handle_review_completion_state(state, settings)
 
         # ────────────────────────────── fallback guard ───────────────────────────────
         case _, _:
@@ -527,26 +486,26 @@ def _handle_review_completion_state(
     state: ReviewCompletion,
     settings: Settings,
 ) -> Complete | Attempt:
-    completion_result = _handle_successful_step(settings, attempt, steps_made)
+    completion_result = _handle_successful_step(settings, state.attempt, state.steps_made)
 
     match completion_result.status:
         case TaskVerdict.COMPLETE:
-            return Complete(status=completion_result.feedback, attempt=attempt)
+            return Complete(status=completion_result.feedback, attempt=state.attempt)
         case TaskVerdict.CONTINUE:
             return Attempt(
-                attempt=attempt + 1,
+                attempt=state.attempt + 1,
                 consecutive_failed_steps=0,
                 consecutive_failed_attempts=0,
-                steps_made=steps_made + 1,
+                steps_made=state.steps_made + 1,
                 feedback=completion_result.feedback,
             )
         case "failed":
             log("Failed to evaluate task completion", message_type=LLMOutputType.ERROR)
             return Attempt(
-                attempt=attempt + 1,
-                consecutive_failed_steps=consecutive_failed_steps + 1,
-                consecutive_failed_attempts=consecutive_failed_attempts + 1,
-                steps_made=steps_made,
+                attempt=state.attempt + 1,
+                consecutive_failed_steps=state.consecutive_failed_steps + 1,
+                consecutive_failed_attempts=state.consecutive_failed_attempts + 1,
+                steps_made=state.steps_made,
                 feedback="Failed to evaluate task completion",
             )
         case other:
@@ -554,29 +513,24 @@ def _handle_review_completion_state(
 
 
 def _handle_evaluate_state(
-    attempt: int,
-    consecutive_failed_attempts: int,
-    consecutive_failed_steps: int,
-    steps_made: int,
-    feedback: Optional[str],
-    step_summary: str,
+    state: Evaluate,
     settings: Settings,
 ) -> State:
     # 2️⃣  judge the step ---------------------------------------------------------
-    verdict, evaluation = _evaluate_step(settings, step_summary)
+    verdict, evaluation = _evaluate_step(settings, state.step_summary)
     log(f"debug: step verdict {verdict}", message_type=LLMOutputType.DEBUG)
     if not verdict:
-        consecutive_failed_attempts += 1
+        consecutive_failed_attempts = state.consecutive_failed_attempts + 1
         if consecutive_failed_attempts >= settings.max_consecutive_failures:
             return Failed(
                 status="Too many consecutive failures to evaluate step",
-                attempt=attempt,
+                attempt=state.attempt,
             )
         return Attempt(
-            attempt=attempt + 1,
-            consecutive_failed_steps=consecutive_failed_steps,
+            attempt=state.attempt + 1,
+            consecutive_failed_steps=state.consecutive_failed_steps,
             consecutive_failed_attempts=consecutive_failed_attempts,
-            steps_made=steps_made,
+            steps_made=state.steps_made,
             feedback=evaluation or "Failed to evaluate step",
         )
 
@@ -585,34 +539,34 @@ def _handle_evaluate_state(
         case StepVerdict.SUCCESS:
             # hand over to the completion‑review state
             return ReviewCompletion(
-                attempt=attempt,
-                consecutive_failed_steps=consecutive_failed_steps,
-                consecutive_failed_attempts=consecutive_failed_attempts,
-                steps_made=steps_made,
+                attempt=state.attempt,
+                consecutive_failed_steps=state.consecutive_failed_steps,
+                consecutive_failed_attempts=state.consecutive_failed_attempts,
+                steps_made=state.steps_made,
                 feedback=evaluation,
             )
 
         case StepVerdict.PARTIAL:
             return Attempt(
-                attempt=attempt + 1,
-                consecutive_failed_steps=consecutive_failed_steps,
-                consecutive_failed_attempts=consecutive_failed_attempts,
-                steps_made=steps_made,
+                attempt=state.attempt + 1,
+                consecutive_failed_steps=state.consecutive_failed_steps,
+                consecutive_failed_attempts=state.consecutive_failed_attempts,
+                steps_made=state.steps_made,
                 feedback=evaluation,
             )
 
         case StepVerdict.FAILURE:
-            consecutive_failed_attempts += 1
+            consecutive_failed_attempts = state.consecutive_failed_attempts + 1
             if consecutive_failed_attempts >= settings.max_consecutive_failures:
                 return Failed(
                     status="Too many consecutive failures in step",
-                    attempt=attempt,
+                    attempt=state.attempt,
                 )
             return Attempt(
-                attempt=attempt + 1,
-                consecutive_failed_steps=consecutive_failed_steps + 1,
+                attempt=state.attempt + 1,
+                consecutive_failed_steps=state.consecutive_failed_steps + 1,
                 consecutive_failed_attempts=consecutive_failed_attempts,
-                steps_made=steps_made,
+                steps_made=state.steps_made,
                 feedback=evaluation,
             )
 
@@ -621,44 +575,40 @@ def _handle_evaluate_state(
 
 
 def _handle_attempt_state(
-    attempt: int,
-    consecutive_failed_attempts: int,
-    consecutive_failed_steps: int,
-    steps_made: int,
-    feedback: Optional[str],
+    state: Attempt,
     settings: Settings,
 ) -> State:
     # hard stop if we've run out of attempts
-    if attempt > settings.max_step_attempts:
+    if state.attempt > settings.max_step_attempts:
         return Failed(
-            status=f"Exceeded maximum step attempts ({attempt})",
-            attempt=attempt,
+            status=f"Exceeded maximum step attempts ({state.attempt})",
+            attempt=state.attempt,
         )
 
     # 1️⃣  generate a step summary ------------------------------------------------
-    step_summary = _get_and_process_step_summary(settings, attempt, feedback)
+    step_summary = _get_and_process_step_summary(settings, state.attempt, state.feedback)
     if not step_summary:
-        consecutive_failed_attempts += 1
+        consecutive_failed_attempts = state.consecutive_failed_attempts + 1
         if consecutive_failed_attempts >= settings.max_consecutive_failures:
             return Failed(
                 status=f"Too many consecutive failures ({consecutive_failed_attempts}) to generate attempt summary",
-                attempt=attempt,
+                attempt=state.attempt,
             )
         return Attempt(
-            attempt=attempt + 1,
-            consecutive_failed_steps=consecutive_failed_steps,
+            attempt=state.attempt + 1,
+            consecutive_failed_steps=state.consecutive_failed_steps,
             consecutive_failed_attempts=consecutive_failed_attempts,
-            steps_made=steps_made,
-            feedback=feedback,
+            steps_made=state.steps_made,
+            feedback=state.feedback,
         )
 
     # after generating a valid step summary, hand over to the Evaluate state
     return Evaluate(
-        attempt=attempt,
-        consecutive_failed_steps=consecutive_failed_steps,
-        consecutive_failed_attempts=consecutive_failed_attempts,
-        steps_made=steps_made,
-        feedback=feedback,
+        attempt=state.attempt,
+        consecutive_failed_steps=state.consecutive_failed_steps,
+        consecutive_failed_attempts=state.consecutive_failed_attempts,
+        steps_made=state.steps_made,
+        feedback=state.feedback,
         step_summary=step_summary,
     )
 
