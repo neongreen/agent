@@ -62,7 +62,7 @@ def main() -> None:
         AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
     if cli_settings.show_config:
-        rich.print(config.model_dump_json(indent=2))
+        rich.print(f"```json\n{config.model_dump_json(indent=2)}\n```")
         exit(0)
 
     if config.quiet_mode:
