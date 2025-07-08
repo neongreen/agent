@@ -524,13 +524,9 @@ def implementation_phase(
 
 
 def _handle_review_completion_state(
-    attempt: int,
-    consecutive_failed_attempts: int,
-    consecutive_failed_steps: int,
-    steps_made: int,
-    feedback: Optional[str],
+    state: ReviewCompletion,
     settings: Settings,
-) -> State:
+) -> Complete | Attempt:
     completion_result = _handle_successful_step(settings, attempt, steps_made)
 
     match completion_result.status:
