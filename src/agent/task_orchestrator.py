@@ -1,6 +1,7 @@
 """Orchestrates the execution of tasks, managing their planning and implementation phases."""
 
 from pathlib import Path
+from typing import Optional, Tuple
 
 from .constants import PLAN_FILE, STATE_FILE, TaskState
 from .git_utils import has_tracked_diff, resolve_commit_specifier, setup_task_branch
@@ -64,67 +65,22 @@ def process_task(
         return ImplementationPhaseResult(status="failed", feedback="Failed to set up task branch")
 
     # Planning phase
-    plan = None
-
-    match current_task_state():
-        case TaskState.PLAN:
-            plan = planning_phase(task, cwd=cwd, llm=llm)
-            if not plan:
-                print_formatted_message("Planning phase failed", message_type=LLMOutputType.ERROR)
-                status_manager.update_status("Failed.", style="red")
-                state[task_id] = TaskState.ABORT
-                write_state(state)
-                return ImplementationPhaseResult(status="failed", feedback="Planning phase failed")
-            state[task_id] = TaskState.IMPLEMENT
-            write_state(state)
-
-        case TaskState.IMPLEMENT | TaskState.DONE:
-            # If already in IMPLEMENT or DONE, try to read the plan from file
-            if PLAN_FILE.exists():
-                with open(PLAN_FILE, "r") as f:
-                    plan = f.read()
-                print_formatted_message(f"Resuming from existing {PLAN_FILE.name}", message_type=LLMOutputType.STATUS)
-            else:
-                print_formatted_message(
-                    f"No {PLAN_FILE.name} found for resuming, aborting task.", message_type=LLMOutputType.ERROR
-                )
-                status_manager.update_status("No plan found for resuming.", style="red")
-                state[task_id] = TaskState.ABORT
-                write_state(state)
-                return ImplementationPhaseResult(status="failed", feedback="No plan found for resuming")
-
-    # Implementation phase
-    assert plan is not None, "Plan should not be None at this point"
+    plan: Optional[str] = None
     result: ImplementationPhaseResult = ImplementationPhaseResult(
         status="failed", feedback="Implementation not attempted"
     )
 
-    if current_task_state() == TaskState.IMPLEMENT:
-        assert resolved_base_commit_sha is not None, "resolved_base_commit_sha should not be None at this point"
-        result = implementation_phase(task=task, plan=plan, base_attempt=resolved_base_commit_sha, cwd=cwd, llm=llm)
-        if result.status == "complete":
-            if not has_tracked_diff(cwd=cwd):
-                print_formatted_message(
-                    "No tracked changes after implementation, marking as DONE.",
-                    message_type=LLMOutputType.STATUS,
-                )
-                state[task_id] = TaskState.DONE
-            else:
-                print_formatted_message(
-                    "Tracked changes remain after implementation, keeping in IMPLEMENT state.",
-                    message_type=LLMOutputType.STATUS,
-                )
-                state[task_id] = TaskState.IMPLEMENT  # Keep in IMPLEMENT if changes exist
-        else:
-            state[task_id] = TaskState.ABORT
-        write_state(state)
+    if current_task_state() == TaskState.PLAN:
+        plan, state = _handle_plan_state(task, cwd, llm, task_id, state)
+    elif current_task_state() in [TaskState.IMPLEMENT, TaskState.DONE]:
+        plan, state = _handle_resume_state(task_id, state)
 
-    elif current_task_state() == TaskState.DONE:
-        print_formatted_message(
-            f"Task {task_num} already marked as DONE, skipping implementation.",
-            message_type=LLMOutputType.STATUS,
-        )
-        result = ImplementationPhaseResult(status="complete", feedback="Task already marked as DONE")
+    # Implementation phase
+    if plan is not None:
+        if current_task_state() == TaskState.IMPLEMENT:
+            result, state = _handle_implement_state(task, plan, resolved_base_commit_sha, cwd, llm, task_id, state)
+        elif current_task_state() == TaskState.DONE:
+            result = _handle_done_state(task_num)
 
     if result.status == "complete":
         print_formatted_message((f"Task {task_num} completed successfully"), message_type=LLMOutputType.STATUS)
@@ -143,3 +99,63 @@ def process_task(
         status_manager.update_status(f"Task {task_num} failed or incomplete.", style="red")
 
     return result
+
+
+def _handle_plan_state(task: str, cwd: Path, llm: LLM, task_id: str, state: dict) -> Tuple[Optional[str], dict]:
+    plan = planning_phase(task, cwd=cwd, llm=llm)
+    if not plan:
+        print_formatted_message("Planning phase failed", message_type=LLMOutputType.ERROR)
+        status_manager.update_status("Failed.", style="red")
+        state[task_id] = TaskState.ABORT
+        write_state(state)
+        return None, state
+    state[task_id] = TaskState.IMPLEMENT
+    write_state(state)
+    return plan, state
+
+
+def _handle_resume_state(task_id: str, state: dict) -> Tuple[Optional[str], dict]:
+    if PLAN_FILE.exists():
+        with open(PLAN_FILE, "r") as f:
+            plan = f.read()
+        print_formatted_message(f"Resuming from existing {PLAN_FILE.name}", message_type=LLMOutputType.STATUS)
+        return plan, state
+    else:
+        print_formatted_message(
+            f"No {PLAN_FILE.name} found for resuming, aborting task.", message_type=LLMOutputType.ERROR
+        )
+        status_manager.update_status("No plan found for resuming.", style="red")
+        state[task_id] = TaskState.ABORT
+        write_state(state)
+        return None, state
+
+
+def _handle_implement_state(
+    task: str, plan: str, resolved_base_commit_sha: str, cwd: Path, llm: LLM, task_id: str, state: dict
+) -> Tuple[ImplementationPhaseResult, dict]:
+    result = implementation_phase(task=task, plan=plan, base_attempt=resolved_base_commit_sha, cwd=cwd, llm=llm)
+    if result.status == "complete":
+        if not has_tracked_diff(cwd=cwd):
+            print_formatted_message(
+                "No tracked changes after implementation, marking as DONE.",
+                message_type=LLMOutputType.STATUS,
+            )
+            state[task_id] = TaskState.DONE
+        else:
+            print_formatted_message(
+                "Tracked changes remain after implementation, keeping in IMPLEMENT state.",
+                message_type=LLMOutputType.STATUS,
+            )
+            state[task_id] = TaskState.IMPLEMENT  # Keep in IMPLEMENT if changes exist
+    else:
+        state[task_id] = TaskState.ABORT
+    write_state(state)
+    return result, state
+
+
+def _handle_done_state(task_num: int) -> ImplementationPhaseResult:
+    print_formatted_message(
+        f"Task {task_num} already marked as DONE, skipping implementation.",
+        message_type=LLMOutputType.STATUS,
+    )
+    return ImplementationPhaseResult(status="complete", feedback="Task already marked as DONE")
