@@ -154,9 +154,14 @@ def transition(
     inside the relevant branches, so the caller only needs to keep feeding
     events until a terminal state (`Complete` or `Failed`) is reached
     """
+    log(
+        f"Entering transition with state: {state.__class__.__name__}, event: {event.__class__.__name__}",
+        message_type=LLMOutputType.DEBUG,
+    )
     match state, event:
         # ────────────────────────────── terminal states ──────────────────────────────
         case Complete(), _:
+            log("Transitioning from Complete state.", message_type=LLMOutputType.DEBUG)
             _perform_final_cleanup(settings.cwd)
             return state
 
