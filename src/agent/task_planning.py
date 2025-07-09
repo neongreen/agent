@@ -9,7 +9,7 @@ from .constants import PLAN_FILE
 from .llm import LLM, check_verdict
 from .output_formatter import LLMOutputType, print_formatted_message
 from .ui import status_manager
-from .utils import log
+from .utils import format_as_markdown_blockquote, log
 
 
 def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
@@ -59,7 +59,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
             plan_prompt += f"\n\n{config.plan.planner_extra_prompt}"
 
         status_manager.update_status("Getting a plan")
-        current_plan = llm.run(
+        raw_plan = llm.run(
             plan_prompt,
             yolo=True,
             cwd=cwd,
@@ -68,6 +68,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
             attempt_number=round_num,
             response_type=LLMOutputType.PLAN,
         )
+        current_plan = format_as_markdown_blockquote(raw_plan) if raw_plan else None
         if not current_plan:
             status_manager.update_status("Failed to get a plan.", style="red")
             print_formatted_message("Failed to get a plan", message_type=LLMOutputType.ERROR)
@@ -91,7 +92,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
 
         status_manager.update_status("Reviewing plan")
 
-        current_review = llm.run(
+        raw_review = llm.run(
             review_prompt,
             yolo=True,
             cwd=cwd,
@@ -100,7 +101,8 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
             attempt_number=round_num,
             response_type=LLMOutputType.EVALUATION,
         )
-        current_verdict = check_verdict(PlanVerdict, current_review or "")
+        current_review = format_as_markdown_blockquote(raw_review) if raw_review else None
+        current_verdict = check_verdict(PlanVerdict, raw_review or "")
 
         if not current_review:
             status_manager.update_status("Failed to get a plan evaluation.", style="red")

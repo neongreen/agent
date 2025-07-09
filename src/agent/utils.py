@@ -66,6 +66,15 @@ def log(
         f.write(json.dumps(log_entry) + "\n")
 
 
+def format_as_markdown_blockquote(text: str) -> str:
+    """
+    Formats the given text as a Markdown blockquote.
+    """
+    lines = text.splitlines()
+    blockquote_lines = [f"> {line}" for line in lines]
+    return "\n".join(blockquote_lines)
+
+
 class RunResult(TypedDict):
     """Represents the result of a shell command execution."""
 
