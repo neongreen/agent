@@ -78,7 +78,6 @@ class AgentSettings(BaseSettings):
         default="main",
         description="Default base branch, commit, or git specifier to switch to before creating a task branch",
     )
-    quiet_mode: bool = Field(default=False, description="Suppress informational output")
     plan: PlanConfig = Field(default_factory=PlanConfig, description="Configuration for the planning phase.")
     implement: ImplementConfig = Field(
         default_factory=ImplementConfig, description="Configuration for the implementation phase."

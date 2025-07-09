@@ -65,12 +65,6 @@ def main() -> None:
         rich.print(f"```json\n{config.model_dump_json(indent=2)}\n```")
         exit(0)
 
-    if config.quiet_mode:
-        # If quiet mode is enabled, suppress informational output
-        # This needs to be handled early, before any logging occurs
-        # Actual suppression logic would go here or be handled by the logger itself
-        pass
-
     log(
         f"Configuration loaded:\n{config.model_dump_json(indent=2)}",
         LLMOutputType.STATUS,

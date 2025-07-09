@@ -76,12 +76,6 @@
       "title": "Default-Base",
       "type": "string"
     },
-    "quiet-mode": {
-      "default": false,
-      "description": "Suppress informational output",
-      "title": "Quiet-Mode",
-      "type": "boolean"
-    },
     "plan": {
       "$ref": "#/$defs/PlanConfig",
       "description": "Configuration for the planning phase."

@@ -10,7 +10,6 @@ import eliot
 from eliot import FileDestination, log_message
 from rich.console import Console
 
-from .config import AGENT_SETTINGS as config
 from .constants import AGENT_STATE_BASE_DIR
 from .output_formatter import LLMOutputType, print_formatted_message
 from .ui import status_manager
@@ -55,9 +54,6 @@ def log(
     """
 
     init_logging()
-
-    if quiet is None:
-        quiet = config.quiet_mode
 
     if not quiet:
         print_formatted_message(message_human or message, message_type)
