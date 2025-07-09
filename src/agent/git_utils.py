@@ -82,23 +82,6 @@ def generate_branch_name(suggestions: list[str], *, cwd: Path) -> str:
     return new_branch_name
 
 
-def has_tracked_diff(*, cwd: Path) -> bool:
-    """
-    Checks if there are any tracked changes in the repository.
-
-    Args:
-        cwd: The current working directory.
-
-    Returns:
-        True if there are tracked changes, False otherwise.
-    """
-    result = run(["git", "status", "--porcelain"], "Checking for tracked changes", directory=cwd)
-    if not result["success"]:
-        log("Failed to check git status.", LLMOutputType.TOOL_ERROR)
-        return False
-    return bool(result["stdout"].strip())
-
-
 def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
     """
     Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA.

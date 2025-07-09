@@ -8,7 +8,6 @@ from agent.git_utils import (
     get_current_branch,
     get_current_commit_hash,
     get_existing_branch_names,
-    has_tracked_diff,
     remove_worktree,
     resolve_commit_specifier,
     sanitize_branch_name,
@@ -69,29 +68,6 @@ def test_get_existing_branch_names(git_repo: Path) -> None:
     """
     branches: list[str] = get_existing_branch_names(cwd=git_repo)
     assert any(b in branches for b in ["master", "main"])
-
-
-def test_has_tracked_diff_false(git_repo: Path) -> None:
-    """
-    Test that has_tracked_diff returns False when there are no staged changes.
-
-    Args:
-        git_repo: Path to the temporary git repository.
-    """
-    assert not has_tracked_diff(cwd=git_repo)
-
-
-def test_has_tracked_diff_true(git_repo: Path) -> None:
-    """
-    Test that has_tracked_diff returns True when there are staged changes.
-
-    Args:
-        git_repo: Path to the temporary git repository.
-    """
-    # Modify file
-    (git_repo / "README.md").write_text("# Modified")
-    subprocess.run(["git", "add", "README.md"], cwd=git_repo, check=True)
-    assert has_tracked_diff(cwd=git_repo)
 
 
 def test_resolve_commit_specifier(git_repo: Path) -> None:

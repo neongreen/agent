@@ -39,10 +39,6 @@ def process_task(
     task_id = f"task_{task_num}"
     state = read_state()
 
-    def current_task_state() -> TaskState:
-        """Returns the current state of the task from the state manager."""
-        return state.get(task_id, TaskState.PLAN)
-
     print_formatted_message(
         (f"Attempting to set up task branch for task {task_num}"), message_type=LLMOutputType.STATUS
     )

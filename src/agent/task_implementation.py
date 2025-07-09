@@ -500,17 +500,6 @@ def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep 
             assert_never(state)
 
 
-@dataclass(frozen=True)
-class ImplementationPhaseResult(TaskState):
-    """
-    Result of the implementation phase.
-    Contains the status, feedback, and attempt number.
-    """
-
-    status: Literal["complete", "failed", "interrupted"]
-    feedback: Optional[str] = None
-
-
 def implementation_phase(
     *,
     task: str,
