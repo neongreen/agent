@@ -41,33 +41,20 @@ class TaskVerdict(Enum):
 
 
 # TODO: replace this whole class with StepPhaseResult
-@dataclass(frozen=True, slots=True)
-class StepResult:
-    success: bool
-    """Whether the step was successful or not."""
-
-    message: Optional[str] = None
-    """Either error message or judge's feedback on the step."""
-
-
-@dataclass(frozen=True, slots=True)
+@dataclass
 class TaskState:
     """Base class for all states."""
 
-    history: list[StepResult]
+    history: list[StepPhaseResult]
     """Previous steps' results."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class StepState(TaskState):
     """Base class for all states happening while working on a step."""
 
-    attempt: int
-    """The current attempt number inside the step - how many times we've tried to finish it."""
-    consecutive_failed_attempts: int
-    """The number of consecutive failures (not success/partial) in the current step."""
-    feedback: Optional[str]
-    """Judge's feedback from the previous attempt"""
+    history: list[AttemptResult]
+    """Previous attempts' results."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,6 +274,13 @@ class StepPhaseResult:
     attempt: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class AttemptResult:
+    attempt: int
+    consecutive_failed_attempts: int
+    feedback: Optional[str]
+
+
 def _generate_commit_message(settings: Settings) -> str:
     """Generate and return a concise, single‑line commit message for the current step."""
     status_manager.update_status("Generating commit message")
@@ -499,19 +493,29 @@ def _handle_review_completion_state(
         case TaskVerdict.COMPLETE:
             return Complete(status=completion_result.feedback, attempt=state.attempt)
         case TaskVerdict.CONTINUE:
+            current_attempt_result = state.history[-1]
             return Attempt(
-                attempt=state.attempt + 1,
-                consecutive_failed_attempts=0,
-                feedback=completion_result.feedback,
-                history=state.history + [StepResult(success=True)],
+                history=state.history
+                + [
+                    AttemptResult(
+                        attempt=current_attempt_result.attempt + 1,
+                        consecutive_failed_attempts=0,
+                        feedback=completion_result.feedback,
+                    )
+                ],
             )
         case "failed":
             log("Failed to evaluate task completion", message_type=LLMOutputType.ERROR)
+            current_attempt_result = state.history[-1]
             return Attempt(
-                attempt=state.attempt + 1,
-                consecutive_failed_attempts=state.consecutive_failed_attempts + 1,
-                feedback="Failed to evaluate task completion",
-                history=state.history + [StepResult(success=False, message="Failed to evaluate task completion")],
+                history=state.history
+                + [
+                    AttemptResult(
+                        attempt=current_attempt_result.attempt + 1,
+                        consecutive_failed_attempts=current_attempt_result.consecutive_failed_attempts + 1,
+                        feedback="Failed to evaluate task completion",
+                    )
+                ],
             )
         case other:
             assert_never(other)
@@ -525,50 +529,70 @@ def _handle_evaluate_state(
     verdict, evaluation = _evaluate_step(settings, state.step_summary)
     log(f"debug: step verdict {verdict}", message_type=LLMOutputType.DEBUG)
     if not verdict:
-        consecutive_failed_attempts = state.consecutive_failed_attempts + 1
+        current_attempt_result = state.history[-1]
+        consecutive_failed_attempts = current_attempt_result.consecutive_failed_attempts + 1
         if consecutive_failed_attempts >= settings.max_consecutive_failures:
             return Failed(
                 status="Too many consecutive failures to evaluate step",
-                attempt=state.attempt,
+                attempt=current_attempt_result.attempt,
             )
         return Attempt(
-            attempt=state.attempt + 1,
-            consecutive_failed_attempts=consecutive_failed_attempts,
-            feedback=evaluation or "Failed to evaluate step",
-            history=state.history,
+            history=state.history
+            + [
+                AttemptResult(
+                    attempt=current_attempt_result.attempt + 1,
+                    consecutive_failed_attempts=consecutive_failed_attempts,
+                    feedback=evaluation or "Failed to evaluate step",
+                )
+            ],
         )
 
     # 3️⃣  branch on verdict ------------------------------------------------------
     match verdict:
         case StepVerdict.SUCCESS:
             # hand over to the completion‑review state
+            current_attempt_result = state.history[-1]
             return ReviewCompletion(
-                attempt=state.attempt,
-                consecutive_failed_attempts=state.consecutive_failed_attempts,
-                feedback=evaluation,
-                history=state.history + [StepResult(success=True)],
+                history=state.history
+                + [
+                    AttemptResult(
+                        attempt=current_attempt_result.attempt,
+                        consecutive_failed_attempts=current_attempt_result.consecutive_failed_attempts,
+                        feedback=evaluation,
+                    )
+                ],
             )
 
         case StepVerdict.PARTIAL:
+            current_attempt_result = state.history[-1]
             return Attempt(
-                attempt=state.attempt + 1,
-                consecutive_failed_attempts=state.consecutive_failed_attempts,
-                feedback=evaluation,
-                history=state.history + [StepResult(success=False, message=evaluation)],
+                history=state.history
+                + [
+                    AttemptResult(
+                        attempt=current_attempt_result.attempt + 1,
+                        consecutive_failed_attempts=current_attempt_result.consecutive_failed_attempts,
+                        feedback=evaluation,
+                    )
+                ],
             )
 
         case StepVerdict.FAILURE:
-            consecutive_failed_attempts = state.consecutive_failed_attempts + 1
+            current_attempt_result = state.history[-1]
+            consecutive_failed_attempts = current_attempt_result.consecutive_failed_attempts + 1
             if consecutive_failed_attempts >= settings.max_consecutive_failures:
                 return Failed(
                     status="Too many consecutive failures in step",
-                    attempt=state.attempt,
+                    attempt=current_attempt_result.attempt,
                 )
             return Attempt(
-                attempt=state.attempt + 1,
-                consecutive_failed_attempts=consecutive_failed_attempts,
-                feedback=evaluation,
-                history=state.history + [StepResult(success=False, message=evaluation)],
+                history=state.history
+                + [
+                    AttemptResult(
+                        attempt=current_attempt_result.attempt + 1,
+                        consecutive_failed_attempts=consecutive_failed_attempts,
+                        feedback=evaluation,
+                    )
+                ],
             )
 
         case other:
@@ -580,10 +604,11 @@ def _handle_attempt_state(
     settings: Settings,
 ) -> State:
     # hard stop if we've run out of attempts
-    if state.attempt > settings.max_step_attempts:
+    current_attempt_result = state.history[-1]
+    if current_attempt_result.attempt > settings.max_step_attempts:
         return Failed(
-            status=f"Exceeded maximum step attempts ({state.attempt})",
-            attempt=state.attempt,
+            status=f"Exceeded maximum step attempts ({current_attempt_result.attempt})",
+            attempt=current_attempt_result.attempt,
         )
 
     # 1️⃣  generate a step summary ------------------------------------------------
@@ -614,10 +639,7 @@ def _handle_attempt_state(
 
 def _handle_ready_for_work_state() -> State:
     return Attempt(
-        attempt=1,
-        consecutive_failed_attempts=0,
-        feedback=None,
-        history=[],
+        history=[AttemptResult(attempt=1, consecutive_failed_attempts=0, feedback=None)],
     )
 
 
