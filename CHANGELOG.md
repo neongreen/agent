@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0-next
+
+Internal:
+- Added a mock test for the implementation phase
+
 ## v0-2025.07.09
 
 Fixed:
