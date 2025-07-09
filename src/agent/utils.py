@@ -1,34 +1,38 @@
 """Utility functions for the agent."""
 
-import datetime
-import json
 import shlex
 import subprocess
 from pathlib import Path
 from posixpath import abspath
 from typing import Optional, TypedDict
 
+import eliot
+from eliot import FileDestination, log_message
 from rich.console import Console
 
 from .config import AGENT_SETTINGS as config
-from .constants import AGENT_TEMP_DIR
+from .constants import AGENT_STATE_BASE_DIR
 from .output_formatter import LLMOutputType, print_formatted_message
 from .ui import status_manager
 
 
 console = Console()
 
-_session_log_file_path: Optional[Path] = None
+
+_logging_initialized = False
 
 
-def get_session_log_file_path() -> Path:
-    global _session_log_file_path
-    if _session_log_file_path is None:
-        log_dir = AGENT_TEMP_DIR / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        _session_log_file_path = log_dir / f"agent_log_{timestamp}.log"
-    return _session_log_file_path
+def init_logging() -> None:
+    global _logging_initialized
+    if _logging_initialized:
+        return
+    _logging_initialized = True
+
+    # Ensure the base directory exists
+    AGENT_STATE_BASE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Initialize Eliot logging
+    eliot.add_destinations(FileDestination(file=open(AGENT_STATE_BASE_DIR / "log.json", "ab")))
 
 
 # TODO: should we forbid using `print_formatted_message` directly and require `log` instead?
@@ -50,20 +54,15 @@ def log(
         quiet: If provided, overrides the global quiet mode setting.
     """
 
+    init_logging()
+
     if quiet is None:
         quiet = config.quiet_mode
-
-    log_entry = {"timestamp": datetime.datetime.now().isoformat(), "message": message}
 
     if not quiet:
         print_formatted_message(message_human or message, message_type)
 
-    session_log_file = get_session_log_file_path()
-    if not session_log_file.exists():
-        with open(session_log_file, "w", encoding="utf-8") as f:
-            f.write("")
-    with open(session_log_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(log_entry) + "\n")
+    log_message(message_type=message_type.value, message=message, message_human=message_human)
 
 
 def format_as_markdown_blockquote(text: str) -> str:
@@ -179,25 +178,25 @@ def run(
 # TODO: this seems weird
 def format_tool_code_output(
     tool_output: RunResult,
-    markdown_code_block: str | None = None,
+    code_block_language: str | None = None,
 ) -> str:
     """
     Formats the output of a tool code execution.
 
     Args:
-        tool_output: The output of the tool execution as a RunResult.
+        tool_output: The output of the tool code execution as a RunResult.
         markdown_code_block: If present, wraps the output in a Markdown code block with the specified language.
           Used for human-readable output. Only applies to `stdout` and `stderr`.
     """
     formatted_output = []
     if tool_output["stdout"] and tool_output["stdout"] != "":
-        if markdown_code_block:
-            formatted_output.append(f"stdout: \n\n```{markdown_code_block}\n{tool_output['stdout']}\n```\n")
+        if code_block_language:
+            formatted_output.append(f"stdout: \n\n```{code_block_language}\n{tool_output['stdout']}\n```\n")
         else:
             formatted_output.append(f"stdout: \n{tool_output['stdout']}\n")
     if tool_output["stderr"] and tool_output["stderr"] != "":
-        if markdown_code_block:
-            formatted_output.append(f"stderr: \n\n```{markdown_code_block}\n{tool_output['stderr']}\n```\n")
+        if code_block_language:
+            formatted_output.append(f"stderr: \n\n```{code_block_language}\n{tool_output['stderr']}\n```\n")
         else:
             formatted_output.append(f"stderr: \n{tool_output['stderr']}\n")
     if tool_output["error"]:

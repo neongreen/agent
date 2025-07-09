@@ -6,6 +6,7 @@ dependencies = [
     "rich",
     "pydantic",
     "pydantic-settings>=2.10.1",
+    "eliot>=1.17.5",
 ]
 requires-python = ">=3.13"
 
@@ -14,6 +15,7 @@ agent = "agent.main:main"
 
 [dependency-groups]
 dev = [
+    "eliot-tree>=24.0.0",
     "pyright>=1.1.402",
     "pytest>=8.4.1",
     "ruff>=0.12.2",
