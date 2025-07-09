@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v0-2025.07.09
+
+Fixed:
+- Plans render more nicely (as blockquotes)
+
+Removed:
+- `quiet` is no longer in the config (for now), although it's possible it never worked anyway
+
+Internal:
+- Agent loop is now a state machine
+- Logging via Eliot
+
 ## v0-2025.07.07
 
 Added:
