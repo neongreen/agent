@@ -52,7 +52,15 @@ class LLM:
             self.model = "github-copilot/gpt-4.1"
 
     def run(
-        self, prompt: str, yolo: bool, *, cwd: Path, phase: Optional[str] = None, response_type: LLMOutputType
+        self,
+        prompt: str,
+        yolo: bool,
+        *,
+        cwd: Path,
+        phase: Optional[str] = None,
+        step_number: Optional[int] = None,
+        attempt_number: Optional[int] = None,
+        response_type: LLMOutputType,
     ) -> Optional[str]:
         if self.engine == "claude":
             return self._run_claude(prompt, yolo, cwd=cwd, phase=phase, response_type=response_type)
@@ -64,7 +72,16 @@ class LLM:
                 prompt, yolo, model=self.model, cwd=cwd, phase=phase, response_type=response_type
             )
         elif self.engine == "gemini":
-            return self._run_gemini(prompt, yolo, model=self.model, cwd=cwd, phase=phase, response_type=response_type)
+            return self._run_gemini(
+                prompt,
+                yolo,
+                model=self.model,
+                cwd=cwd,
+                phase=phase,
+                step_number=step_number,
+                attempt_number=attempt_number,
+                response_type=response_type,
+            )
         elif self.engine == "opencode":
             assert self.model is not None, "Checked in the constructor."
             return self._run_opencode(prompt, yolo, model=self.model, cwd=cwd, phase=phase, response_type=response_type)
@@ -180,17 +197,25 @@ class LLM:
         *,
         cwd: Path,
         phase: Optional[str] = None,
+        step_number: Optional[int] = None,
+        attempt_number: Optional[int] = None,
         response_type: LLMOutputType,
     ) -> Optional[str]:
         gemini_model = model or "gemini-2.5-flash"
         command = ["gemini", "-m", gemini_model, *(["--yolo"] if yolo else []), "-p", prompt]
         log(prompt, message_type=LLMOutputType.PROMPT)
+        status_message = phase or "Calling Gemini"
+        if step_number is not None:
+            status_message = f"Step {step_number}: {status_message}"
+        if attempt_number is not None:
+            status_message = f"{status_message}, Attempt {attempt_number}"
+
         result = run(
             command,
-            phase or "Calling Gemini",
+            status_message,
             command_human=command[:-1] + ["<prompt>"],
             directory=cwd,
-            status_message=phase or "Calling Gemini",
+            status_message=status_message,
             log_stdout=False,
         )
         if result["success"]:

@@ -59,7 +59,15 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
             plan_prompt += f"\n\n{config.plan.planner_extra_prompt}"
 
         status_manager.update_status("Getting a plan")
-        current_plan = llm.run(plan_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.PLAN)
+        current_plan = llm.run(
+            plan_prompt,
+            yolo=True,
+            cwd=cwd,
+            phase="Getting a plan",
+            step_number=1,
+            attempt_number=round_num,
+            response_type=LLMOutputType.PLAN,
+        )
         if not current_plan:
             status_manager.update_status("Failed to get a plan.", style="red")
             print_formatted_message("Failed to get a plan", message_type=LLMOutputType.ERROR)
@@ -83,7 +91,15 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
 
         status_manager.update_status("Reviewing plan")
 
-        current_review = llm.run(review_prompt, yolo=True, cwd=cwd, response_type=LLMOutputType.EVALUATION)
+        current_review = llm.run(
+            review_prompt,
+            yolo=True,
+            cwd=cwd,
+            phase="Reviewing plan",
+            step_number=1,
+            attempt_number=round_num,
+            response_type=LLMOutputType.EVALUATION,
+        )
         current_verdict = check_verdict(PlanVerdict, current_review or "")
 
         if not current_review:
