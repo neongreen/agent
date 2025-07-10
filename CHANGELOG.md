@@ -2,6 +2,7 @@
 
 ## v0-next
 
+(AGENT) Gracefully handle no changes to commit.
 Internal:
 - Added a mock test for the implementation phase
 

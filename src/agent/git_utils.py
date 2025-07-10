@@ -278,3 +278,24 @@ def remove_worktree(path: Path, *, cwd: Path) -> bool:
             LLMOutputType.TOOL_ERROR,
         )
         return False
+
+
+def has_uncommitted_changes(*, cwd: Path) -> bool:
+    """
+    Checks if there are any uncommitted changes (staged or unstaged) in the repository.
+
+    Args:
+        cwd: The current working directory.
+
+    Returns:
+        True if there are uncommitted changes, False otherwise.
+    """
+    result = run(["git", "status", "--porcelain"], "Checking for uncommitted changes", directory=cwd)
+    if result["success"]:
+        return bool(result["stdout"].strip())
+    else:
+        log(
+            f"Failed to check for uncommitted changes. Stderr: {result['stderr']}",
+            LLMOutputType.TOOL_ERROR,
+        )
+        return False

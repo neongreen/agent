@@ -25,6 +25,7 @@ from typing import Literal, Optional, assert_never
 
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
+from agent.git_utils import has_uncommitted_changes
 from agent.llm import LLM, check_verdict
 from agent.output_formatter import LLMOutputType, print_formatted_message
 from agent.task_planning import planning_phase
@@ -370,12 +371,15 @@ def _generate_commit_message(settings: Settings) -> str:
 def _commit_step(settings: Settings, commit_msg: str) -> None:
     """Stage and commit the changes for this step."""
     status_manager.update_status("Committing step")
-    run(["git", "add", "."], "Adding files", directory=settings.cwd)
-    run(
-        ["git", "commit", "-m", f"{commit_msg[:100]}"],
-        "Committing step",
-        directory=settings.cwd,
-    )
+    if has_uncommitted_changes(cwd=settings.cwd):
+        run(["git", "add", "."], "Adding files", directory=settings.cwd)
+        run(
+            ["git", "commit", "-m", f"{commit_msg[:100]}"],
+            "Committing step",
+            directory=settings.cwd,
+        )
+    else:
+        log("No changes to commit.", message_type=LLMOutputType.STATUS)
 
 
 def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict], Optional[str]]:
