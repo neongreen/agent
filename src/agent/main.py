@@ -7,6 +7,8 @@ and orchestration of the agent's task processing.
 
 import argparse
 import os
+import signal
+import sys
 import tempfile
 from pathlib import Path
 
@@ -24,6 +26,18 @@ from agent.ui import status_manager
 from agent.utils import log
 
 
+_llm_instance = None
+
+
+def _signal_handler(signum, frame):
+    global _llm_instance
+    if _llm_instance:
+        pid = _llm_instance.terminate_llm_process()
+        if pid:
+            print(f"LLM process with PID {pid} killed.")
+    sys.exit(1)
+
+
 def main() -> None:
     """
     Main entry point for the agent application.
@@ -34,6 +48,10 @@ def main() -> None:
     Parses command-line arguments, sets up the environment, and initiates
     the agentic loop for task processing.
     """
+    global _llm_instance
+
+    signal.signal(signal.SIGINT, _signal_handler)
+
     parser = argparse.ArgumentParser(description="Agentic loop")
     parser.add_argument("--quiet", action="store_true", help="Suppress informational output")
     parser.add_argument("--cwd", type=str, default=None, help="Working directory for task execution")
@@ -77,15 +95,15 @@ def main() -> None:
 
     # This is the only place where LLM() should be instantiated.
     if cli_settings.claude:
-        llm = LLM(engine="claude", model=cli_settings.model)
+        _llm_instance = LLM(engine="claude", model=cli_settings.model)
     elif cli_settings.codex:
-        llm = LLM(engine="codex", model=cli_settings.model)
+        _llm_instance = LLM(engine="codex", model=cli_settings.model)
     elif cli_settings.openrouter:
-        llm = LLM(engine="openrouter", model=cli_settings.model)
+        _llm_instance = LLM(engine="openrouter", model=cli_settings.model)
     elif cli_settings.opencode:
-        llm = LLM(engine="opencode", model=cli_settings.model)
+        _llm_instance = LLM(engine="opencode", model=cli_settings.model)
     else:
-        llm = LLM(engine="gemini", model=cli_settings.model)
+        _llm_instance = LLM(engine="gemini", model=cli_settings.model)
 
     effective_cwd = Path(os.path.abspath(str(cli_settings.cwd) if cli_settings.cwd else os.getcwd()))
 

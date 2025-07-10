@@ -7,15 +7,16 @@ Claude, Codex, OpenRouter, Opencode, and Gemini CLIs.
 
 import os
 import re
+import subprocess
 import tempfile
 from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional, Type
 
 from agent.constants import AGENT_STATE_BASE_DIR, AGENT_TEMP_DIR
-from agent.output_formatter import LLMOutputType
+from agent.output_formatter import LLMOutputType, log
 from agent.ui import status_manager
-from agent.utils import log, run
+from agent.utils import run
 
 
 class LLM:
