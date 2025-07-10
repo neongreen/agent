@@ -66,7 +66,7 @@ def main() -> None:
         exit(0)
 
     log(
-        f"Configuration loaded:\n{config.model_dump_json(indent=2)}",
+        f"Configuration loaded:\n```json\n{config.model_dump_json(indent=2)}\n```",
         LLMOutputType.STATUS,
     )
 
