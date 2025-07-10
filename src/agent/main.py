@@ -153,7 +153,7 @@ def main() -> None:
                     using_worktree = True
 
                 os.chdir(work_dir)
-                process_task(task_prompt, i, base_rev=base, cwd=work_dir, llm=llm)
+                process_task(task_prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance)
                 task_status = "Success"
                 task_commit_hash = git_utils.get_current_commit_hash(cwd=work_dir)
             except Exception as e:

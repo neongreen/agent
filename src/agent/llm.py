@@ -14,9 +14,9 @@ from pathlib import Path
 from typing import Literal, Optional, Type
 
 from agent.constants import AGENT_STATE_BASE_DIR, AGENT_TEMP_DIR
-from agent.output_formatter import LLMOutputType, log
+from agent.output_formatter import LLMOutputType
 from agent.ui import status_manager
-from agent.utils import run
+from agent.utils import log, run
 
 
 class LLM:

@@ -155,17 +155,18 @@ def run(
                 message_type=LLMOutputType.TOOL_ERROR,
             )
 
-        return RunResult(
-            exit_code=process.returncode,
-            stdout=stdout,
-            stderr=stderr,
-            success=process.returncode == 0,
-            error=None,
-            signal=None,
-            background_pids=None,
-            process_group_pgid=process.pid,  # Store the PID here
-            process=process if store_process else None,
-        )
+        result_dict: RunResult = {
+            "exit_code": process.returncode,
+            "stdout": stdout,
+            "stderr": stderr,
+            "success": process.returncode == 0,
+            "error": None,
+            "signal": None,
+            "background_pids": None,
+            "process_group_pgid": process.pid,
+            "process": process,  # Always store the process object
+        }
+        return result_dict
 
     except Exception as e:
         log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
