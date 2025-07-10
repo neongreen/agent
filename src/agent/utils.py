@@ -81,6 +81,7 @@ class RunResult(TypedDict):
     signal: Optional[int]
     background_pids: Optional[list[int]]
     process_group_pgid: Optional[int]
+    process: Optional[subprocess.Popen]
 
 
 def run(
@@ -92,6 +93,7 @@ def run(
     directory: Path,
     shell: bool = False,
     log_stdout: bool = True,
+    store_process: bool = False,
 ) -> RunResult:
     """
     Run command and log it.
@@ -102,6 +104,7 @@ def run(
         directory: Optional working directory to run the command in as a Path.
         command_human: If present, will be used in console output instead of the full command.
         config: Agent configuration for logging settings.
+        store_process: If True, the subprocess.Popen object will be stored in the RunResult.
     """
 
     if status_message:
@@ -127,34 +130,41 @@ def run(
     )
 
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=abs_directory, shell=shell)
+        process = subprocess.Popen(
+            command,
+            text=True,
+            cwd=abs_directory,
+            shell=shell,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = process.communicate()
 
-        if result.returncode != 0:
+        if process.returncode != 0:
             log(
-                f"Command {command_display} failed with exit code {result.returncode}\nStdout: {result.stdout}\nStderr: {result.stderr}",
+                f"Command {command_display} failed with exit code {process.returncode}\nStdout: {stdout}\nStderr: {stderr}",
                 message_human=(
                     "\n\n".join(
                         [
-                            f"Command `{command_human_display}` failed with exit code {result.returncode}",
-                            f"Stdout:\n\n```\n{result.stdout}\n```" if result.stdout.strip() else "Stdout: empty",
-                            f"Stderr:\n\n```\n{result.stderr}\n```" if result.stderr.strip() else "Stderr: empty",
+                            f"Command `{command_human_display}` failed with exit code {process.returncode}",
+                            f"Stdout:\n\n```\n{stdout}\n```" if stdout.strip() else "Stdout: empty",
+                            f"Stderr:\n\n```\n{stderr}\n```" if stderr.strip() else "Stderr: empty",
                         ]
                     )
                 ),
                 message_type=LLMOutputType.TOOL_ERROR,
             )
 
-        # TODO: do we want to log success? or do we always log it later somewhere?
-
         return RunResult(
-            exit_code=result.returncode,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            success=result.returncode == 0,
+            exit_code=process.returncode,
+            stdout=stdout,
+            stderr=stderr,
+            success=process.returncode == 0,
             error=None,
             signal=None,
             background_pids=None,
-            process_group_pgid=None,
+            process_group_pgid=process.pid,  # Store the PID here
+            process=process if store_process else None,
         )
 
     except Exception as e:
@@ -168,6 +178,7 @@ def run(
             signal=None,
             background_pids=None,
             process_group_pgid=None,
+            process=None,
         )
 
 

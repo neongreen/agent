@@ -2,6 +2,9 @@
 
 ## v0-next
 
+Fixed:
+- Ctrl+C now stops the agent and shuts down the LLM process, reporting its PID.
+
 (AGENT) Gracefully handle no changes to commit.
 Internal:
 - Added a mock test for the implementation phase

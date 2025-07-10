@@ -26,6 +26,7 @@ class LLM:
     ):
         self.engine = engine
         self.model = model
+        self.llm_process: Optional[subprocess.Popen] = None
 
         if engine == "gemini":
             if "GEMINI_API_KEY" in os.environ:
@@ -107,6 +108,7 @@ class LLM:
             directory=cwd,
             status_message=phase or "Calling Claude",
             log_stdout=False,
+            store_process=True,
         )
         if result["success"]:
             response = result["stdout"].strip()
@@ -158,6 +160,7 @@ class LLM:
                 directory=cwd,
                 status_message=phase or "Calling Codex",
                 log_stdout=False,
+                store_process=True,
             )
             if result["success"]:
                 status_manager.update_status("Successful.")
@@ -218,14 +221,34 @@ class LLM:
             directory=cwd,
             status_message=status_message,
             log_stdout=False,
+            store_process=True,
         )
         if result["success"]:
+            self.llm_process = result["process"]
             response = result["stdout"].strip()
             status_manager.update_status("Successful.")
             log(response, message_type=response_type)
             return response
         else:
             return None
+
+    def terminate_llm_process(self) -> Optional[int]:
+        """
+        Terminates the LLM process if it's running.
+        Returns the PID of the killed process, or None if no process was found.
+        """
+        if self.llm_process and self.llm_process.poll() is None:
+            pid = self.llm_process.pid
+            log(f"Terminating LLM process with PID: {pid}", message_type=LLMOutputType.STATUS)
+            self.llm_process.terminate()
+            try:
+                self.llm_process.wait(timeout=5)  # Wait for 5 seconds for graceful termination
+            except subprocess.TimeoutExpired:
+                log(f"LLM process {pid} did not terminate gracefully, killing it.", message_type=LLMOutputType.STATUS)
+                self.llm_process.kill()
+            self.llm_process = None
+            return pid
+        return None
 
     def _run_opencode(
         self,
@@ -253,6 +276,7 @@ class LLM:
             directory=cwd,
             status_message=phase or "Calling Opencode",
             log_stdout=False,
+            store_process=True,
         )
         if result["success"]:
             response = result["stdout"].strip()
