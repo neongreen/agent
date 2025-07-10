@@ -5,6 +5,7 @@
 (AGENT) Gracefully handle no changes to commit.
 Internal:
 - Added a mock test for the implementation phase
+- `check_verdict` now uses the last found verdict and has unit tests.
 
 ## v0-2025.07.09
 

@@ -6,6 +6,7 @@ Claude, Codex, OpenRouter, Opencode, and Gemini CLIs.
 """
 
 import os
+import re
 import tempfile
 from enum import Enum
 from pathlib import Path
@@ -281,7 +282,11 @@ def check_verdict[T: Enum](verdict_type: Type[T], judgment: str) -> T | None:
         An Enum member indicating the verdict, or None if not found.
     """
     first_line = judgment.split("\n", 1)[0].upper()
+    last_verdict_end_index = -1
+    found_verdict = None
     for verdict in verdict_type:
-        if verdict.value in first_line:
-            return verdict
-    return None
+        for match in re.finditer(r"\b" + re.escape(verdict.value) + r"\b", first_line):
+            if match.end() > last_verdict_end_index:
+                last_verdict_end_index = match.end()
+                found_verdict = verdict
+    return found_verdict
