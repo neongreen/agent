@@ -33,6 +33,7 @@ judge-extra-prompt = """
   - The plan proposes to run the agent tool itself (src/agent/main.py).
   - The plan proposes using `pip` or `poetry` (this project uses `uv`).
   - The plan proposes pushing commits or creating pull requests.
+  - The plan proposes to edit `config.schema.json` (it is generated from Pydantic models).
 
   The exception is if the **task** explicitly asks to do any of these things.
   For example, if the task is "write a test for function Abc", then the plan can include writing and running a test for function `Abc`.
