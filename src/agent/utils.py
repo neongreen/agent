@@ -1,77 +1,16 @@
 """Utility functions for the agent."""
 
-import os
 import shlex
 import subprocess
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from posixpath import abspath
 from typing import Optional
 
-import eliot
-from eliot import FileDestination, log_message, start_action
-from rich.console import Console
+from eliot import start_action
 
-from agent.constants import AGENT_STATE_BASE_DIR
-from agent.output_formatter import LLMOutputType, print_formatted_message
+from agent.logging import LLMOutputType, log
 from agent.ui import status_manager
-
-
-console = Console()
-
-
-_logging_initialized = False
-
-
-def init_logging() -> None:
-    global _logging_initialized
-    if _logging_initialized:
-        return
-    _logging_initialized = True
-
-    # Initialize Eliot logging
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
-    log_file = AGENT_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    eliot.add_destinations(FileDestination(file=open(log_file, "ab")))
-
-
-# TODO: should we forbid using `print_formatted_message` directly and require `log` instead?
-# Probably yes.
-def log(
-    message: str,
-    message_type: LLMOutputType,
-    message_human: Optional[str] = None,
-    quiet=None,
-) -> None:
-    """
-    Simple logging function that respects quiet mode.
-
-    Arguments:
-        message: The message to log to the log file.
-        message_type: The type of the message, used for formatting.
-        message_human: Optional human-readable message to display in the console. Should be formatted as Markdown.
-          If not provided, `message` will be used.
-        quiet: If provided, overrides the global quiet mode setting.
-    """
-
-    init_logging()
-
-    if not quiet:
-        print_formatted_message(message_human or message, message_type)
-
-    # TODO: probably wrong usage of `log_message`
-    log_message(message_type=message_type.value, message=message, message_human=message_human)
-
-
-def format_as_markdown_blockquote(text: str) -> str:
-    """
-    Formats the given text as a Markdown blockquote.
-    """
-    lines = text.splitlines()
-    blockquote_lines = [f"> {line}" for line in lines]
-    return "\n".join(blockquote_lines)
 
 
 @dataclass(frozen=True)
@@ -228,50 +167,14 @@ def format_tool_code_output(
     formatted_output = []
     if tool_output.stdout:
         if code_block_language:
-            formatted_output.append(
-                "\n".join(
-                    [
-                        "stdout: ",
-                        f"```{code_block_language}",
-                        tool_output.stdout,
-                        "```",
-                    ]
-                )
-            )
+            formatted_output.append(f"stdout: \n\n```{code_block_language}\n{tool_output.stdout}\n```\n")
         else:
-            formatted_output.append(
-                "\n".join(
-                    [
-                        "stdout: ",
-                        "```",
-                        tool_output.stdout,
-                        "```",
-                    ]
-                )
-            )
+            formatted_output.append(f"stdout: \n{tool_output.stdout}\n")
     if tool_output.stderr:
         if code_block_language:
-            formatted_output.append(
-                "\n".join(
-                    [
-                        "stderr: ",
-                        f"```{code_block_language}",
-                        tool_output.stderr,
-                        "```",
-                    ]
-                )
-            )
+            formatted_output.append(f"stderr: \n\n```{code_block_language}\n{tool_output.stderr}\n```\n")
         else:
-            formatted_output.append(
-                "\n".join(
-                    [
-                        "stderr: ",
-                        "```",
-                        tool_output.stderr,
-                        "```",
-                    ]
-                )
-            )
+            formatted_output.append(f"stderr: \n{tool_output.stderr}\n")
     if tool_output.error is not None:
         formatted_output.append(f"error: {tool_output.error}\n")
     if tool_output.exit_code is not None:

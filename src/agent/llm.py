@@ -16,9 +16,9 @@ from typing import Literal, Optional, Type
 from eliot import log_call
 
 from agent.constants import AGENT_STATE_BASE_DIR, AGENT_TEMP_DIR
-from agent.output_formatter import LLMOutputType
+from agent.logging import LLMOutputType, log
 from agent.ui import status_manager
-from agent.utils import log, run
+from agent.utils import run
 
 
 class LLM:

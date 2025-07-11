@@ -9,9 +9,8 @@ from eliot import log_call
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
 from agent.llm import LLM, check_verdict
-from agent.output_formatter import LLMOutputType, print_formatted_message
+from agent.logging import LLMOutputType, format_as_markdown_blockquote, log
 from agent.ui import status_manager
-from agent.utils import format_as_markdown_blockquote, log
 
 
 @log_call(include_args=["task", "cwd"])
@@ -27,7 +26,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
         The approved plan as a string, or None if planning failed.
     """
     status_manager.set_phase("Planning")
-    print_formatted_message(f"Starting planning phase for task: {task}", message_type=LLMOutputType.STATUS)
+    log(f"Starting planning phase for task: {task}", message_type=LLMOutputType.STATUS)
 
     max_planning_rounds = 5
 
@@ -37,7 +36,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
 
     for round_num in range(1, max_planning_rounds + 1):
         status_manager.set_phase("Planning", f"{round_num}/{max_planning_rounds}")
-        print_formatted_message((f"Planning round {round_num}"), message_type=LLMOutputType.STATUS)
+        log((f"Planning round {round_num}"), message_type=LLMOutputType.STATUS)
 
         # Ask Gemini to create/revise plan
         if round_num == 1:
@@ -74,23 +73,21 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
         current_plan = format_as_markdown_blockquote(raw_plan) if raw_plan else None
         if not current_plan:
             status_manager.update_status("Failed to get a plan.", style="red")
-            print_formatted_message("Failed to get a plan", message_type=LLMOutputType.ERROR)
+            log("Failed to get a plan", message_type=LLMOutputType.ERROR)
             return None
 
-        # Ask LLM to review the plan.
-        # We want the review text to have something before and after the verdict -
-        # otherwise OpenCode likes outputting e.g. "VED" instead of "APPROVED".
+        # Ask Gemini to review the plan
         review_prompt = (
             f"Review this plan for task {repr(task)}:\n\n"
             f"{current_plan}\n\n"
             "After you are done, output your review as a single message using this template:\n\n"
-            "    I am the plan judge.\n\n"
-            "    Feedback: [[your plan feedback]]\n\n"
-            "    List of objections to address: [[list of objections to address, or 'None']]\n\n"
+            "    I am the plan judge.\n"
+            "    Feedback: [[your plan feedback]]\n"
+            "    List of objections to address: [[list of objections to address, or 'None']]\n"
             "    Verdict: [[your verdict]], end of plan review.\n\n"
             "Your verdict must be one of the following:\n"
-            "- APPROVED APPROVED APPROVED if the plan is good enough to implement (even if minor improvements are possible);\n"
-            "- REJECTED REJECTED REJECTED if the plan must be revised.\n"
+            "  - APPROVED APPROVED APPROVED if the plan is good enough to implement (even if minor improvements are possible);\n"
+            "  - REJECTED REJECTED REJECTED if the plan must be revised.\n"
         )
 
         if config.plan.judge_extra_prompt:
@@ -123,8 +120,8 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
 
         elif current_verdict == PlanVerdict.APPROVED:
             status_manager.update_status(f"Approved in round {round_num}.")
-            print_formatted_message((f"Plan approved in round {round_num}"), message_type=LLMOutputType.STATUS)
-            print_formatted_message(current_plan, message_type=LLMOutputType.PLAN)
+            log((f"Plan approved in round {round_num}"), message_type=LLMOutputType.STATUS)
+            log(current_plan, message_type=LLMOutputType.PLAN)
 
             plan = current_plan  # This is the approved plan
 

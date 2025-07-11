@@ -19,7 +19,7 @@ from agent.cli_settings import CLISettings
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import AGENT_TEMP_DIR
 from agent.llm import LLM
-from agent.output_formatter import LLMOutputType, display_task_summary
+from agent.logging import LLMOutputType, display_task_summary
 from agent.state_manager import write_state
 from agent.task_orchestrator import process_task
 from agent.ui import status_manager

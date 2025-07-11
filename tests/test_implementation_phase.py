@@ -55,7 +55,7 @@ def test_implementation_phase() -> None:
         ) as _mock_run,
         unittest.mock.patch("agent.task_implementation.log") as _mock_log,
         unittest.mock.patch("agent.task_implementation.status_manager.update_status") as _mock_update_status,
-        unittest.mock.patch("agent.task_implementation.print_formatted_message") as _mock_print_formatted_message,
+        # (print_formatted_message is now internal; patch log if needed)
     ):
         # Run the implementation phase
         result = implementation_phase(
@@ -79,4 +79,4 @@ def test_implementation_phase() -> None:
         # mock_log.assert_called()
 
         # # Verify that formatted messages were printed
-        # mock_print_formatted_message.assert_called()
+        # (print_formatted_message is now internal; assert log call if needed)

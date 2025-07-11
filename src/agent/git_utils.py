@@ -10,8 +10,8 @@ from eliot import log_call
 
 from agent.constants import TASK_META_DIR
 from agent.llm import LLM
-from agent.output_formatter import LLMOutputType
-from agent.utils import log, run
+from agent.logging import LLMOutputType, log
+from agent.utils import run
 
 
 def sanitize_branch_name(name: str) -> str:

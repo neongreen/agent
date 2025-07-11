@@ -1,11 +1,17 @@
+import os
+from datetime import datetime
 from enum import Enum, auto
 
+import eliot
+from eliot import FileDestination, log_message
 from rich.console import Console
 from rich.errors import MarkupError
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+
+from agent.constants import AGENT_STATE_BASE_DIR
 
 
 class LLMOutputType(Enum):
@@ -36,7 +42,23 @@ class LLMOutputType(Enum):
 console = Console()
 
 
-def print_formatted_message(message: str, message_type: LLMOutputType):
+_logging_initialized = False
+
+
+def init_logging() -> None:
+    global _logging_initialized
+    if _logging_initialized:
+        return
+    _logging_initialized = True
+
+    # Initialize Eliot logging
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
+    log_file = AGENT_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    eliot.add_destinations(FileDestination(file=open(log_file, "ab")))
+
+
+def __print_formatted_message(message: str, message_type: LLMOutputType):
     """
     Prints a formatted message to the console based on its type.
     """
@@ -71,6 +93,42 @@ def print_formatted_message(message: str, message_type: LLMOutputType):
         console.print(Text.from_markup(message).plain)
 
     console.print("\n", end="")
+
+
+# print_formatted_message is now internal; use log instead.
+def log(
+    message: str,
+    message_type: LLMOutputType,
+    message_human: str | None = None,
+    quiet=None,
+) -> None:
+    """
+    Simple logging function that respects quiet mode.
+
+    Arguments:
+        message: The message to log to the log file.
+        message_type: The type of the message, used for formatting.
+        message_human: Optional human-readable message to display in the console. Should be formatted as Markdown.
+          If not provided, `message` will be used.
+        quiet: If provided, overrides the global quiet mode setting.
+    """
+
+    init_logging()
+
+    if not quiet:
+        __print_formatted_message(message_human or message, message_type)
+
+    # TODO: probably wrong usage of `log_message`
+    log_message(message_type=message_type.value, message=message, message_human=message_human)
+
+
+def format_as_markdown_blockquote(text: str) -> str:
+    """
+    Formats the given text as a Markdown blockquote.
+    """
+    lines = text.splitlines()
+    blockquote_lines = [f"> {line}" for line in lines]
+    return "\n".join(blockquote_lines)
 
 
 def display_task_summary(task_results: list):

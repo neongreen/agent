@@ -31,10 +31,10 @@ from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
 from agent.git_utils import has_uncommitted_changes
 from agent.llm import LLM, check_verdict
-from agent.output_formatter import LLMOutputType, print_formatted_message
+from agent.logging import LLMOutputType, log
 from agent.task_planning import planning_phase
 from agent.ui import status_manager
-from agent.utils import format_tool_code_output, log, run
+from agent.utils import format_tool_code_output, run
 
 
 class StepVerdict(Enum):
@@ -585,7 +585,7 @@ def implementation_phase(
     until a terminal state is reached
     """
     status_manager.set_phase("Step")
-    print_formatted_message(
+    log(
         f"Starting step phase for task: {task}",
         message_type=LLMOutputType.STATUS,
     )
