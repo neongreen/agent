@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import StrEnum, auto
 
 import eliot
-from eliot import FileDestination, log_message
+from eliot import FileDestination
 from rich.console import Console
 from rich.errors import MarkupError
 from rich.markdown import Markdown
@@ -118,8 +118,7 @@ def log(
     if not quiet:
         __print_formatted_message(message_human or message, message_type)
 
-    # TODO: probably wrong usage of `log_message`
-    log_message(message_type=message_type.value, message=message, message_human=message_human)
+    eliot.log_message(f"log.{message_type}", str=message, **({"human": message_human} if message_human else {}))
 
 
 def format_as_markdown_blockquote(text: str) -> str:
