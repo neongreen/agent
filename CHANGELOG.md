@@ -4,6 +4,9 @@
 
 ## v0-next
 
+Added:
+- Many more logs.
+
 Changed:
 - Logs are now written to a file in the `~/.agent/logs/` directory, one file per run.
 

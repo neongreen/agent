@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from eliot import log_call
+
 from agent.constants import TASK_META_DIR
 from agent.llm import LLM
 from agent.output_formatter import LLMOutputType
@@ -32,6 +34,7 @@ def sanitize_branch_name(name: str) -> str:
     return name
 
 
+@log_call
 def get_existing_branch_names(*, cwd: Path) -> list[str]:
     """
     Gets a list of all local Git branch names.
@@ -49,6 +52,7 @@ def get_existing_branch_names(*, cwd: Path) -> list[str]:
     return [line.strip().replace("* ", "") for line in result["stdout"].split("\n") if line.strip()]
 
 
+@log_call
 def generate_branch_name(suggestions: list[str], *, cwd: Path) -> str:
     """
     Generates a unique branch name by trying suggestions first.
@@ -82,6 +86,7 @@ def generate_branch_name(suggestions: list[str], *, cwd: Path) -> str:
     return new_branch_name
 
 
+@log_call
 def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
     """
     Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA.
@@ -108,6 +113,7 @@ def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
         return None
 
 
+@log_call
 def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> bool:
     """
     Set up git branch for task.
@@ -189,6 +195,7 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> 
     return True
 
 
+@log_call
 def get_current_branch(*, cwd: Path) -> Optional[str]:
     """
     Gets the current active Git branch name.
@@ -207,6 +214,7 @@ def get_current_branch(*, cwd: Path) -> Optional[str]:
         return None
 
 
+@log_call
 def get_current_commit_hash(*, cwd: Path) -> Optional[str]:
     """
     Gets the current commit hash.
@@ -228,6 +236,7 @@ def get_current_commit_hash(*, cwd: Path) -> Optional[str]:
         return None
 
 
+@log_call
 def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
     """
     Adds a new git worktree at the specified path, based on the given revision.
@@ -255,6 +264,7 @@ def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
         return False
 
 
+@log_call
 def remove_worktree(path: Path, *, cwd: Path) -> bool:
     """
     Removes a git worktree at the specified path.
@@ -280,6 +290,7 @@ def remove_worktree(path: Path, *, cwd: Path) -> bool:
         return False
 
 
+@log_call
 def has_uncommitted_changes(*, cwd: Path) -> bool:
     """
     Checks if there are any uncommitted changes (staged or unstaged) in the repository.

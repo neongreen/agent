@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import assert_never
 
+from eliot import log_call
+
 from agent.constants import STATE_FILE, TaskState
 from agent.git_utils import resolve_commit_specifier, setup_task_branch
 from agent.llm import LLM
@@ -13,6 +15,7 @@ from agent.ui import status_manager
 from agent.utils import log
 
 
+@log_call
 def process_task(
     task: str,
     task_num: int,

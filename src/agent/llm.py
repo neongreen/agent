@@ -13,6 +13,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional, Type
 
+from eliot import log_call
+
 from agent.constants import AGENT_STATE_BASE_DIR, AGENT_TEMP_DIR
 from agent.output_formatter import LLMOutputType
 from agent.ui import status_manager
@@ -294,6 +296,7 @@ class LLM:
 ### Utils ###
 
 
+@log_call
 def check_verdict[T: Enum](verdict_type: Type[T], judgment: str) -> T | None:
     """
     Checks judge's verdict based on a list of possible verdicts/statuses from an Enum.

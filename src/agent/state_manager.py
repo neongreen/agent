@@ -3,9 +3,12 @@
 import json
 from typing import Dict
 
+from eliot import log_call
+
 from agent.constants import STATE_FILE, TaskState
 
 
+@log_call
 def read_state() -> Dict[str, TaskState]:
     """
     Reads the current state from the state file.
@@ -20,6 +23,7 @@ def read_state() -> Dict[str, TaskState]:
         return {task_id: TaskState.from_json(state_value) for task_id, state_value in raw_state.items()}
 
 
+@log_call
 def write_state(state: Dict[str, TaskState]) -> None:
     """
     Writes the current state to the state file.

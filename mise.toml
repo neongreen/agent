@@ -16,6 +16,17 @@ run = "uv run agent"
 description = "Run all checks and tests"
 depends = ["lint", "pyright", "check-schema", "test"]
 
+[tasks.logs]
+description = "Show the logs of the agent (~/.agent/logs/)"
+quiet = true
+run = """
+  file={{arg(name="file", default="", help="The log file to view")}}
+  if [ -z "$file" ]; then
+    file=~/.agent/logs/"$(ls -t ~/.agent/logs/ | head -n 1)"
+  fi
+  uv run eliot-tree "$file"
+  """
+
 # Note: this includes some formatting rules that are *not* checked by the linter.
 # This is because some of the linter warns are completely harmless.
 #

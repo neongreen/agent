@@ -9,7 +9,7 @@ from posixpath import abspath
 from typing import Optional, TypedDict
 
 import eliot
-from eliot import FileDestination, log_message
+from eliot import FileDestination, log_call, log_message
 from rich.console import Console
 
 from agent.constants import AGENT_STATE_BASE_DIR
@@ -86,6 +86,7 @@ class RunResult(TypedDict):
     process: Optional[subprocess.Popen]
 
 
+@log_call
 def run(
     command: str | list[str],
     description=None,

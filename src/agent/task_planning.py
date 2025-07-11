@@ -4,6 +4,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, assert_never
 
+from eliot import log_call
+
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
 from agent.llm import LLM, check_verdict
@@ -12,6 +14,7 @@ from agent.ui import status_manager
 from agent.utils import format_as_markdown_blockquote, log
 
 
+@log_call
 def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
     """
     Iterative planning phase with Gemini approval.

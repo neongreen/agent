@@ -23,6 +23,8 @@ from itertools import takewhile
 from pathlib import Path
 from typing import Literal, Optional, assert_never
 
+from eliot import log_call
+
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
 from agent.git_utils import has_uncommitted_changes
@@ -191,6 +193,7 @@ class Settings:
     max_consecutive_failures: int = 3
 
 
+@log_call
 def transition(
     state: State,
     event: Event,
@@ -236,6 +239,7 @@ def transition(
             assert_never(event)
 
 
+@log_call
 def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingStep | Done:
     """
     Generate a plan for the task.
@@ -258,6 +262,7 @@ def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingSte
         )
 
 
+@log_call
 def _handle_StartingStep(settings: Settings, state: StartingStep) -> StartingAttempt:
     """
     Start a new step with the given plan.
@@ -270,6 +275,7 @@ def _handle_StartingStep(settings: Settings, state: StartingStep) -> StartingAtt
     )
 
 
+@log_call
 def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> JudgingAttempt:
     """
     Generate the implementation prompt for a single step, invoke the LLM,
@@ -319,6 +325,7 @@ def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> Judgi
     )
 
 
+@log_call
 def _evaluate_step(settings: Settings, step_summary: Optional[str]) -> tuple[Optional[StepVerdict], Optional[str]]:
     eval_prompt = (
         f"Evaluate if these changes make progress on the task {repr(settings.task)}.\n"
@@ -352,6 +359,7 @@ def _evaluate_step(settings: Settings, step_summary: Optional[str]) -> tuple[Opt
     return verdict, evaluation
 
 
+@log_call
 def _generate_commit_message(settings: Settings) -> str:
     """Generate and return a concise, single‑line commit message for the current step."""
     status_manager.update_status("Generating commit message")
@@ -371,6 +379,7 @@ def _generate_commit_message(settings: Settings) -> str:
     return commit_msg
 
 
+@log_call
 def _commit_step(settings: Settings, commit_msg: str) -> None:
     """Stage and commit the changes for this step."""
     status_manager.update_status("Committing step")
@@ -385,6 +394,7 @@ def _commit_step(settings: Settings, commit_msg: str) -> None:
         log("No changes to commit.", message_type=LLMOutputType.STATUS)
 
 
+@log_call
 def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict], Optional[str]]:
     """Ask the LLM whether the overall task is finished after this step."""
     status_manager.update_status("Checking if task is complete...")
@@ -422,6 +432,7 @@ def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict]
     return completion_verdict, completion_evaluation
 
 
+@log_call
 def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep | FinalizingTask:
     # TODO: this should be somewhere else? separate state?
     if hasattr(config, "post_implementation_hook_command") and config.post_implementation_hook_command:
@@ -511,6 +522,7 @@ def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep 
             assert_never(state)
 
 
+@log_call
 def implementation_phase(
     *,
     task: str,
@@ -570,6 +582,7 @@ def implementation_phase(
 # ────────────────────────────── Transitions ──────────────────────────────
 
 
+@log_call
 def _is_failed_attempt(attemp: AttemptResult) -> bool:
     """
     Check if the attempt is a failed attempt.
@@ -583,6 +596,7 @@ def _is_failed_attempt(attemp: AttemptResult) -> bool:
             assert_never(other)
 
 
+@log_call
 def _handle_JudgingAttempt(
     settings: Settings,
     state: JudgingAttempt,
@@ -659,6 +673,7 @@ def _handle_JudgingAttempt(
             assert_never(other)
 
 
+@log_call
 def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> Done:
     try:
         diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=settings.cwd)
