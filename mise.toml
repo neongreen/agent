@@ -93,7 +93,13 @@ run = """jj x 'MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run format'"""
 [tasks.clean-branches]
 description = "Remove all agent branches (bookmarks) below main"
 run = '''
-  jj bookmark list -r 'main | (~main::)' -T'self++"\n"' | grep -E '^agent/' | grep -Ev '^main$' | xargs jj bookmark delete
+  jj bookmark list -r 'main | (~main::)' -T'self++"\n"' | grep -E '^agent/' | xargs jj bookmark delete
+'''
+
+[tasks."clean-branches:all"]
+description = "Remove all agent branches (bookmarks) everywhere"
+run = '''
+  jj bookmark list -T'self++"\n"' | grep -E '^agent/' | xargs jj bookmark delete
 '''
 
 # Checks
