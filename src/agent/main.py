@@ -135,8 +135,7 @@ def main() -> None:
 
     log("Starting agentic loop", LLMOutputType.STATUS)
 
-    try:
-        status_manager.init_status_bar()
+    with status_manager.get_status_manager():
         status_manager.set_phase("Agent initialized")
 
         selected_tasks = cli_settings.prompt or []
@@ -197,10 +196,8 @@ def main() -> None:
         status_manager.set_phase("Agentic loop completed")
         display_task_summary(task_results)
 
-    finally:
-        status_manager.cleanup_status_bar()
-        # Ensure we are back in the original effective_cwd
-        os.chdir(effective_cwd)
+    # Ensure we are back in the original effective_cwd
+    os.chdir(effective_cwd)
 
 
 if __name__ == "__main__":
