@@ -33,6 +33,7 @@ judge-extra-prompt = """
     Running tests written for pure functions is also allowed.
   - The plan proposes to run the agent tool itself (src/agent/main.py).
   - The plan proposes using `pip` or `poetry` (this project uses `uv`).
+    Also, dependencies must be added with `uv add`, not `uv pip`.
   - The plan proposes pushing commits or creating pull requests.
   - The plan proposes to edit `config.schema.json` (it is generated from Pydantic models).
 
