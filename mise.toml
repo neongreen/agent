@@ -31,7 +31,28 @@ run = """
   eval "args=(${usage_eliot_tree_args:-})"
   uv run eliot-tree "$usage_file" "${args[@]}"
   echo "--- $usage_file ---"
-  """
+"""
+
+[tasks.logs-good]
+description = "Show the logs of the agent (~/.agent/logs/)"
+quiet = true
+usage = """
+  flag "--file <file>" "The log file to view (default: latest log file in ~/.agent/logs/)"
+  arg "[eliot_tree_args]" var=#true "Additional arguments for eliot-tree"
+"""
+run = """
+  if [[ -z "$usage_file" ]]; then
+    usage_file=~/.agent/logs/"$(ls -t ~/.agent/logs/ | head -n 1)"
+  fi
+  echo "--- $usage_file ---"
+  eval "args=(${usage_eliot_tree_args:-})"
+  cat "$usage_file" \
+    | jq -c 'select(has("message_human") | not)' \
+    | jq -c 'del(.state.steps_log, .result.steps_log, .state.attempts_log, .result.attempts_log, .event)' 2>/dev/null \
+    | jq -c 'select(.action_type != "run")' \
+    | uv run eliot-tree "${args[@]}"
+  echo "--- $usage_file ---"
+"""
 
 # Note: this includes some formatting rules that are *not* checked by the linter.
 # This is because some of the linter warns are completely harmless.
