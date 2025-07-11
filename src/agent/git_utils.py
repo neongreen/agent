@@ -113,7 +113,7 @@ def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
         return None
 
 
-@log_call
+@log_call(include_args=["task", "task_num", "base_rev", "cwd"])
 def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> bool:
     """
     Set up git branch for task.

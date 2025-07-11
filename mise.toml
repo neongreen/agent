@@ -19,12 +19,18 @@ depends = ["lint", "pyright", "check-schema", "test"]
 [tasks.logs]
 description = "Show the logs of the agent (~/.agent/logs/)"
 quiet = true
+usage = """
+  flag "--file <file>" "The log file to view (default: latest log file in ~/.agent/logs/)"
+  arg "[eliot_tree_args]" var=#true "Additional arguments for eliot-tree"
+"""
 run = """
-  file={{arg(name="file", default="", help="The log file to view")}}
-  if [ -z "$file" ]; then
-    file=~/.agent/logs/"$(ls -t ~/.agent/logs/ | head -n 1)"
+  if [[ -z "$usage_file" ]]; then
+    usage_file=~/.agent/logs/"$(ls -t ~/.agent/logs/ | head -n 1)"
   fi
-  uv run eliot-tree "$file"
+  echo "--- $usage_file ---"
+  eval "args=(${usage_eliot_tree_args:-})"
+  uv run eliot-tree "$usage_file" "${args[@]}"
+  echo "--- $usage_file ---"
   """
 
 # Note: this includes some formatting rules that are *not* checked by the linter.

@@ -10,7 +10,7 @@ from posixpath import abspath
 from typing import Optional
 
 import eliot
-from eliot import FileDestination, log_call, log_message, start_action
+from eliot import FileDestination, log_message, start_action
 from rich.console import Console
 
 from agent.constants import AGENT_STATE_BASE_DIR
@@ -61,6 +61,7 @@ def log(
     if not quiet:
         print_formatted_message(message_human or message, message_type)
 
+    # TODO: probably wrong usage of `log_message`
     log_message(message_type=message_type.value, message=message, message_human=message_human)
 
 
@@ -88,7 +89,6 @@ class RunResult:
     process: Optional[subprocess.Popen]
 
 
-@log_call
 def run(
     command: str | list[str],
     description=None,

@@ -14,7 +14,7 @@ from agent.ui import status_manager
 from agent.utils import format_as_markdown_blockquote, log
 
 
-@log_call
+@log_call(include_args=["task", "cwd"])
 def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
     """
     Iterative planning phase with Gemini approval.

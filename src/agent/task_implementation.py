@@ -214,7 +214,7 @@ class Settings:
     max_consecutive_failures: int = 3
 
 
-@log_call
+@log_call(include_args=["state", "event"])
 def transition(
     state: State,
     event: Event,
@@ -263,7 +263,7 @@ def transition(
             assert_never(event)
 
 
-@log_call
+@log_call(include_args=["state"])
 def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingStep | Done:
     """
     Generate a plan for the task.
@@ -286,7 +286,7 @@ def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingSte
         )
 
 
-@log_call
+@log_call(include_args=["state"])
 def _handle_StartingStep(settings: Settings, state: StartingStep) -> StartingAttempt:
     """
     Start a new step with the given plan.
@@ -299,7 +299,7 @@ def _handle_StartingStep(settings: Settings, state: StartingStep) -> StartingAtt
     )
 
 
-@log_call
+@log_call(include_args=["state"])
 def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostAttemptHooks:
     """
     Generate the implementation prompt for a single step, invoke the LLM,
@@ -349,8 +349,8 @@ def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostA
     )
 
 
-@log_call
-def _handle_PostAttemptHooks(settings: "Settings", state: PostAttemptHooks) -> JudgingAttempt | StartingAttempt:
+@log_call(include_args=["state"])
+def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) -> JudgingAttempt | StartingAttempt:
     # This one always runs and is supposed to have things like formatters, etc.
     if config.post_implementation_hook_command:
         run(
@@ -391,29 +391,26 @@ def _handle_PostAttemptHooks(settings: "Settings", state: PostAttemptHooks) -> J
     )
 
 
-@log_call
+@log_call(include_args=["step_summary"])
 def _evaluate_step(settings: Settings, step_summary: Optional[str]) -> tuple[Optional[StepVerdict], Optional[str]]:
     eval_prompt = (
         f"Evaluate if these changes make progress on the task {repr(settings.task)}.\n"
-        "There are three possible verdicts: SUCCESS, PARTIAL, and FAILURE.\n"
-        "- The 'SUCCESS' verdict means the changes are a good step forward.\n"
-        "    In this case, provide a brief comment on the changes and the next step the agent could take (if needed).\n"
-        "- The 'PARTIAL' verdict means the changes are somewhat helpful, but need more work.\n"
-        "    In this case, provide specific feedback on what should be improved.\n"
-        "- The 'FAILURE' verdict means the changes are not useful.\n"
-        "    In this case, list specific reasons why the changes are inadequate.\n"
         "Here is the summary of the changes, provided by their author:\n\n"
         f"{step_summary}\n\n"
         "Here are the uncommitted changes:\n\n"
         f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "Here is the diff of the changes made in previous attempts:\n\n"
         f"{format_tool_code_output(run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
-        "The last line of your response must be the verdict:\n"
-        "  - SUCCESS SUCCESS SUCCESS if it's a good step forward;\n"
-        "  - PARTIAL PARTIAL PARTIAL if it's somewhat helpful;\n"
-        "  - FAILURE FAILURE FAILURE if it's not useful.\n"
-        "If you need to do any checks, do them before outputting the verdict.\n"
-        "You can deliberate for a while before finally outputing the verdict."
+        "After you are done, output your review as a single message using this template:\n\n"
+        "    I am the step judge.\n\n"
+        "    Feedback: [[your feedback on the current batch of changes]]\n\n"
+        "    List of objections related to the already done work: [[list of objections concerning what was already done, or 'None']]\n\n"
+        "    Next step: [[either the next unimplemented step from the plan, or 'Address the objections', or 'None']]\n\n"
+        "    Verdict: [[your verdict]], end of step review.\n\n"
+        "Your verdict must be one of the following:\n"
+        "- SUCCESS SUCCESS SUCCESS if the changes are a good step forward and can be committed;\n"
+        "- PARTIAL PARTIAL PARTIAL if the changes are somewhat helpful, but need more work;\n"
+        "- FAILURE FAILURE FAILURE if the changes are not useful and the author must rethink the approach.\n"
     )
 
     if config.implement.judge_extra_prompt:
@@ -425,7 +422,7 @@ def _evaluate_step(settings: Settings, step_summary: Optional[str]) -> tuple[Opt
     return verdict, evaluation
 
 
-@log_call
+@log_call(include_args=[])
 def _generate_commit_message(settings: Settings) -> str:
     """Generate and return a concise, single‑line commit message for the current step."""
     status_manager.update_status("Generating commit message")
@@ -445,7 +442,7 @@ def _generate_commit_message(settings: Settings) -> str:
     return commit_msg
 
 
-@log_call
+@log_call(include_args=["commit_msg"])
 def _commit_step(settings: Settings, commit_msg: str) -> None:
     """Stage and commit the changes for this step."""
     status_manager.update_status("Committing step")
@@ -460,29 +457,25 @@ def _commit_step(settings: Settings, commit_msg: str) -> None:
         log("No changes to commit.", message_type=LLMOutputType.STATUS)
 
 
-@log_call
+@log_call(include_args=[])
 def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict], Optional[str]]:
     """Ask the LLM whether the overall task is finished after this step."""
     status_manager.update_status("Checking if task is complete...")
     completion_prompt = (
         f"Is the task {repr(settings.task)} now complete based on the work done?\n"
         "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
-        "You may not finish your response at 'I have to check ...' or 'I have to inspect files ...' - you must use your tools to check directly.\n"
-        "There are two possible verdicts:\n"
-        "- COMPLETE COMPLETE COMPLETE if the task is fully done.\n"
-        "    In this case, provide a brief summary of the overall changes and how they address the task requirements.\n"
-        "    Go through the requirements one by one, and for each explain how it was addressed.\n"
-        "- CONTINUE CONTINUE CONTINUE if more work is needed.\n"
-        "    In this case, provide specific next steps to take, or objections to address.\n"
         "Here are the uncommitted changes:\n\n"
         f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "Here is the diff of the changes made in previous attempts:\n\n"
         f"{format_tool_code_output(run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
-        "The last line of your response must be the verdict:\n"
-        "  - COMPLETE COMPLETE COMPLETE if the task is fully done;\n"
-        "  - CONTINUE CONTINUE CONTINUE if more work is needed.\n"
-        "To remind you: you *must* output the *final* verdict in the last line of your response.\n"
-        "You can deliberate for a while before finally outputing the verdict."
+        "After you are done, output your review as a single message using this template:\n\n"
+        "    I am the task completion judge.\n\n"
+        "    Task requirements: [[list of task requirements and for each - whether it was addressed]]\n\n"
+        "    List of objections to address: [[list of objections concerning the implementation, or 'None']]\n\n"
+        "    Verdict: [[your verdict]], end of task completion review.\n\n"
+        "Your verdict must be one of the following:\n"
+        "- COMPLETE COMPLETE COMPLETE if the task is fully done.\n"
+        "- CONTINUE CONTINUE CONTINUE if more work is needed.\n"
     )
 
     if config.implement.completion.judge_extra_prompt:
@@ -498,7 +491,7 @@ def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict]
     return completion_verdict, completion_evaluation
 
 
-@log_call
+@log_call(include_args=["state"])
 def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep | FinalizingTask | StartingAttempt:
     # 1. generate commit message and commit the step
     commit_msg = _generate_commit_message(settings)
@@ -579,7 +572,7 @@ def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep 
             assert_never(state)
 
 
-@log_call
+@log_call(include_args=["task", "base_commit", "cwd"])
 def implementation_phase(
     *,
     task: str,
@@ -640,11 +633,11 @@ def implementation_phase(
 
 
 @log_call
-def _is_failed_attempt(attemp: AttemptResult) -> bool:
+def _is_failed_attempt(attempt: AttemptResult) -> bool:
     """
     Check if the attempt is a failed attempt.
     """
-    match attemp.verdict:
+    match attempt.verdict:
         case StepVerdict.SUCCESS | StepVerdict.PARTIAL:
             return False
         case StepVerdict.FAILURE | None:
@@ -653,7 +646,7 @@ def _is_failed_attempt(attemp: AttemptResult) -> bool:
             assert_never(other)
 
 
-@log_call
+@log_call(include_args=["state"])
 def _handle_JudgingAttempt(
     settings: Settings,
     state: JudgingAttempt,
@@ -730,7 +723,7 @@ def _handle_JudgingAttempt(
             assert_never(other)
 
 
-@log_call
+@log_call(include_args=["state"])
 def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> Done:
     try:
         diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=settings.cwd)

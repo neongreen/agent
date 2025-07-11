@@ -15,7 +15,7 @@ from agent.ui import status_manager
 from agent.utils import log
 
 
-@log_call
+@log_call(include_args=["task", "task_num", "base_rev", "cwd"])
 def process_task(
     task: str,
     task_num: int,
