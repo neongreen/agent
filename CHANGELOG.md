@@ -1,13 +1,16 @@
 # CHANGELOG
 
+(*) denotes changes made by the agent.
+
 ## v0-next
 
 Fixed:
-- Ctrl+C now stops the agent and shuts down the LLM process, reporting its PID.
+- Ctrl+C now stops the agent and shuts down the LLM process.
+- (*) Don't complain when there are no changes to commit.
+- Worked around gemini-cli outputting "Loaded cached credentials." in the response.
 
-(AGENT) Gracefully handle no changes to commit.
 Internal:
-- Added a mock test for the implementation phase
+- Added a mock test for the implementation phase.
 - `check_verdict` now uses the last found verdict and has unit tests.
 
 ## v0-2025.07.09

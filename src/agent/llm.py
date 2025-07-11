@@ -227,6 +227,8 @@ class LLM:
         if result["success"]:
             self.llm_process = result["process"]
             response = result["stdout"].strip()
+            if response.startswith("Loaded cached credentials."):
+                response = response.split("Loaded cached credentials.", maxsplit=1)[-1].strip()
             status_manager.update_status("Successful.")
             log(response, message_type=response_type)
             return response
@@ -296,7 +298,7 @@ def check_verdict[T: Enum](verdict_type: Type[T], judgment: str) -> T | None:
     """
     Checks judge's verdict based on a list of possible verdicts/statuses from an Enum.
 
-    This function assumes you asked the LLM to repeat the verdict several times in the first line.
+    This function assumes you asked the LLM to repeat the verdict several times.
     This is necessary because Opencode sometimes outputs misspelled verdicts.
 
     Args:
@@ -306,11 +308,10 @@ def check_verdict[T: Enum](verdict_type: Type[T], judgment: str) -> T | None:
     Returns:
         An Enum member indicating the verdict, or None if not found.
     """
-    first_line = judgment.split("\n", 1)[0].upper()
     last_verdict_end_index = -1
     found_verdict = None
     for verdict in verdict_type:
-        for match in re.finditer(r"\b" + re.escape(verdict.value) + r"\b", first_line):
+        for match in re.finditer(r"\b" + re.escape(verdict.value) + r"\b", judgment.upper()):
             if match.end() > last_verdict_end_index:
                 last_verdict_end_index = match.end()
                 found_verdict = verdict
