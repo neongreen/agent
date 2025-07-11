@@ -263,7 +263,6 @@ def transition(
             assert_never(event)
 
 
-@log_call(include_args=["state"])
 def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingStep | Done:
     """
     Generate a plan for the task.
@@ -286,7 +285,6 @@ def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingSte
         )
 
 
-@log_call(include_args=["state"])
 def _handle_StartingStep(settings: Settings, state: StartingStep) -> StartingAttempt:
     """
     Start a new step with the given plan.
@@ -299,7 +297,6 @@ def _handle_StartingStep(settings: Settings, state: StartingStep) -> StartingAtt
     )
 
 
-@log_call(include_args=["state"])
 def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostAttemptHooks:
     """
     Generate the implementation prompt for a single step, invoke the LLM,
@@ -351,7 +348,6 @@ def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostA
     )
 
 
-@log_call(include_args=["state"])
 def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) -> JudgingAttempt | StartingAttempt:
     # This one always runs and is supposed to have things like formatters, etc.
     if config.post_implementation_hook_command:
@@ -493,7 +489,6 @@ def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict]
     return completion_verdict, completion_evaluation
 
 
-@log_call(include_args=["state"])
 def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep | FinalizingTask | StartingAttempt:
     # 1. generate commit message and commit the step
     commit_msg = _generate_commit_message(settings)
@@ -642,7 +637,6 @@ def implementation_phase(
 # ────────────────────────────── Transitions ──────────────────────────────
 
 
-@log_call
 def _is_failed_attempt(attempt: AttemptResult) -> bool:
     """
     Check if the attempt is a failed attempt.
@@ -656,7 +650,6 @@ def _is_failed_attempt(attempt: AttemptResult) -> bool:
             assert_never(other)
 
 
-@log_call(include_args=["state"])
 def _handle_JudgingAttempt(
     settings: Settings,
     state: JudgingAttempt,
@@ -734,7 +727,6 @@ def _handle_JudgingAttempt(
             assert_never(other)
 
 
-@log_call(include_args=["state"])
 def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> Done:
     try:
         diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=settings.cwd)
