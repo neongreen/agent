@@ -600,15 +600,11 @@ def implementation_phase(
 
     try:
         # kick‑off
-        log(f"debug: transition {state} with Tick event", message_type=LLMOutputType.DEBUG)
         state = transition(state, Tick(), settings)
 
         # main loop: keep working while we're in `Attempt`, `Evaluate`, or `ReviewCompletion`
         while not isinstance(state, Done):
-            log(f"debug: transition {state} with Tick event", message_type=LLMOutputType.DEBUG)
             state = transition(state, Tick(), settings)
-
-        log(f"debug: final state {state}", message_type=LLMOutputType.DEBUG)
 
     except KeyboardInterrupt:
         log(
@@ -618,12 +614,24 @@ def implementation_phase(
         status_manager.update_status("Interrupted by user.", style="red")
         # TODO: still do the final commit and everything
 
+        match state:
+            case FinalizingTask() | Done():
+                status = state.status or ""
+            case (
+                StartingTask()
+                | StartingStep()
+                | StartingAttempt()
+                | PostAttemptHooks()
+                | JudgingAttempt()
+                | JudgingStep()
+            ):
+                status = ""
+            case _:
+                assert_never(state)
+
         state = Done(
             verdict="interrupted",
-            status=(
-                hasattr(state, "status") and state.status  # type: ignore
-            )
-            + "; Interrupted by user",
+            status=status + "; Interrupted by user",
         )
 
     return state
@@ -658,7 +666,8 @@ def _handle_JudgingAttempt(
     prev_failed_attempts = len(list(takewhile(_is_failed_attempt, reversed(state.attempts_log))))
 
     verdict, evaluation = _evaluate_step(settings, state.attempt_summary)
-    log(f"debug: step verdict {verdict}", message_type=LLMOutputType.DEBUG)
+    log(f"Verdict from the judgment: {verdict}", message_type=LLMOutputType.DEBUG)
+
     if not verdict:
         attempt_result = AttemptResult(
             verdict=None,
