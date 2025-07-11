@@ -8,13 +8,14 @@ from eliot import log_call
 
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
-from agent.llm import LLM, check_verdict
+from agent.llm import check_verdict
+from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, format_as_markdown_blockquote, log
 from agent.ui import status_manager
 
 
 @log_call(include_args=["task", "cwd"])
-def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
+def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
     """
     Iterative planning phase with Gemini approval.
 

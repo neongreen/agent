@@ -7,7 +7,7 @@ from eliot import log_call
 
 from agent.constants import STATE_FILE, TaskState
 from agent.git_utils import resolve_commit_specifier, setup_task_branch
-from agent.llm import LLM
+from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
 from agent.state_manager import read_state
 from agent.task_implementation import Done, TaskVerdict, implementation_phase
@@ -21,7 +21,7 @@ def process_task(
     *,
     base_rev: str,
     cwd: Path,
-    llm: LLM,
+    llm: LLMBase,
 ) -> Done:
     """
     Processes a single task through its planning and implementation phases.

@@ -1,28 +1,28 @@
 # CHANGELOG
 
-(*) denotes changes made by the agent.
+`[AGENT]` denotes changes made by this agent.
+`[CLINE]` is for the Cline extension.
 
 ## v0-next
 
-(*) Feedback about previous attempts is now rendered as a Markdown blockquote in the implementation prompt.
-
 Added:
-- Many more logs.
-- (*) The new `post-implementation-check-command` setting runs a command after post-implementation hook.
+- `[AGENT]` The new `post-implementation-check-command` setting runs a command after post-implementation hook.
   If it fails, the agent will make another attempt without going to the judge first.
-- (*) Switched status_manager.py to use rich.progress for status display, removing custom progress logic.
+- Many more logs.
 
 Changed:
 - Logs are now written to a file in the `~/.agent/logs/` directory, one file per run.
 
 Fixed:
-- Ctrl+C now stops the agent and shuts down the LLM process.
-  (Partial fix)
-- (*) Don't complain when there are no changes to commit.
+- `[AGENT]` Ctrl+C now stops the agent and shuts down the LLM process. (Partial fix)
+- `[AGENT]` Feedback about previous attempts is now rendered as a Markdown blockquote.
+- `[CLINE]` Don't complain when there are no changes to commit.
 - Worked around gemini-cli outputting "Loaded cached credentials." in the response.
 - Asking LLMs to output the verdict in the last line of their response - maybe it will improve verdict detection.
 
 Internal:
+- `[CLINE]` Refactored the `LLM` class.
+- `[AGENT]` Switched status_manager.py to use rich.progress for status display, removing custom progress logic.
 - Added a mock test for the implementation phase.
 
 ## v0-2025.07.09

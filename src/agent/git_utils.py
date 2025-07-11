@@ -9,7 +9,7 @@ from typing import Optional
 from eliot import log_call
 
 from agent.constants import TASK_META_DIR
-from agent.llm import LLM
+from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
 from agent.utils import run
 
@@ -114,7 +114,7 @@ def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
 
 
 @log_call(include_args=["task", "task_num", "base_rev", "cwd"])
-def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> bool:
+def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLMBase) -> bool:
     """
     Set up git branch for task.
 

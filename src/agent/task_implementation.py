@@ -30,7 +30,8 @@ from eliot import log_call
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
 from agent.git_utils import has_uncommitted_changes
-from agent.llm import LLM, check_verdict
+from agent.llm import check_verdict
+from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
 from agent.task_planning import planning_phase
 from agent.ui import status_manager
@@ -209,7 +210,7 @@ class Settings:
     task: str
     base_commit: str
     cwd: Path
-    llm: LLM
+    llm: LLMBase
     max_step_attempts: int = 10
     max_consecutive_failures: int = 3
 
@@ -575,7 +576,7 @@ def implementation_phase(
     task: str,
     base_commit: str,
     cwd: Path,
-    llm: LLM,
+    llm: LLMBase,
 ) -> Done:
     """
     high‑level driver that repeatedly feeds events into the state‑machine

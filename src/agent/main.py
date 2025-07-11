@@ -18,7 +18,7 @@ from agent import git_utils
 from agent.cli_settings import CLISettings
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import AGENT_TEMP_DIR
-from agent.llm import LLM
+from agent.llm import get_llm
 from agent.logging import LLMOutputType, display_task_summary
 from agent.state_manager import write_state
 from agent.task_orchestrator import process_task
@@ -93,17 +93,17 @@ def main() -> None:
             "Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, --openrouter, or --opencode."
         )
 
-    # This is the only place where LLM() should be instantiated.
+    # This is the only place where get_llm() should be called.
     if cli_settings.claude:
-        _llm_instance = LLM(engine="claude", model=cli_settings.model)
+        _llm_instance = get_llm(engine="claude", model=cli_settings.model)
     elif cli_settings.codex:
-        _llm_instance = LLM(engine="codex", model=cli_settings.model)
+        _llm_instance = get_llm(engine="codex", model=cli_settings.model)
     elif cli_settings.openrouter:
-        _llm_instance = LLM(engine="openrouter", model=cli_settings.model)
+        _llm_instance = get_llm(engine="openrouter", model=cli_settings.model)
     elif cli_settings.opencode:
-        _llm_instance = LLM(engine="opencode", model=cli_settings.model)
+        _llm_instance = get_llm(engine="opencode", model=cli_settings.model)
     else:
-        _llm_instance = LLM(engine="gemini", model=cli_settings.model)
+        _llm_instance = get_llm(engine="gemini", model=cli_settings.model)
 
     effective_cwd = Path(os.path.abspath(str(cli_settings.cwd) if cli_settings.cwd else os.getcwd()))
 
