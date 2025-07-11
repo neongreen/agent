@@ -27,7 +27,7 @@ def sanitize_branch_name(name: str) -> str:
     if not name.strip():
         return "no-name"
     name = name.lower()
-    name = re.sub(r"[^a-z0-9/.]+", "-", name)  # Replace invalid characters with a single hyphen
+    name = re.sub(r"[^a-z0-9/]+", "-", name)  # Replace invalid characters with a single hyphen
     name = name.strip("-")  # Remove leading/trailing hyphens
     if len(name) > 100:  # Truncate to a reasonable length
         name = name[:100]

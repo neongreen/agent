@@ -16,9 +16,9 @@ from agent.git_utils import (
 
 def test_sanitize_branch_name_invalid_chars() -> None:
     """Test that sanitize_branch_name removes invalid characters."""
-    raw: str = "Feature/New Stuff!*?"
+    raw: str = "Feature/New Stuff.Is Here!*?"
     cleaned: str = sanitize_branch_name(raw)
-    assert cleaned == "feature/new-stuff"
+    assert cleaned == "feature/new-stuff-is-here"
 
 
 def test_sanitize_branch_name_leading_trailing_hyphens() -> None:
