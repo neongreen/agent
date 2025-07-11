@@ -1,13 +1,15 @@
-"""Manages the display of the agent's current status and phase in the CLI using rich.progress."""
+"""Manages the display of the agent's current status and phase in the CLI using rich.progress and rich.layout."""
 
 import time
 from typing import Optional
 
 from rich.console import Console
+from rich.layout import Layout
 from rich.progress import Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
 
 
 console = Console()
+layout: Layout = Layout()
 _progress: Optional[Progress] = None
 _task_id: Optional[TaskID] = None
 _current_phase: Optional[str] = None
@@ -26,7 +28,7 @@ def _get_description() -> str:
 
 
 def init_status_bar() -> None:
-    global _progress, _task_id, _action_start_time
+    global _progress, _task_id, _action_start_time, layout
     if _progress is None:
         _progress = Progress(
             SpinnerColumn(style="green"),
@@ -36,6 +38,8 @@ def init_status_bar() -> None:
             transient=False,
             refresh_per_second=4,
         )
+        layout.split(Layout(name="logs", ratio=3), Layout(name="statusbar", size=3))
+        layout["statusbar"].update(_progress)
         _progress.start()
         _task_id = TaskID(_progress.add_task(_get_description(), total=None))
         _action_start_time = time.time()
@@ -61,7 +65,7 @@ def set_phase(phase: str, attempt_info: Optional[str] = None) -> None:
 
 
 def cleanup_status_bar() -> None:
-    global _progress, _task_id, _current_phase, _last_message, _action_start_time
+    global _progress, _task_id, _current_phase, _last_message, _action_start_time, layout
     if _progress is not None:
         _progress.stop()
         _progress = None
@@ -69,3 +73,11 @@ def cleanup_status_bar() -> None:
     _current_phase = None
     _last_message = None
     _action_start_time = None
+    layout["statusbar"].update("")
+    layout["logs"].update("")
+
+
+def render_layout(log_panel):
+    global layout
+    layout["logs"].update(log_panel)
+    console.print(layout)
