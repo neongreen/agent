@@ -5,6 +5,8 @@
 
 ## v0-next
 
+Changed:
+
 Added:
 - `[AGENT]` The new `post-implementation-check-command` setting runs a command after post-implementation hook.
   If it fails, the agent will make another attempt without going to the judge first.
@@ -23,8 +25,7 @@ Fixed:
 - Asking LLMs to output the verdict in the last line of their response - maybe it will improve verdict detection.
 
 Internal:
-- `[CLINE]` Refactored the `LLM` class.
-- `[AGENT]` Switched status_manager.py to use rich.progress for status display, removing custom progress logic.
+- `[CLINE]` Refactored the `LLM` class, centralized logging in `LLMBase`.
 - Added a mock test for the implementation phase.
 
 ## v0-2025.07.09

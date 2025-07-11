@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 from agent.llms.codex import Codex
-from agent.logging import LLMOutputType
 
 
 class OpenRouter(Codex):
@@ -18,16 +17,12 @@ class OpenRouter(Codex):
         if "OPENROUTER_API_KEY" not in os.environ:
             raise ValueError("OPENROUTER_API_KEY must be set for OpenRouter.")
 
-    def run(
+    def _run(
         self,
         prompt: str,
         yolo: bool,
         *,
         cwd: Path,
-        phase: Optional[str] = None,
-        step_number: Optional[int] = None,
-        attempt_number: Optional[int] = None,
-        response_type: LLMOutputType,
     ) -> Optional[str]:
         """Runs the OpenRouter LLM."""
         provider_url = "https://openrouter.ai/api/v1"
@@ -39,6 +34,4 @@ class OpenRouter(Codex):
             provider_url=provider_url,
             provider_env_key=provider_env_key,
             cwd=cwd,
-            phase=phase,
-            response_type=response_type,
         )

@@ -7,27 +7,15 @@ from typing import Optional
 
 from agent.constants import AGENT_TEMP_DIR
 from agent.llms.base import LLMBase
-from agent.logging import LLMOutputType, log
-from agent.ui import update_status
 from agent.utils import run
 
 
 class Codex(LLMBase):
     """Codex LLM provider."""
 
-    def run(
-        self,
-        prompt: str,
-        yolo: bool,
-        *,
-        cwd: Path,
-        phase: Optional[str] = None,
-        step_number: Optional[int] = None,
-        attempt_number: Optional[int] = None,
-        response_type: LLMOutputType,
-    ) -> Optional[str]:
+    def _run(self, prompt: str, yolo: bool, *, cwd: Path) -> Optional[str]:
         """Runs the Codex LLM."""
-        return self._run_codex(prompt, yolo, model=self.model, cwd=cwd, phase=phase, response_type=response_type)
+        return self._run_codex(prompt, yolo, model=self.model, cwd=cwd)
 
     def _run_codex(
         self,
@@ -38,8 +26,6 @@ class Codex(LLMBase):
         model: Optional[str] = None,
         provider_url: Optional[str] = None,
         provider_env_key: Optional[str] = None,
-        phase: Optional[str] = None,
-        response_type: LLMOutputType,
     ) -> Optional[str]:
         with tempfile.NamedTemporaryFile(
             "r", prefix="agent-codex-output", dir=AGENT_TEMP_DIR, delete=True
@@ -63,20 +49,16 @@ class Codex(LLMBase):
                 f"--output-last-message={temp_file_path}",
                 prompt,
             ]
-            log(prompt, message_type=LLMOutputType.PROMPT)
             result = run(
                 command,
                 "Calling Codex",
                 command_human=command[:-1] + ["<prompt>"],
                 directory=cwd,
-                status_message=phase or "Calling Codex",
                 log_stdout=False,
                 store_process=True,
             )
             if result.success:
-                update_status("Successful.")
                 response = temp_file.read().strip()
-                log(response, message_type=response_type)
                 return response
             else:
                 return None

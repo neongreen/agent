@@ -21,7 +21,6 @@ class LLMBase(ABC):
         self.model = model
         self.llm_process: Optional[subprocess.Popen] = None
 
-    @abstractmethod
     def run(
         self,
         prompt: str,
@@ -47,6 +46,28 @@ class LLMBase(ABC):
 
         Returns:
             The response from the LLM, or None if an error occurred.
+        """
+
+        log(prompt, message_type=LLMOutputType.PROMPT)
+        try:
+            response = self._run(prompt, yolo, cwd=cwd)
+            if response is not None:
+                log(f"LLM response: {response}", message_type=response_type)
+            return response
+        except Exception as e:
+            log(f"Error running LLM: {e}", message_type=LLMOutputType.ERROR)
+            return None
+
+    @abstractmethod
+    def _run(
+        self,
+        prompt: str,
+        yolo: bool,
+        *,
+        cwd: Path,
+    ) -> Optional[str]:
+        """
+        Runs the LLM with the given prompt. No logging, no status updates, etc.
         """
         raise NotImplementedError
 
