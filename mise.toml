@@ -1,3 +1,6 @@
+# Auto-activate the venv so that `python` and `python3` work even without `uv run`.
+settings.python.uv_venv_auto = true
+
 [tools]
 python = "3.13.5"
 uv = "0.7.18"
