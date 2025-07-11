@@ -11,7 +11,7 @@ from agent.constants import PLAN_FILE
 from agent.llm import check_verdict
 from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, format_as_markdown_blockquote, log
-from agent.ui import status_manager
+from agent.ui import set_phase, update_status
 
 
 @log_call(include_args=["task", "cwd"])
@@ -26,7 +26,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
     Returns:
         The approved plan as a string, or None if planning failed.
     """
-    status_manager.set_phase("Planning")
+    set_phase("Planning")
     log(f"Starting planning phase for task: {task}", message_type=LLMOutputType.STATUS)
 
     max_planning_rounds = 5
@@ -36,7 +36,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
     previous_review: Optional[str] = None
 
     for round_num in range(1, max_planning_rounds + 1):
-        status_manager.set_phase("Planning", f"{round_num}/{max_planning_rounds}")
+        set_phase("Planning", f"{round_num}/{max_planning_rounds}")
         log((f"Planning round {round_num}"), message_type=LLMOutputType.STATUS)
 
         # Ask Gemini to create/revise plan
@@ -61,7 +61,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
         if config.plan.planner_extra_prompt:
             plan_prompt += f"\n\n{config.plan.planner_extra_prompt}"
 
-        status_manager.update_status("Getting a plan")
+        update_status("Getting a plan")
         raw_plan = llm.run(
             plan_prompt,
             yolo=True,
@@ -73,7 +73,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
         )
         current_plan = format_as_markdown_blockquote(raw_plan) if raw_plan else None
         if not current_plan:
-            status_manager.update_status("Failed to get a plan.", style="red")
+            update_status("Failed to get a plan.", style="red")
             log("Failed to get a plan", message_type=LLMOutputType.ERROR)
             return None
 
@@ -94,7 +94,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
         if config.plan.judge_extra_prompt:
             review_prompt += f"\n\n{config.plan.judge_extra_prompt}"
 
-        status_manager.update_status("Reviewing plan")
+        update_status("Reviewing plan")
 
         raw_review = llm.run(
             review_prompt,
@@ -109,18 +109,18 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
         current_verdict = check_verdict(PlanVerdict, raw_review or "")
 
         if not current_review:
-            status_manager.update_status("Failed to get a plan evaluation.", style="red")
+            update_status("Failed to get a plan evaluation.", style="red")
             log("LLM provided no output", message_type=LLMOutputType.ERROR)
 
         elif not current_verdict:
-            status_manager.update_status("Failed to get a plan verdict.", style="red")
+            update_status("Failed to get a plan verdict.", style="red")
             log(
                 f"Couldn't determine the verdict from the plan evaluation. Evaluation was:\n\n{current_review}",
                 message_type=LLMOutputType.ERROR,
             )
 
         elif current_verdict == PlanVerdict.APPROVED:
-            status_manager.update_status(f"Approved in round {round_num}.")
+            update_status(f"Approved in round {round_num}.")
             log((f"Plan approved in round {round_num}"), message_type=LLMOutputType.STATUS)
             log(current_plan, message_type=LLMOutputType.PLAN)
 
@@ -134,7 +134,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
             return plan
 
         elif current_verdict == PlanVerdict.REJECTED:
-            status_manager.update_status(f"Plan rejected in round {round_num}.")
+            update_status(f"Plan rejected in round {round_num}.")
             log(f"Plan rejected in round {round_num}", message_type=LLMOutputType.STATUS)
             previous_plan = current_plan  # Store for next round's prompt
             previous_review = current_review  # Store for next round's prompt
@@ -143,7 +143,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
             assert_never(current_verdict)
 
     log(f"Planning failed after {max_planning_rounds} rounds", message_type=LLMOutputType.ERROR)
-    status_manager.update_status("Planning failed.", style="red")
+    update_status("Planning failed.", style="red")
     return None
 
 

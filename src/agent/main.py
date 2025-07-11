@@ -22,7 +22,7 @@ from agent.llm import get_llm
 from agent.logging import LLMOutputType, display_task_summary
 from agent.state_manager import write_state
 from agent.task_orchestrator import process_task
-from agent.ui import status_manager
+from agent.ui import get_ui_manager, set_phase
 from agent.utils import log
 
 
@@ -85,11 +85,6 @@ def main() -> None:
         rich.print(f"```json\n{config.model_dump_json(indent=2)}\n```")
         exit(0)
 
-    log(
-        f"Configuration loaded:\n```json\n{config.model_dump_json(indent=2)}\n```",
-        LLMOutputType.STATUS,
-    )
-
     if [
         cli_settings.claude,
         cli_settings.codex,
@@ -101,42 +96,47 @@ def main() -> None:
             "Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, --openrouter, --opencode, or --mock."
         )
 
-    # This is the only place where get_llm() should be called.
-    if cli_settings.mock:
-        from agent.llms.mock import MockLLM
+    with get_ui_manager():
+        log(
+            f"Configuration loaded:\n```json\n{config.model_dump_json(indent=2)}\n```",
+            LLMOutputType.STATUS,
+        )
 
-        _llm_instance = MockLLM(model=cli_settings.model, mock_delay=cli_settings.mock_delay)
-    elif cli_settings.claude:
-        _llm_instance = get_llm(engine="claude", model=cli_settings.model)
-    elif cli_settings.codex:
-        _llm_instance = get_llm(engine="codex", model=cli_settings.model)
-    elif cli_settings.openrouter:
-        _llm_instance = get_llm(engine="openrouter", model=cli_settings.model)
-    elif cli_settings.opencode:
-        _llm_instance = get_llm(engine="opencode", model=cli_settings.model)
-    else:
-        _llm_instance = get_llm(engine="gemini", model=cli_settings.model)
+        # This is the only place where get_llm() should be called.
+        if cli_settings.mock:
+            from agent.llms.mock import MockLLM
 
-    effective_cwd = Path(os.path.abspath(str(cli_settings.cwd) if cli_settings.cwd else os.getcwd()))
+            _llm_instance = MockLLM(model=cli_settings.model, mock_delay=cli_settings.mock_delay)
+        elif cli_settings.claude:
+            _llm_instance = get_llm(engine="claude", model=cli_settings.model)
+        elif cli_settings.codex:
+            _llm_instance = get_llm(engine="codex", model=cli_settings.model)
+        elif cli_settings.openrouter:
+            _llm_instance = get_llm(engine="openrouter", model=cli_settings.model)
+        elif cli_settings.opencode:
+            _llm_instance = get_llm(engine="opencode", model=cli_settings.model)
+        else:
+            _llm_instance = get_llm(engine="gemini", model=cli_settings.model)
 
-    # Ensure the .agent directory exists
-    if not AGENT_TEMP_DIR.exists():
-        log(f"Creating agent directory at {AGENT_TEMP_DIR}", message_type=LLMOutputType.STATUS)
-        AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        effective_cwd = Path(os.path.abspath(str(cli_settings.cwd) if cli_settings.cwd else os.getcwd()))
 
-    # XXX: Initialize state file if it doesn't exist.
-    # But actually, always erase the state. We don't have proper resumability yet since we don't save evaluations, etc.
-    # if not STATE_FILE.exists():
-    write_state({})
+        # Ensure the .agent directory exists
+        if not AGENT_TEMP_DIR.exists():
+            log(f"Creating agent directory at {AGENT_TEMP_DIR}", message_type=LLMOutputType.STATUS)
+            AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    base = cli_settings.base if cli_settings.base is not None else config.default_base or "main"
+        # XXX: Initialize state file if it doesn't exist.
+        # But actually, always erase the state. We don't have proper resumability yet since we don't save evaluations, etc.
+        # if not STATE_FILE.exists():
+        write_state({})
 
-    log(f"Repo directory: {effective_cwd}", LLMOutputType.STATUS)
+        base = cli_settings.base if cli_settings.base is not None else config.default_base or "main"
 
-    log("Starting agentic loop", LLMOutputType.STATUS)
+        log(f"Repo directory: {effective_cwd}", LLMOutputType.STATUS)
 
-    with status_manager.get_status_manager():
-        status_manager.set_phase("Agent initialized")
+        log("Starting agentic loop", LLMOutputType.STATUS)
+
+        set_phase("Agent initialized")
 
         selected_tasks = cli_settings.prompt or []
         task_results = []
@@ -193,7 +193,7 @@ def main() -> None:
                         )
 
         log("Agentic loop completed", LLMOutputType.STATUS)
-        status_manager.set_phase("Agentic loop completed")
+        set_phase("Agentic loop completed")
         display_task_summary(task_results)
 
     # Ensure we are back in the original effective_cwd

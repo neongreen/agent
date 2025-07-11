@@ -11,7 +11,7 @@ from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
 from agent.state_manager import read_state
 from agent.task_implementation import Done, TaskVerdict, implementation_phase
-from agent.ui import status_manager
+from agent.ui import set_phase, update_status
 
 
 @log_call(include_args=["task", "task_num", "base_rev", "cwd"])
@@ -35,7 +35,7 @@ def process_task(
     Returns:
         Implementation status.
     """
-    status_manager.set_phase(f"Task {task_num}")
+    set_phase(f"Task {task_num}")
     log((f"Processing task {task_num}: {task}"), message_type=LLMOutputType.STATUS)
 
     task_id = f"task_{task_num}"
@@ -104,9 +104,9 @@ def process_task(
         if STATE_FILE.exists():
             STATE_FILE.unlink()
             log(("Agent state file removed."), message_type=LLMOutputType.STATUS)
-            status_manager.update_status("Agent state file removed.")
+            update_status("Agent state file removed.")
     except OSError as e:
         log(f"Error removing agent state file: {e}", message_type=LLMOutputType.ERROR)
-        status_manager.update_status("Error removing agent state file.", style="red")
+        update_status("Error removing agent state file.", style="red")
 
     return result

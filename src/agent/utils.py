@@ -10,7 +10,7 @@ from typing import Optional
 from eliot import start_action
 
 from agent.logging import LLMOutputType, log
-from agent.ui import status_manager
+from agent.ui import update_status
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,7 @@ def run(
         shell=shell,
     ) as action:
         if status_message:
-            status_manager.update_status(status_message)
+            update_status(status_message)
 
         abs_directory = abspath(str(directory))
 

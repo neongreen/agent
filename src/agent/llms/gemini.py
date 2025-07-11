@@ -6,7 +6,7 @@ from typing import Optional
 
 from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
-from agent.ui import status_manager
+from agent.ui import update_status
 from agent.utils import run
 
 
@@ -61,7 +61,7 @@ class Gemini(LLMBase):
             response = result.stdout.strip()
             if response.startswith("Loaded cached credentials."):
                 response = response.split("Loaded cached credentials.", maxsplit=1)[-1].strip()
-            status_manager.update_status("Successful.")
+            update_status("Successful.")
             log(response, message_type=response_type)
             return response
         else:

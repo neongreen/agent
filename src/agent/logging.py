@@ -13,6 +13,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agent.constants import AGENT_STATE_BASE_DIR
+from agent.ui import print_to_main
 
 
 class LLMOutputType(StrEnum):
@@ -76,38 +77,35 @@ def __print_formatted_message(message: str, message_type: LLMOutputType):
     """
     try:
         if message_type == LLMOutputType.STATUS:
-            console.print(Panel(Markdown(message), title="Status", title_align="left", border_style="magenta"))
+            print_to_main(Panel(Markdown(message), title="Status", title_align="left", border_style="magenta"))
         elif message_type == LLMOutputType.DEBUG:
-            console.print(Panel(Markdown(message), title="Debug", title_align="left", border_style="slate_blue3"))
+            print_to_main(Panel(Markdown(message), title="Debug", title_align="left", border_style="slate_blue3"))
         elif message_type == LLMOutputType.PLAN:
-            console.print(Panel(Markdown(message), title="Proposed plan", title_align="left", border_style="green"))
+            print_to_main(Panel(Markdown(message), title="Proposed plan", title_align="left", border_style="green"))
         elif message_type == LLMOutputType.EVALUATION:
-            console.print(
+            print_to_main(
                 Panel(Markdown(message), title="Reviewer evaluation", title_align="left", border_style="yellow")
             )
         elif message_type == LLMOutputType.TOOL_EXECUTION:
-            console.print(Panel(Markdown(message), title="Tool execution", title_align="left", border_style="cyan"))
+            print_to_main(Panel(Markdown(message), title="Tool execution", title_align="left", border_style="cyan"))
         elif message_type == LLMOutputType.TOOL_OUTPUT:
-            console.print(Panel(Markdown(message), title="Tool output", title_align="left", border_style="white"))
+            print_to_main(Panel(Markdown(message), title="Tool output", title_align="left", border_style="white"))
         elif message_type == LLMOutputType.TOOL_ERROR:
-            console.print(Panel(Markdown(message), title="Tool error", title_align="left", border_style="red"))
+            print_to_main(Panel(Markdown(message), title="Tool error", title_align="left", border_style="red"))
         elif message_type == LLMOutputType.ERROR:
-            console.print(Panel(Markdown(message), title="Error", title_align="left", border_style="red"))
+            print_to_main(Panel(Markdown(message), title="Error", title_align="left", border_style="red"))
         elif message_type == LLMOutputType.PROMPT:
-            console.print(Panel(Markdown(message), title="Prompt", title_align="left", border_style="bright_blue"))
+            print_to_main(Panel(Markdown(message), title="Prompt", title_align="left", border_style="bright_blue"))
         elif message_type == LLMOutputType.LLM_RESPONSE:
-            console.print(
+            print_to_main(
                 Panel(Markdown(message), title="LLM response", title_align="left", border_style="bright_magenta")
             )
         else:
-            console.print(message)
+            print_to_main(message)
     except MarkupError:
-        console.print(Text.from_markup(message).plain)
-
-    console.print("\n", end="")
+        print_to_main(Panel(Text.from_markup(message)))
 
 
-# print_formatted_message is now internal; use log instead.
 def log(
     message: str,
     message_type: LLMOutputType,

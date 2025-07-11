@@ -6,7 +6,7 @@ from typing import Optional
 from agent.constants import AGENT_STATE_BASE_DIR
 from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
-from agent.ui import status_manager
+from agent.ui import update_status
 from agent.utils import run
 
 
@@ -56,7 +56,7 @@ class Opencode(LLMBase):
         if result.success:
             response = result.stdout.strip()
             content = response.split("Text  ", maxsplit=1)[-1].strip()
-            status_manager.update_status("Successful.")
+            update_status("Successful.")
             log(content, message_type=response_type)
             return content
         else:

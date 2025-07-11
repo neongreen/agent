@@ -8,7 +8,7 @@ from typing import Optional
 from agent.constants import AGENT_TEMP_DIR
 from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
-from agent.ui import status_manager
+from agent.ui import update_status
 from agent.utils import run
 
 
@@ -74,7 +74,7 @@ class Codex(LLMBase):
                 store_process=True,
             )
             if result.success:
-                status_manager.update_status("Successful.")
+                update_status("Successful.")
                 response = temp_file.read().strip()
                 log(response, message_type=response_type)
                 return response
