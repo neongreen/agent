@@ -40,6 +40,11 @@ class CLISettings(BaseSettings):
         description="Use Opencode CLI for LLM calls",
         alias="opencode",
     )
+    mock: bool = Field(
+        default=False,
+        description="Use MockLLM for LLM calls",
+        alias="mock",
+    )
     show_config: bool = Field(
         default=False,
         description="Show the current configuration and exit",

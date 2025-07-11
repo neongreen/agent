@@ -12,12 +12,13 @@ from agent.llms.base import LLMBase
 from agent.llms.claude import Claude
 from agent.llms.codex import Codex
 from agent.llms.gemini import Gemini
+from agent.llms.mock import MockLLM
 from agent.llms.opencode import Opencode
 from agent.llms.openrouter import OpenRouter
 
 
 def get_llm(
-    engine: Literal["gemini", "claude", "codex", "openrouter", "opencode"],
+    engine: Literal["gemini", "claude", "codex", "openrouter", "opencode", "mock"],
     model: Optional[str],
 ) -> LLMBase:
     """
@@ -40,6 +41,8 @@ def get_llm(
         return Gemini(model)
     elif engine == "opencode":
         return Opencode(model)
+    elif engine == "mock":
+        return MockLLM(model)
     else:
         raise ValueError(f"Unknown LLM engine: {engine}.")
 

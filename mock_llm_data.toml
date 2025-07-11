@@ -1,0 +1,9 @@
+# This will be used when the agent is run with the `--mock` flag.
+
+[[prompts]]
+prompt = "Hello"
+response = "Hi there!"
+
+[[prompts]]
+prompt = "What is your name?"
+response = "I am a mock LLM."

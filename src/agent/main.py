@@ -60,6 +60,7 @@ def main() -> None:
     parser.add_argument("--codex", action="store_true", help="Use Codex CLI for LLM calls")
     parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter (via Codex CLI) for LLM calls")
     parser.add_argument("--opencode", action="store_true", help="Use Opencode CLI for LLM calls")
+    parser.add_argument("--mock", action="store_true", help="Use MockLLM for LLM calls")
     parser.add_argument(
         "--model", type=str, default=None, help="Specify the model name for gemini, claude, codex, or opencode"
     )
@@ -88,9 +89,15 @@ def main() -> None:
         LLMOutputType.STATUS,
     )
 
-    if [cli_settings.claude, cli_settings.codex, cli_settings.openrouter, cli_settings.opencode].count(True) > 1:
+    if [
+        cli_settings.claude,
+        cli_settings.codex,
+        cli_settings.openrouter,
+        cli_settings.opencode,
+        cli_settings.mock,
+    ].count(True) > 1:
         raise ValueError(
-            "Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, --openrouter, or --opencode."
+            "Cannot specify multiple LLM engines at once. Choose one of --claude, --codex, --openrouter, --opencode, or --mock."
         )
 
     # This is the only place where get_llm() should be called.
@@ -102,6 +109,8 @@ def main() -> None:
         _llm_instance = get_llm(engine="openrouter", model=cli_settings.model)
     elif cli_settings.opencode:
         _llm_instance = get_llm(engine="opencode", model=cli_settings.model)
+    elif cli_settings.mock:
+        _llm_instance = get_llm(engine="mock", model=cli_settings.model)
     else:
         _llm_instance = get_llm(engine="gemini", model=cli_settings.model)
 
