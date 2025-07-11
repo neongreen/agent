@@ -4,6 +4,8 @@
 
 ## v0-next
 
+(*) Feedback about previous attempts is now rendered as a Markdown blockquote in the implementation prompt.
+
 Added:
 - Many more logs.
 - (*) The new `post-implementation-check-command` setting runs a command after post-implementation hook.

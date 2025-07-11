@@ -309,8 +309,10 @@ def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostA
     Each run is called an "attempt".
     """
 
+    from agent.logging import format_as_markdown_blockquote
+
     prev_attempt_feedback = (
-        f"And the feedback about your previous attempt:\n\n{state.attempts_log[-1].feedback}\n\n"
+        f"And the feedback about your previous attempt:\n\n{format_as_markdown_blockquote(state.attempts_log[-1].feedback or '')}\n\n"
         if state.attempts_log
         else ""
     )
