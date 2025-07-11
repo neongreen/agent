@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import StrEnum, auto
 
 import eliot
+import eliot.json
 from eliot import FileDestination
 from rich.console import Console
 from rich.errors import MarkupError
@@ -42,6 +43,17 @@ class LLMOutputType(StrEnum):
 console = Console()
 
 
+def log_json_encoder(obj):
+    """
+    Custom JSON encoder that builds on Eliot's JSON encoder but doesn't fail on non-serializable objects.
+    """
+
+    try:
+        return eliot.json.json_default(obj)
+    except TypeError:
+        return repr(obj)
+
+
 _logging_initialized = False
 
 
@@ -55,7 +67,7 @@ def init_logging() -> None:
     timestamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
     log_file = AGENT_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    eliot.add_destinations(FileDestination(file=open(log_file, "ab")))
+    eliot.add_destinations(FileDestination(file=open(log_file, "ab"), json_default=log_json_encoder))
 
 
 def __print_formatted_message(message: str, message_type: LLMOutputType):

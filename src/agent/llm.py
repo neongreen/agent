@@ -6,8 +6,6 @@ import re
 from enum import StrEnum
 from typing import Literal, Optional, Type
 
-from eliot import log_call
-
 from agent.llms.base import LLMBase
 from agent.llms.claude import Claude
 from agent.llms.codex import Codex
@@ -50,7 +48,6 @@ def get_llm(
 ### Utils ###
 
 
-@log_call
 def check_verdict[T: StrEnum](verdict_type: Type[T], judgment: str) -> T | None:
     """
     Checks judge's verdict based on a list of possible verdicts/statuses from an Enum.

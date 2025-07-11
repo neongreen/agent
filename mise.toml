@@ -16,6 +16,7 @@ run = "uv run agent"
 description = "Run all checks and tests"
 depends = ["lint", "pyright", "check-schema", "test"]
 
+
 [tasks.logs]
 description = "Show the logs of the agent (~/.agent/logs/)"
 quiet = true
@@ -29,12 +30,15 @@ run = """
   fi
   echo "--- $usage_file ---"
   eval "args=(${usage_eliot_tree_args:-})"
-  uv run eliot-tree "$usage_file" "${args[@]}"
+  cat "$usage_file" \
+    | jq -c 'del(.state.steps_log, .result.steps_log, .state.attempts_log, .result.attempts_log, .event)' 2>/dev/null \
+    | jq -c 'select(.message_type // "" | startswith("log.") | not)' \
+    | uv run eliot-tree "${args[@]}"
   echo "--- $usage_file ---"
 """
 
-[tasks.logs-good]
-description = "Show the logs of the agent (~/.agent/logs/)"
+[tasks."logs:full"]
+description = "Show the logs of the agent (~/.agent/logs/) without filtering"
 quiet = true
 usage = """
   flag "--file <file>" "The log file to view (default: latest log file in ~/.agent/logs/)"
@@ -46,11 +50,7 @@ run = """
   fi
   echo "--- $usage_file ---"
   eval "args=(${usage_eliot_tree_args:-})"
-  cat "$usage_file" \
-    | jq -c 'select(has("message_human") | not)' \
-    | jq -c 'del(.state.steps_log, .result.steps_log, .state.attempts_log, .result.attempts_log, .event)' 2>/dev/null \
-    | jq -c 'select(.action_type != "run")' \
-    | uv run eliot-tree "${args[@]}"
+  uv run eliot-tree "$usage_file" "${args[@]}"
   echo "--- $usage_file ---"
 """
 

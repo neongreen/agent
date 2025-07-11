@@ -120,9 +120,9 @@ def run(
             )
 
             action.add_success_fields(
-                exit_code=result.exit_code,
-                stdout=result.stdout,
-                stderr=result.stderr,
+                **({"exit_code": result.exit_code} if result.exit_code != 0 else {}),
+                **({"stdout": result.stdout} if result.stdout.strip() else {}),
+                **({"stderr": result.stderr} if result.stderr.strip() else {}),
             )
 
             return result

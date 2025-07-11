@@ -25,7 +25,7 @@ from itertools import takewhile
 from pathlib import Path
 from typing import Literal, Optional, assert_never
 
-from eliot import log_call
+from eliot import log_call, start_action
 
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
@@ -215,7 +215,6 @@ class Settings:
     max_consecutive_failures: int = 3
 
 
-@log_call(include_args=["state", "event"])
 def transition(
     state: State,
     event: Event,
@@ -228,40 +227,46 @@ def transition(
     inside the relevant branches, so the caller only needs to keep feeding
     events until a terminal state (`Complete` or `Failed`) is reached
     """
-    log(
-        f"Entering transition with state: {state.__class__.__name__}, event: {event.__class__.__name__}",
-        message_type=LLMOutputType.DEBUG,
-    )
-    match state, event:
-        case StartingTask(), Tick():
-            # TODO: this can actually be a class method?
-            return _handle_StartingTask(settings, state)
 
-        case StartingStep(), Tick():
-            return _handle_StartingStep(settings, state)
+    with start_action(
+        action_type=f"transition: {state.__class__.__name__}, {event.__class__.__name__}",
+        **({"state": state.__dataclass_fields__} if state.__dataclass_fields__ else {}),
+        **({"event": event.__dataclass_fields__} if event.__dataclass_fields__ else {}),
+    ) as action:
+        match state, event:
+            case StartingTask(), Tick():
+                # TODO: this can actually be a class method?
+                result = _handle_StartingTask(settings, state)
 
-        case StartingAttempt(), Tick():
-            return _handle_StartingAttempt(settings, state)
+            case StartingStep(), Tick():
+                result = _handle_StartingStep(settings, state)
 
-        case PostAttemptHooks(), Tick():
-            return _handle_PostAttemptHooks(settings, state)
+            case StartingAttempt(), Tick():
+                result = _handle_StartingAttempt(settings, state)
 
-        case JudgingAttempt(), Tick():
-            return _handle_JudgingAttempt(settings, state)
+            case PostAttemptHooks(), Tick():
+                result = _handle_PostAttemptHooks(settings, state)
 
-        case JudgingStep(), Tick():
-            return _handle_JudgingStep(settings, state)
+            case JudgingAttempt(), Tick():
+                result = _handle_JudgingAttempt(settings, state)
 
-        case FinalizingTask(), Tick():
-            return _handle_FinalizingTask(settings, state)
+            case JudgingStep(), Tick():
+                result = _handle_JudgingStep(settings, state)
 
-        case Done(), Tick():
-            log("Done state reached, no further transitions.", message_type=LLMOutputType.DEBUG)
-            return state
+            case FinalizingTask(), Tick():
+                result = _handle_FinalizingTask(settings, state)
 
-        case _, _:
-            assert_never(state)
-            assert_never(event)
+            case Done(), Tick():
+                log("Done state reached, no further transitions.", message_type=LLMOutputType.DEBUG)
+                result = state
+
+            case _, _:
+                assert_never(state)
+                assert_never(event)
+
+        action.addSuccessFields(_=result.__class__.__name__, **result.__dataclass_fields__)
+
+        return result
 
 
 def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingStep | Done:
