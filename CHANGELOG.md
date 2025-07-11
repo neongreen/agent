@@ -6,6 +6,8 @@
 
 Added:
 - Many more logs.
+- (*) The new `post-implementation-check-command` setting runs a command after post-implementation hook.
+  If it fails, the agent will make another attempt without going to the judge first.
 
 Changed:
 - Logs are now written to a file in the `~/.agent/logs/` directory, one file per run.

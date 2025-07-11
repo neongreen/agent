@@ -3,10 +3,11 @@
 import os
 import shlex
 import subprocess
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from posixpath import abspath
-from typing import Optional, TypedDict
+from typing import Optional
 
 import eliot
 from eliot import FileDestination, log_call, log_message
@@ -72,7 +73,8 @@ def format_as_markdown_blockquote(text: str) -> str:
     return "\n".join(blockquote_lines)
 
 
-class RunResult(TypedDict):
+@dataclass(frozen=True)
+class RunResult:
     """Represents the result of a shell command execution."""
 
     exit_code: int
@@ -101,12 +103,13 @@ def run(
     """
     Run command and log it.
 
+    Errors are logged but *not* raised as exceptions.
+
     Args:
         command: Command to run as a list of arguments.
         description: Optional description of the command for logging.
         directory: Optional working directory to run the command in as a Path.
         command_human: If present, will be used in console output instead of the full command.
-        config: Agent configuration for logging settings.
         store_process: If True, the subprocess.Popen object will be stored in the RunResult.
     """
 
@@ -158,18 +161,17 @@ def run(
                 message_type=LLMOutputType.TOOL_ERROR,
             )
 
-        result_dict: RunResult = {
-            "exit_code": process.returncode,
-            "stdout": stdout,
-            "stderr": stderr,
-            "success": process.returncode == 0,
-            "error": None,
-            "signal": None,
-            "background_pids": None,
-            "process_group_pgid": process.pid,
-            "process": process,  # Always store the process object
-        }
-        return result_dict
+        return RunResult(
+            exit_code=process.returncode,
+            stdout=stdout,
+            stderr=stderr,
+            success=process.returncode == 0,
+            error=None,
+            signal=None,
+            background_pids=None,
+            process_group_pgid=process.pid,
+            process=process,  # Always store the process object
+        )
 
     except Exception as e:
         log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
@@ -200,24 +202,24 @@ def format_tool_code_output(
           Used for human-readable output. Only applies to `stdout` and `stderr`.
     """
     formatted_output = []
-    if "stdout" in tool_output and tool_output["stdout"] != "":
+    if tool_output.stdout:
         if code_block_language:
-            formatted_output.append(f"stdout: \n\n```{code_block_language}\n{tool_output['stdout']}\n```\n")
+            formatted_output.append(f"stdout: \n\n```{code_block_language}\n{tool_output.stdout}\n```\n")
         else:
-            formatted_output.append(f"stdout: \n{tool_output['stdout']}\n")
-    if "stderr" in tool_output and tool_output["stderr"] != "":
+            formatted_output.append(f"stdout: \n{tool_output.stdout}\n")
+    if tool_output.stderr:
         if code_block_language:
-            formatted_output.append(f"stderr: \n\n```{code_block_language}\n{tool_output['stderr']}\n```\n")
+            formatted_output.append(f"stderr: \n\n```{code_block_language}\n{tool_output.stderr}\n```\n")
         else:
-            formatted_output.append(f"stderr: \n{tool_output['stderr']}\n")
-    if "error" in tool_output and tool_output["error"]:
-        formatted_output.append(f"error: {tool_output['error']}\n")
-    if "exit_code" in tool_output and tool_output["exit_code"] is not None:
-        formatted_output.append(f"exit_code: {tool_output['exit_code']}\n")
-    if "signal" in tool_output and tool_output["signal"] is not None:
-        formatted_output.append(f"signal: {tool_output['signal']}\n")
-    if "background_pids" in tool_output and tool_output["background_pids"]:
-        formatted_output.append(f"background_pids: {tool_output['background_pids']}\n")
-    if "process_group_pgid" in tool_output and tool_output["process_group_pgid"] is not None:
-        formatted_output.append(f"process_group_pgid: {tool_output['process_group_pgid']}\n")
+            formatted_output.append(f"stderr: \n{tool_output.stderr}\n")
+    if tool_output.error is not None:
+        formatted_output.append(f"error: {tool_output.error}\n")
+    if tool_output.exit_code is not None:
+        formatted_output.append(f"exit_code: {tool_output.exit_code}\n")
+    if tool_output.signal is not None:
+        formatted_output.append(f"signal: {tool_output.signal}\n")
+    if tool_output.background_pids:
+        formatted_output.append(f"background_pids: {tool_output.background_pids}\n")
+    if tool_output.process_group_pgid is not None:
+        formatted_output.append(f"process_group_pgid: {tool_output.process_group_pgid}\n")
     return "\n".join(formatted_output)

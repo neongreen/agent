@@ -8,6 +8,10 @@ post-implementation-hook-command = """
   MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run format
 """
 
+post-implementation-check-command = """
+  MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run --jobs=1 check
+"""
+
 [plan]
 planner-extra-prompt = """
   Do not propose writing tests, running automatic tests, or doing testing manually.

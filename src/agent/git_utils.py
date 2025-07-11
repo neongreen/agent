@@ -46,10 +46,10 @@ def get_existing_branch_names(*, cwd: Path) -> list[str]:
         A list of existing branch names.
     """
     result = run(["git", "branch", "--list"], "Listing existing branches", directory=cwd)
-    if not result["success"]:
+    if not result.success:
         log("Failed to list existing branches.", LLMOutputType.TOOL_ERROR)
         return []
-    return [line.strip().replace("* ", "") for line in result["stdout"].split("\n") if line.strip()]
+    return [line.strip().replace("* ", "") for line in result.stdout.split("\n") if line.strip()]
 
 
 @log_call
@@ -102,12 +102,12 @@ def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
     command = ["git", "rev-parse", "--verify", specifier]
     result = run(command, f"Resolving {specifier} to commit SHA", directory=cwd)
 
-    if result["success"] and result["stdout"].strip():
-        log(f"Resolved {specifier} to {result['stdout'].strip()}", LLMOutputType.STATUS)
-        return result["stdout"].strip()
+    if result.success and result.stdout.strip():
+        log(f"Resolved {specifier} to {result.stdout.strip()}", LLMOutputType.STATUS)
+        return result.stdout.strip()
     else:
         log(
-            f"Failed to resolve commit specifier: {specifier}. Stderr: {result['stderr']}",
+            f"Failed to resolve commit specifier: {specifier}. Stderr: {result.stderr}",
             LLMOutputType.TOOL_ERROR,
         )
         return None
@@ -171,7 +171,7 @@ def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLM) -> 
         directory=cwd,
     )
 
-    if not result["success"]:
+    if not result.success:
         log(f"Failed to create branch {branch_name}", message_type=LLMOutputType.TOOL_ERROR)
         return False
 
@@ -207,10 +207,10 @@ def get_current_branch(*, cwd: Path) -> Optional[str]:
         The current branch name, or None if not found.
     """
     result = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], "Getting current branch", directory=cwd)
-    if result["success"]:
-        return result["stdout"].strip()
+    if result.success:
+        return result.stdout.strip()
     else:
-        log(f"Failed to get current branch. Stderr: {result['stderr']}", LLMOutputType.TOOL_ERROR)
+        log(f"Failed to get current branch. Stderr: {result.stderr}", LLMOutputType.TOOL_ERROR)
         return None
 
 
@@ -226,11 +226,11 @@ def get_current_commit_hash(*, cwd: Path) -> Optional[str]:
         The current commit hash, or None if not found.
     """
     result = run(["git", "rev-parse", "HEAD"], "Getting current commit hash", directory=cwd)
-    if result["success"]:
-        return result["stdout"].strip()
+    if result.success:
+        return result.stdout.strip()
     else:
         log(
-            f"Failed to get current commit hash. Stderr: {result['stderr']}",
+            f"Failed to get current commit hash. Stderr: {result.stderr}",
             message_type=LLMOutputType.TOOL_ERROR,
         )
         return None
@@ -253,12 +253,12 @@ def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
     commit = resolve_commit_specifier(rev, cwd=cwd)
     command = ["git", "worktree", "add", str(path), commit]
     result = run(command, f"Adding worktree {path}", directory=cwd)
-    if result["success"]:
+    if result.success:
         log(f"Successfully added worktree at {path}", message_type=LLMOutputType.STATUS)
         return True
     else:
         log(
-            f"Failed to add worktree at {path}. Stderr: {result['stderr']}",
+            f"Failed to add worktree at {path}. Stderr: {result.stderr}",
             message_type=LLMOutputType.TOOL_ERROR,
         )
         return False
@@ -279,12 +279,12 @@ def remove_worktree(path: Path, *, cwd: Path) -> bool:
     log(f"Removing worktree at {path}", message_type=LLMOutputType.STATUS)
     command = ["git", "worktree", "remove", "--force", str(path)]
     result = run(command, f"Removing worktree {path}", directory=cwd)
-    if result["success"]:
+    if result.success:
         log(f"Successfully removed worktree at {path}", message_type=LLMOutputType.STATUS)
         return True
     else:
         log(
-            f"Failed to remove worktree at {path}. Stderr: {result['stderr']}",
+            f"Failed to remove worktree at {path}. Stderr: {result.stderr}",
             LLMOutputType.TOOL_ERROR,
         )
         return False
@@ -302,11 +302,11 @@ def has_uncommitted_changes(*, cwd: Path) -> bool:
         True if there are uncommitted changes, False otherwise.
     """
     result = run(["git", "status", "--porcelain"], "Checking for uncommitted changes", directory=cwd)
-    if result["success"]:
-        return bool(result["stdout"].strip())
+    if result.success:
+        return bool(result.stdout.strip())
     else:
         log(
-            f"Failed to check for uncommitted changes. Stderr: {result['stderr']}",
+            f"Failed to check for uncommitted changes. Stderr: {result.stderr}",
             LLMOutputType.TOOL_ERROR,
         )
         return False

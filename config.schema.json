@@ -90,6 +90,12 @@
       "title": "Post-Implementation-Hook-Command",
       "type": "string"
     },
+    "post-implementation-check-command": {
+      "default": "",
+      "description": "Shell command to run after the post-implementation-hook-command. If it fails, the agent makes another attempt and its stdout/stderr is the feedback.",
+      "title": "Post-Implementation-Check-Command",
+      "type": "string"
+    },
     "$schema": {
       "type": "string",
       "description": "The schema URL for validation."

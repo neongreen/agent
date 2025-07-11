@@ -113,8 +113,8 @@ class LLM:
             log_stdout=False,
             store_process=True,
         )
-        if result["success"]:
-            response = result["stdout"].strip()
+        if result.success:
+            response = result.stdout.strip()
             status_manager.update_status("Successful.")
             log(response, message_type=response_type)
             return response
@@ -165,7 +165,7 @@ class LLM:
                 log_stdout=False,
                 store_process=True,
             )
-            if result["success"]:
+            if result.success:
                 status_manager.update_status("Successful.")
                 response = temp_file.read().strip()
                 log(response, message_type=response_type)
@@ -226,9 +226,9 @@ class LLM:
             log_stdout=False,
             store_process=True,
         )
-        if result["success"]:
-            self.llm_process = result["process"]
-            response = result["stdout"].strip()
+        if result.success:
+            self.llm_process = result.process
+            response = result.stdout.strip()
             if response.startswith("Loaded cached credentials."):
                 response = response.split("Loaded cached credentials.", maxsplit=1)[-1].strip()
             status_manager.update_status("Successful.")
@@ -283,8 +283,8 @@ class LLM:
             log_stdout=False,
             store_process=True,
         )
-        if result["success"]:
-            response = result["stdout"].strip()
+        if result.success:
+            response = result.stdout.strip()
             content = response.split("Text  ", maxsplit=1)[-1].strip()
             status_manager.update_status("Successful.")
             log(content, message_type=response_type)

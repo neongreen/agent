@@ -2,6 +2,7 @@ import unittest.mock
 from pathlib import Path
 
 from agent.task_implementation import Done, Settings, TaskVerdict, implementation_phase
+from agent.utils import RunResult
 
 
 def test_implementation_phase() -> None:
@@ -34,11 +35,23 @@ def test_implementation_phase() -> None:
         base_commit="main",
     )
 
-    # Patch the dependencies
+    # Patch the dependencies.
+    #
+    # TODO: how to make sure the types match the original function signatures?
     with (
         unittest.mock.patch(
             "agent.task_implementation.run",
-            return_value={"success": True, "stdout": "", "stderr": ""},
+            return_value=RunResult(
+                success=True,
+                stdout="",
+                stderr="",
+                exit_code=0,
+                error=None,
+                signal=None,
+                background_pids=None,
+                process_group_pgid=None,
+                process=None,
+            ),
         ) as _mock_run,
         unittest.mock.patch("agent.task_implementation.log") as _mock_log,
         unittest.mock.patch("agent.task_implementation.status_manager.update_status") as _mock_update_status,

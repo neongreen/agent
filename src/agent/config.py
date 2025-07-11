@@ -86,6 +86,10 @@ class AgentSettings(BaseSettings):
         default="",
         description="Shell command to run after each implementation step, e.g. 'ruff format'",
     )
+    post_implementation_check_command: str = Field(
+        default="",
+        description="Shell command to run after the post-implementation-hook-command. If it fails, the agent makes another attempt and its stdout/stderr is the feedback.",
+    )
 
     model_config = SettingsConfigDict(
         populate_by_name=True,

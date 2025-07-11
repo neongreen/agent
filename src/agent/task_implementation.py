@@ -17,6 +17,8 @@ Overview of the state machine:
     - if the task is not complete, we will be starting a new step
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from itertools import takewhile
@@ -122,6 +124,16 @@ class StartingAttempt(StepState):
 
 
 @dataclass(frozen=True, slots=True)
+class PostAttemptHooks(AttemptState):
+    """
+    The agent is going to run post-attempt hooks like `post-implementation-hook-command`
+    and `post-implementation-check-command`.
+    """
+
+    attempt_summary: Optional[str]
+
+
+@dataclass(frozen=True, slots=True)
 class JudgingAttempt(AttemptState):
     """
     Represents the state where the agent reviews the work done and whether more attempts are needed.
@@ -170,7 +182,16 @@ class Done:
     status: Optional[str]
 
 
-type State = StartingTask | StartingStep | StartingAttempt | JudgingAttempt | JudgingStep | FinalizingTask | Done
+type State = (
+    StartingTask
+    | StartingStep
+    | StartingAttempt
+    | PostAttemptHooks
+    | JudgingAttempt
+    | JudgingStep
+    | FinalizingTask
+    | Done
+)
 
 # Events
 
@@ -220,6 +241,9 @@ def transition(
 
         case StartingAttempt(), Tick():
             return _handle_StartingAttempt(settings, state)
+
+        case PostAttemptHooks(), Tick():
+            return _handle_PostAttemptHooks(settings, state)
 
         case JudgingAttempt(), Tick():
             return _handle_JudgingAttempt(settings, state)
@@ -276,7 +300,7 @@ def _handle_StartingStep(settings: Settings, state: StartingStep) -> StartingAtt
 
 
 @log_call
-def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> JudgingAttempt:
+def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostAttemptHooks:
     """
     Generate the implementation prompt for a single step, invoke the LLM,
     and return its summary of work done.
@@ -317,11 +341,53 @@ def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> Judgi
         impl_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.LLM_RESPONSE
     )
 
-    return JudgingAttempt(
+    return PostAttemptHooks(
         plan=state.plan,
         steps_log=state.steps_log,
         attempts_log=state.attempts_log,
         attempt_summary=attempt_summary,
+    )
+
+
+@log_call
+def _handle_PostAttemptHooks(settings: "Settings", state: PostAttemptHooks) -> JudgingAttempt | StartingAttempt:
+    # This one always runs and is supposed to have things like formatters, etc.
+    if config.post_implementation_hook_command:
+        run(
+            config.post_implementation_hook_command,
+            "Running post-step hook",
+            directory=settings.cwd,
+            shell=True,
+        )
+
+    # This one *checks* code after the attempt. If it fails, we will make another attempt.
+    if config.post_implementation_check_command:
+        check_result = run(
+            config.post_implementation_check_command,
+            "Running post-implementation check",
+            directory=settings.cwd,
+            shell=True,
+        )
+        if check_result.exit_code != 0:
+            feedback = (
+                f"Post-implementation check command failed with exit code {check_result.exit_code}.\n"
+                f"Stdout: {check_result.stdout}\nStderr: {check_result.stderr}"
+            )
+            attempt_result = AttemptResult(
+                verdict=StepVerdict.PARTIAL,
+                feedback=feedback,
+            )
+            return StartingAttempt(
+                plan=state.plan,
+                steps_log=state.steps_log,
+                attempts_log=state.attempts_log + [attempt_result],
+            )
+
+    return JudgingAttempt(
+        plan=state.plan,
+        steps_log=state.steps_log,
+        attempts_log=state.attempts_log,
+        attempt_summary=state.attempt_summary,
     )
 
 
@@ -433,16 +499,7 @@ def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict]
 
 
 @log_call
-def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep | FinalizingTask:
-    # TODO: this should be somewhere else? separate state?
-    if hasattr(config, "post_implementation_hook_command") and config.post_implementation_hook_command:
-        run(
-            config.post_implementation_hook_command,
-            "Running post-step hook command",
-            directory=settings.cwd,
-            shell=True,
-        )
-
+def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep | FinalizingTask | StartingAttempt:
     # 1. generate commit message and commit the step
     commit_msg = _generate_commit_message(settings)
     _commit_step(settings, commit_msg)
@@ -677,7 +734,7 @@ def _handle_JudgingAttempt(
 def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> Done:
     try:
         diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=settings.cwd)
-        if not diff["success"]:
+        if not diff.success:
             run(["git", "add", "."], "Staging uncommitted changes", directory=settings.cwd)
             run(
                 ["git", "commit", "-m", "Final commit (auto)"],
