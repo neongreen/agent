@@ -11,10 +11,10 @@ Fixed:
 - Ctrl+C now stops the agent and shuts down the LLM process.
 - (*) Don't complain when there are no changes to commit.
 - Worked around gemini-cli outputting "Loaded cached credentials." in the response.
+- Asking LLMs to output the verdict in the last line of their response - maybe it will improve verdict detection.
 
 Internal:
 - Added a mock test for the implementation phase.
-- `check_verdict` now uses the last found verdict and has unit tests.
 
 ## v0-2025.07.09
 

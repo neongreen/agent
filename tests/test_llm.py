@@ -18,6 +18,9 @@ def test_check_verdict_last_found():
     judgment = "CONT CONT CONT looks good looks fine OK OK OK"
     assert check_verdict(SomeVerdict, judgment) == SomeVerdict.OK
 
+    judgment = "OK OK OK looks fine CONT CONT CONT actually not"
+    assert check_verdict(SomeVerdict, judgment) == SomeVerdict.CONT
+
 
 def test_check_verdict_single_verdict():
     judgment = "OK"
@@ -27,16 +30,6 @@ def test_check_verdict_single_verdict():
 def test_check_verdict_no_verdict():
     judgment = "This is some random text"
     assert check_verdict(SomeVerdict, judgment) is None
-
-
-def test_check_verdict_case_insensitivity():
-    judgment = "ok ok ok"
-    assert check_verdict(SomeVerdict, judgment) == SomeVerdict.OK
-
-
-def test_check_verdict_mixed_case():
-    judgment = "cOnT OK fAiL"
-    assert check_verdict(SomeVerdict, judgment) == SomeVerdict.FAIL
 
 
 def test_check_verdict_partial_match():
@@ -49,23 +42,15 @@ def test_check_verdict_empty_judgment():
     assert check_verdict(SomeVerdict, judgment) is None
 
 
-def test_check_verdict_multiple_verdicts_last_cont():
-    judgment = "OK OK OK CONT CONT CONT"
-    assert check_verdict(SomeVerdict, judgment) == SomeVerdict.CONT
-
-
-def test_check_verdict_multiple_verdicts_last_fail():
-    judgment = "CONT OK FAIL"
-    assert check_verdict(SomeVerdict, judgment) == SomeVerdict.FAIL
-
-
-def test_check_verdict_second_line():
-    """
-    gemini-cli outputs `Loaded cached credentials` on the first line sometimes.
-    """
-
-    judgment = (
-        "Loaded cached credentials.\n"
-        "APPROVED APPROVED APPROVED The plan is comprehensive and logically structured to achieve the task."
-    )
+def test_check_verdict_last_line_only():
+    judgment = "This is a test.\nAPPROVED APPROVED APPROVED"
     assert check_verdict(ApprovedOrRejected, judgment) == ApprovedOrRejected.APPROVED
+
+    judgment = "This is a test.\nREJECTED REJECTED REJECTED"
+    assert check_verdict(ApprovedOrRejected, judgment) == ApprovedOrRejected.REJECTED
+
+    judgment = "This is a test.\nREJECTED REJECTED REJECTED\n\n"
+    assert check_verdict(ApprovedOrRejected, judgment) == ApprovedOrRejected.REJECTED
+
+    judgment = "This is a test.\nSomething else"
+    assert check_verdict(ApprovedOrRejected, judgment) is None

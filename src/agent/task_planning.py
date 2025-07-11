@@ -78,13 +78,12 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
         review_prompt = (
             f"Review this plan for task {repr(task)}:\n\n"
             f"{current_plan}\n\n"
-            "The first line of your response should be the verdict:\n"
+            "Provide a brief, one sentence comment on the plan, or detailed feedback on what needs to be improved.\n"
+            "The last line of your response should be the verdict:\n"
             "  - APPROVED APPROVED APPROVED if the plan is good enough to implement (even if minor improvements are possible);\n"
             "  - REJECTED REJECTED REJECTED if the plan must be revised.\n"
-            "If you approve the plan, provide a brief, one sentence comment on the plan.\n"
-            "If you reject the plan, provide detailed feedback on what needs to be improved.\n"
-            "To remind you: you *must* output the *final* verdict in the first line of your response.\n"
-            "If you need to do any checks, do them before outputting the verdict.\n"
+            "To remind you: you *must* output the *final* verdict in the last line of your response.\n"
+            "You can deliberate for a while before finally outputing the verdict."
         )
 
         if config.plan.judge_extra_prompt:

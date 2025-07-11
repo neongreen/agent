@@ -15,15 +15,15 @@ def test_implementation_phase() -> None:
         if "Create a detailed implementation plan" in prompt:
             return "This is a mock plan."
         if "Review this plan" in prompt:
-            return "APPROVED APPROVED APPROVED\nLooks good"
-        if "Evaluate if this step makes progress" in prompt:
-            return "SUCCESS SUCCESS SUCCESS\nExcellent progress"
+            return "Looks good\nAPPROVED APPROVED APPROVED"
+        if "Evaluate if these changes make progress" in prompt:
+            return "Excellent progress\nSUCCESS SUCCESS SUCCESS"
         if "now complete based on the work done" in prompt:
-            return "COMPLETE COMPLETE COMPLETE\nLooks good"
+            return "Looks good\nCOMPLETE COMPLETE COMPLETE"
         if "Implement the next step" in prompt and "This is your attempt #1" in prompt:
             return "I think I'm done here."
         else:
-            raise ValueError(f"Unexpected prompt: {prompt}")
+            raise ValueError(f"The mock LLM doesn't know how to respond to this prompt: {prompt}")
 
     llm_mock.run.side_effect = llm_run_side_effect
 
@@ -53,7 +53,7 @@ def test_implementation_phase() -> None:
         )
 
         # Assert the final result
-        assert result == Done(verdict=TaskVerdict.COMPLETE, status="COMPLETE COMPLETE COMPLETE\nLooks good")
+        assert result == Done(verdict=TaskVerdict.COMPLETE, status="Looks good\nCOMPLETE COMPLETE COMPLETE")
 
         # # Check that `run` was called for git operations
         # assert any("git add" in call.args[0] for call in mock_run.call_args_list)

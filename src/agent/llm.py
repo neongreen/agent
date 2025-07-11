@@ -297,9 +297,7 @@ class LLM:
 def check_verdict[T: Enum](verdict_type: Type[T], judgment: str) -> T | None:
     """
     Checks judge's verdict based on a list of possible verdicts/statuses from an Enum.
-
-    This function assumes you asked the LLM to repeat the verdict several times.
-    This is necessary because Opencode sometimes outputs misspelled verdicts.
+    The verdict is expected to be in the **last** line.
 
     Args:
         verdict_type: An Enum class containing possible status values (e.g. ImplementationVerdict).
@@ -308,11 +306,17 @@ def check_verdict[T: Enum](verdict_type: Type[T], judgment: str) -> T | None:
     Returns:
         An Enum member indicating the verdict, or None if not found.
     """
-    last_verdict_end_index = -1
-    found_verdict = None
-    for verdict in verdict_type:
-        for match in re.finditer(r"\b" + re.escape(verdict.value) + r"\b", judgment.upper()):
-            if match.end() > last_verdict_end_index:
-                last_verdict_end_index = match.end()
-                found_verdict = verdict
-    return found_verdict
+    lines = judgment.strip().splitlines()
+    if not lines:
+        return None
+
+    last_line = lines[-1].upper()
+    matches = re.findall("|".join([r"\b" + re.escape(verdict.value) + r"\b" for verdict in verdict_type]), last_line)
+
+    if not matches:
+        return None
+    else:
+        last_verdict = matches[-1]
+        for verdict in verdict_type:
+            if last_verdict == verdict.value.upper():
+                return verdict
