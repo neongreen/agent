@@ -1,6 +1,6 @@
 """Handles the planning phase of the agent's execution, including iterative plan generation and review."""
 
-from enum import Enum
+from enum import StrEnum, auto
 from pathlib import Path
 from typing import Optional, assert_never
 
@@ -146,10 +146,10 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
     return None
 
 
-class PlanVerdict(Enum):
+class PlanVerdict(StrEnum):
     """
     Enum for verdicts from the plan evaluation judge.
     """
 
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
+    APPROVED = auto()
+    REJECTED = auto()

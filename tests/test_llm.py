@@ -1,17 +1,17 @@
-from enum import Enum
+from enum import StrEnum, auto
 
 from agent.llm import check_verdict
 
 
-class SomeVerdict(Enum):
-    CONT = "CONT"
-    OK = "OK"
-    FAIL = "FAIL"
+class SomeVerdict(StrEnum):
+    CONT = auto()
+    OK = auto()
+    FAIL = auto()
 
 
-class ApprovedOrRejected(Enum):
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
+class ApprovedOrRejected(StrEnum):
+    APPROVED = auto()
+    REJECTED = auto()
 
 
 def test_check_verdict_last_found():

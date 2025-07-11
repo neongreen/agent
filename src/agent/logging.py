@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from enum import Enum, auto
+from enum import StrEnum, auto
 
 import eliot
 from eliot import FileDestination, log_message
@@ -14,7 +14,7 @@ from rich.text import Text
 from agent.constants import AGENT_STATE_BASE_DIR
 
 
-class LLMOutputType(Enum):
+class LLMOutputType(StrEnum):
     """Represents the different types of LLM outputs."""
 
     PLAN = auto()

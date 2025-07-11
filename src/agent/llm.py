@@ -9,7 +9,7 @@ import os
 import re
 import subprocess
 import tempfile
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal, Optional, Type
 
@@ -297,29 +297,29 @@ class LLM:
 
 
 @log_call
-def check_verdict[T: Enum](verdict_type: Type[T], judgment: str) -> T | None:
+def check_verdict[T: StrEnum](verdict_type: Type[T], judgment: str) -> T | None:
     """
     Checks judge's verdict based on a list of possible verdicts/statuses from an Enum.
     The verdict is expected to be in the **last** line.
 
     Args:
-        verdict_type: An Enum class containing possible status values (e.g. ImplementationVerdict).
+        verdict_type: A StrEnum class containing possible status values (e.g. ImplementationVerdict).
         judgment: A string with the entire judgment from the LLM.
 
     Returns:
-        An Enum member indicating the verdict, or None if not found.
+        An enum member indicating the verdict, or None if not found.
     """
     lines = judgment.strip().splitlines()
     if not lines:
         return None
 
     last_line = lines[-1].upper()
-    matches = re.findall("|".join([r"\b" + re.escape(verdict.value) + r"\b" for verdict in verdict_type]), last_line)
+    matches = re.findall("|".join([r"\b" + re.escape(verdict.upper()) + r"\b" for verdict in verdict_type]), last_line)
 
     if not matches:
         return None
     else:
         last_verdict = matches[-1]
         for verdict in verdict_type:
-            if last_verdict == verdict.value.upper():
+            if last_verdict == verdict.upper():
                 return verdict

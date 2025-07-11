@@ -20,7 +20,7 @@ Overview of the state machine:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum, auto
 from itertools import takewhile
 from pathlib import Path
 from typing import Literal, Optional, assert_never
@@ -37,23 +37,23 @@ from agent.ui import status_manager
 from agent.utils import format_tool_code_output, run
 
 
-class StepVerdict(Enum):
+class StepVerdict(StrEnum):
     """Enum for possible verdicts from the step judge."""
 
-    SUCCESS = "SUCCESS"
+    SUCCESS = auto()
     """Work done here is a good step forward."""
-    PARTIAL = "PARTIAL"
+    PARTIAL = auto()
     """Keep work done in this step so far, but it needs more iteration."""
-    FAILURE = "FAILURE"
+    FAILURE = auto()
     """Work done in this step is not useful and should be discarded."""
 
 
-class TaskVerdict(Enum):
+class TaskVerdict(StrEnum):
     """Enum for possible verdicts from the task completion judge."""
 
-    COMPLETE = "COMPLETE"
+    COMPLETE = auto()
     """Task is fully completed."""
-    CONTINUE = "CONTINUE"
+    CONTINUE = auto()
     """More work is needed."""
 
 

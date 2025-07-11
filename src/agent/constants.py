@@ -2,11 +2,11 @@
 
 import uuid
 from datetime import datetime
-from enum import Enum, auto
+from enum import StrEnum, auto
 from pathlib import Path
 
 
-class TaskState(Enum):
+class TaskState(StrEnum):
     """Represents the different states a task can be in."""
 
     PLAN = auto()
