@@ -18,11 +18,8 @@ planner-extra-prompt = """
   If you do, your plan will be rejected.
   The exception is if the **task** explicitly asks to write or run tests.
 
-  Please include this step in your plan: `uv run pyright --project .`.
-  It must pass before the task is considered complete.
-
   Please include updating the changelog in your plan, if the task results in a change to the codebase.
-  The changelog entry for your changes must start with "(AGENT)".
+  The changelog entry for your changes must start with "(*)".
 
   Please note in your plan that all agent-generated commits must start with (AGENT) in the commit message,
   and the task statement (cleaned up if needed) in the commit message body.
@@ -49,8 +46,5 @@ judge-extra-prompt = """
 [implement]
 completion.judge-extra-prompt = """
   You must not accept the implementation until:
-
-  - You run `uv run pyright --project .` and it passes without errors.
-  - You run `uv run pytest -v` and it passes without errors.
   - The changelog has been updated accordingly (if the task results in a change to the codebase).
 """
