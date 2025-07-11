@@ -1,5 +1,6 @@
 """Manages the display of the agent's current status and phase in the CLI."""
 
+import time
 from typing import Optional
 
 from rich.columns import Columns
@@ -16,9 +17,11 @@ _current_phase: Optional[str] = None
 _current_attempt_info: Optional[str] = None
 _last_message: Optional[str] = None
 _is_active: bool = False
+_action_start_time: Optional[float] = None
 
 
 def _update_display() -> None:
+    global _action_start_time
     """Updates the live display with the current phase, attempt info, and last message."""
     global live_display, _current_phase, _current_attempt_info, _last_message
     if live_display is not None:
@@ -48,6 +51,11 @@ def _update_display() -> None:
             content_elements = []
             if _is_active:
                 content_elements.append(spinner)
+                if _action_start_time:
+                    elapsed = int(time.time() - _action_start_time)
+                    mins, secs = divmod(elapsed, 60)
+                    elapsed_str = f"{mins}:{secs:02d}"
+                    content_elements.append(Text(f"[{elapsed_str}]", style="yellow"))
             content_elements.extend([phase_text, attempt_text, message_text])
             content = Columns(content_elements)
             live_display.update(Panel(content, border_style="dim"))
@@ -73,25 +81,29 @@ def init_status_bar() -> None:
 
 
 def update_status(message: str, style: str = "dim") -> None:
-    global _last_message, _is_active
+    global _last_message, _is_active, _action_start_time
     _last_message = message
     _is_active = True
+    if _action_start_time is None:
+        _action_start_time = time.time()
     _update_display()
 
 
 def set_phase(phase: str, attempt_info: Optional[str] = None) -> None:
-    global _current_phase, _current_attempt_info, _last_message
+    global _current_phase, _current_attempt_info, _last_message, _action_start_time
     _current_phase = phase
     _current_attempt_info = attempt_info
     _last_message = None  # Clear last message when a new phase comes in
+    _action_start_time = time.time()
     _update_display()
 
 
 def cleanup_status_bar() -> None:
-    global live_display, _current_phase, _last_message
+    global live_display, _current_phase, _last_message, _action_start_time
     if live_display is not None:
         # Manually exit the context
         live_display.__exit__(None, None, None)
         live_display = None
     _current_phase = None
     _last_message = None
+    _action_start_time = None

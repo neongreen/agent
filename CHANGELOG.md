@@ -8,6 +8,7 @@ Added:
 - Many more logs.
 - (*) The new `post-implementation-check-command` setting runs a command after post-implementation hook.
   If it fails, the agent will make another attempt without going to the judge first.
+- (*) The status bar spinner now displays the elapsed time for the current action.
 
 Changed:
 - Logs are now written to a file in the `~/.agent/logs/` directory, one file per run.
