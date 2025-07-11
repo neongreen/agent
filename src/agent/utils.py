@@ -10,7 +10,7 @@ from posixpath import abspath
 from typing import Optional
 
 import eliot
-from eliot import FileDestination, log_call, log_message
+from eliot import FileDestination, log_call, log_message, start_action
 from rich.console import Console
 
 from agent.constants import AGENT_STATE_BASE_DIR
@@ -113,9 +113,6 @@ def run(
         store_process: If True, the subprocess.Popen object will be stored in the RunResult.
     """
 
-    if status_message:
-        status_manager.update_status(status_message)
-
     if isinstance(command, str):
         command_display = command
     else:
@@ -126,66 +123,93 @@ def run(
     else:
         command_human_display = shlex.join(command_human)
 
-    abs_directory = abspath(str(directory))
+    with start_action(
+        action_type="run",
+        command=command_display,
+        description=description,
+        directory=directory,
+        shell=shell,
+    ) as action:
+        if status_message:
+            status_manager.update_status(status_message)
 
-    log(
-        f"Running command: {command_display} in {abs_directory}",
-        message_human=(description + "\n\n" if description else "")
-        + f"Running command: `{command_human_display}` in `{abs_directory}`",
-        message_type=LLMOutputType.TOOL_EXECUTION,
-    )
+        abs_directory = abspath(str(directory))
 
-    try:
-        process = subprocess.Popen(
-            command,
-            text=True,
-            cwd=abs_directory,
-            shell=shell,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        log(
+            f"Running command: {command_display} in {abs_directory}",
+            message_human=(description + "\n\n" if description else "")
+            + f"Running command: `{command_human_display}` in `{abs_directory}`",
+            message_type=LLMOutputType.TOOL_EXECUTION,
         )
-        stdout, stderr = process.communicate()
 
-        if process.returncode != 0:
-            log(
-                f"Command {command_display} failed with exit code {process.returncode}\nStdout: {stdout}\nStderr: {stderr}",
-                message_human=(
-                    "\n\n".join(
-                        [
-                            f"Command `{command_human_display}` failed with exit code {process.returncode}",
-                            f"Stdout:\n\n```\n{stdout}\n```" if stdout.strip() else "Stdout: empty",
-                            f"Stderr:\n\n```\n{stderr}\n```" if stderr.strip() else "Stderr: empty",
-                        ]
-                    )
-                ),
-                message_type=LLMOutputType.TOOL_ERROR,
+        try:
+            process = subprocess.Popen(
+                command,
+                text=True,
+                cwd=abs_directory,
+                shell=shell,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            stdout, stderr = process.communicate()
+
+            if process.returncode != 0:
+                log(
+                    f"Command {command_display} failed with exit code {process.returncode}\nStdout: {stdout}\nStderr: {stderr}",
+                    message_human=(
+                        "\n\n".join(
+                            [
+                                f"Command `{command_human_display}` failed with exit code {process.returncode}",
+                                f"Stdout:\n\n```\n{stdout}\n```" if stdout.strip() else "Stdout: empty",
+                                f"Stderr:\n\n```\n{stderr}\n```" if stderr.strip() else "Stderr: empty",
+                            ]
+                        )
+                    ),
+                    message_type=LLMOutputType.TOOL_ERROR,
+                )
+
+            result = RunResult(
+                exit_code=process.returncode,
+                stdout=stdout,
+                stderr=stderr,
+                success=process.returncode == 0,
+                error=None,
+                signal=None,
+                background_pids=None,
+                process_group_pgid=process.pid,
+                process=process,  # Always store the process object
             )
 
-        return RunResult(
-            exit_code=process.returncode,
-            stdout=stdout,
-            stderr=stderr,
-            success=process.returncode == 0,
-            error=None,
-            signal=None,
-            background_pids=None,
-            process_group_pgid=process.pid,
-            process=process,  # Always store the process object
-        )
+            action.add_success_fields(
+                exit_code=result.exit_code,
+                stdout=result.stdout,
+                stderr=result.stderr,
+            )
 
-    except Exception as e:
-        log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
-        return RunResult(
-            exit_code=-1,
-            stdout="",
-            stderr=str(e),
-            success=False,
-            error=str(e),
-            signal=None,
-            background_pids=None,
-            process_group_pgid=None,
-            process=None,
-        )
+            return result
+
+        except Exception as e:
+            log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
+            result = RunResult(
+                exit_code=-1,
+                stdout="",
+                stderr=str(e),
+                success=False,
+                error=str(e),
+                signal=None,
+                background_pids=None,
+                process_group_pgid=None,
+                process=None,
+            )
+
+            action.add_success_fields(
+                exit_code=result.exit_code,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                error=result.error,
+            )
+
+            return result
 
 
 # TODO: this seems weird

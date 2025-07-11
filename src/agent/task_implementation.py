@@ -371,7 +371,7 @@ def _handle_PostAttemptHooks(settings: "Settings", state: PostAttemptHooks) -> J
         if check_result.exit_code != 0:
             feedback = (
                 f"Post-implementation check command failed with exit code {check_result.exit_code}.\n"
-                f"Stdout: {check_result.stdout}\nStderr: {check_result.stderr}"
+                + format_tool_code_output(check_result)
             )
             attempt_result = AttemptResult(
                 verdict=StepVerdict.PARTIAL,
