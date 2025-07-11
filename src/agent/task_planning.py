@@ -77,16 +77,20 @@ def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:
             print_formatted_message("Failed to get a plan", message_type=LLMOutputType.ERROR)
             return None
 
-        # Ask Gemini to review the plan
+        # Ask LLM to review the plan.
+        # We want the review text to have something before and after the verdict -
+        # otherwise OpenCode likes outputting e.g. "VED" instead of "APPROVED".
         review_prompt = (
             f"Review this plan for task {repr(task)}:\n\n"
             f"{current_plan}\n\n"
-            "Provide a brief, one sentence comment on the plan, or detailed feedback on what needs to be improved.\n"
-            "The last line of your response should be the verdict:\n"
-            "  - APPROVED APPROVED APPROVED if the plan is good enough to implement (even if minor improvements are possible);\n"
-            "  - REJECTED REJECTED REJECTED if the plan must be revised.\n"
-            "To remind you: you *must* output the *final* verdict in the last line of your response.\n"
-            "You can deliberate for a while before finally outputing the verdict."
+            "After you are done, output your review as a single message using this template:\n\n"
+            "    I am the plan judge.\n\n"
+            "    Feedback: [[your plan feedback]]\n\n"
+            "    List of objections to address: [[list of objections to address, or 'None']]\n\n"
+            "    Verdict: [[your verdict]], end of plan review.\n\n"
+            "Your verdict must be one of the following:\n"
+            "- APPROVED APPROVED APPROVED if the plan is good enough to implement (even if minor improvements are possible);\n"
+            "- REJECTED REJECTED REJECTED if the plan must be revised.\n"
         )
 
         if config.plan.judge_extra_prompt:

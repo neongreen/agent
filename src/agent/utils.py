@@ -228,14 +228,50 @@ def format_tool_code_output(
     formatted_output = []
     if tool_output.stdout:
         if code_block_language:
-            formatted_output.append(f"stdout: \n\n```{code_block_language}\n{tool_output.stdout}\n```\n")
+            formatted_output.append(
+                "\n".join(
+                    [
+                        "stdout: ",
+                        f"```{code_block_language}",
+                        tool_output.stdout,
+                        "```",
+                    ]
+                )
+            )
         else:
-            formatted_output.append(f"stdout: \n{tool_output.stdout}\n")
+            formatted_output.append(
+                "\n".join(
+                    [
+                        "stdout: ",
+                        "```",
+                        tool_output.stdout,
+                        "```",
+                    ]
+                )
+            )
     if tool_output.stderr:
         if code_block_language:
-            formatted_output.append(f"stderr: \n\n```{code_block_language}\n{tool_output.stderr}\n```\n")
+            formatted_output.append(
+                "\n".join(
+                    [
+                        "stderr: ",
+                        f"```{code_block_language}",
+                        tool_output.stderr,
+                        "```",
+                    ]
+                )
+            )
         else:
-            formatted_output.append(f"stderr: \n{tool_output.stderr}\n")
+            formatted_output.append(
+                "\n".join(
+                    [
+                        "stderr: ",
+                        "```",
+                        tool_output.stderr,
+                        "```",
+                    ]
+                )
+            )
     if tool_output.error is not None:
         formatted_output.append(f"error: {tool_output.error}\n")
     if tool_output.exit_code is not None:
