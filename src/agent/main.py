@@ -61,6 +61,7 @@ def main() -> None:
     parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter (via Codex CLI) for LLM calls")
     parser.add_argument("--opencode", action="store_true", help="Use Opencode CLI for LLM calls")
     parser.add_argument("--mock", action="store_true", help="Use MockLLM for LLM calls")
+    parser.add_argument("--mock-delay", type=int, default=5, help="Set a 'sleep' inside each mock llm invocation")
     parser.add_argument(
         "--model", type=str, default=None, help="Specify the model name for gemini, claude, codex, or opencode"
     )
@@ -101,7 +102,11 @@ def main() -> None:
         )
 
     # This is the only place where get_llm() should be called.
-    if cli_settings.claude:
+    if cli_settings.mock:
+        from agent.llms.mock import MockLLM
+
+        _llm_instance = MockLLM(model=cli_settings.model, mock_delay=cli_settings.mock_delay)
+    elif cli_settings.claude:
         _llm_instance = get_llm(engine="claude", model=cli_settings.model)
     elif cli_settings.codex:
         _llm_instance = get_llm(engine="codex", model=cli_settings.model)
@@ -109,8 +114,6 @@ def main() -> None:
         _llm_instance = get_llm(engine="openrouter", model=cli_settings.model)
     elif cli_settings.opencode:
         _llm_instance = get_llm(engine="opencode", model=cli_settings.model)
-    elif cli_settings.mock:
-        _llm_instance = get_llm(engine="mock", model=cli_settings.model)
     else:
         _llm_instance = get_llm(engine="gemini", model=cli_settings.model)
 

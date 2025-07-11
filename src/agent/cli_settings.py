@@ -65,6 +65,11 @@ class CLISettings(BaseSettings):
         description="Task(s) to do",
         alias="prompt",
     )
+    mock_delay: int = Field(
+        default=5,
+        description="Set a 'sleep' inside each mock llm invocation",
+        alias="mock-delay",
+    )
 
     model_config = SettingsConfigDict(
         populate_by_name=True,

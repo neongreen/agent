@@ -9,6 +9,7 @@ Added:
 - `[AGENT]` The new `post-implementation-check-command` setting runs a command after post-implementation hook.
   If it fails, the agent will make another attempt without going to the judge first.
 - `[CLINE]` The `--mock` option to use a mock (data from a file) instead of an LLM.
+- `[CLINE]` The `--mock-delay` option to set a sleep duration for each mock LLM invocation.
 - Many more logs.
 
 Changed:
