@@ -1,0 +1,5 @@
+# Rules
+
+- Update the changelog in your plan, if the task results in a change to the codebase.
+- Do not use `pip` or `poetry` (this project uses `uv`).
+- Do not edit `config.schema.json` (it is generated from Pydantic models).
