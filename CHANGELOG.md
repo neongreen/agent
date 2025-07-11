@@ -4,6 +4,9 @@
 
 ## v0-next
 
+Changed:
+- Logs are now written to a file in the `~/.agent/logs/` directory, one file per run.
+
 Fixed:
 - Ctrl+C now stops the agent and shuts down the LLM process.
 - (*) Don't complain when there are no changes to commit.

@@ -1,7 +1,9 @@
 """Utility functions for the agent."""
 
+import os
 import shlex
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from posixpath import abspath
 from typing import Optional, TypedDict
@@ -27,11 +29,11 @@ def init_logging() -> None:
         return
     _logging_initialized = True
 
-    # Ensure the base directory exists
-    AGENT_STATE_BASE_DIR.mkdir(parents=True, exist_ok=True)
-
     # Initialize Eliot logging
-    eliot.add_destinations(FileDestination(file=open(AGENT_STATE_BASE_DIR / "log.json", "ab")))
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
+    log_file = AGENT_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    eliot.add_destinations(FileDestination(file=open(log_file, "ab")))
 
 
 # TODO: should we forbid using `print_formatted_message` directly and require `log` instead?
