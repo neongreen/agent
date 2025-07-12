@@ -68,7 +68,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "AgentSettings defines the configuration for the agent.",
+  "description": "OkSettings defines the configuration for the ok agent.",
   "properties": {
     "default-base": {
       "default": "main",

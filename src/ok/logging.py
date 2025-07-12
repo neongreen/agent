@@ -11,8 +11,8 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 
-from agent.constants import AGENT_STATE_BASE_DIR
-from agent.ui import print_to_main
+from ok.constants import OK_STATE_BASE_DIR
+from ok.ui import print_to_main
 
 
 class LLMOutputType(StrEnum):
@@ -65,7 +65,7 @@ def init_logging() -> None:
 
     # Initialize Eliot logging
     timestamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
-    log_file = AGENT_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
+    log_file = OK_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
     log_file.parent.mkdir(parents=True, exist_ok=True)
     eliot.add_destinations(FileDestination(file=open(log_file, "ab"), json_default=log_json_encoder))
 

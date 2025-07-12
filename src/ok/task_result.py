@@ -1,7 +1,7 @@
 from rich.table import Table
 
-from agent.logging import console
-from agent.utils import TaskResult
+from ok.logging import console
+from ok.utils import TaskResult
 
 
 def display_task_summary(task_results: list[TaskResult]) -> None:

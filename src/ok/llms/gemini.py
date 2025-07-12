@@ -3,8 +3,8 @@
 from pathlib import Path
 from typing import Optional
 
-from agent.llms.base import LLMBase
-from agent.utils import run
+from ok.llms.base import LLMBase
+from ok.utils import run
 
 
 class Gemini(LLMBase):

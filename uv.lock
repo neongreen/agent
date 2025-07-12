@@ -3,47 +3,6 @@ revision = 2
 requires-python = ">=3.13"
 
 [[package]]
-name = "agent"
-version = "99.0.0"
-source = { editable = "." }
-dependencies = [
-    { name = "eliot" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pygments" },
-    { name = "rich" },
-    { name = "trio" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "eliot-tree" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-trio" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "eliot", specifier = ">=1.17.5" },
-    { name = "pydantic" },
-    { name = "pydantic-settings", specifier = ">=2.10.1" },
-    { name = "pygments", specifier = ">=2.19.2" },
-    { name = "rich" },
-    { name = "trio", specifier = ">=0.30.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "eliot-tree", specifier = ">=24.0.0" },
-    { name = "pyright", specifier = ">=1.1.402" },
-    { name = "pytest", specifier = ">=8.4.1" },
-    { name = "pytest-trio", specifier = ">=0.8.0" },
-    { name = "ruff", specifier = ">=0.12.2" },
-]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -198,6 +157,47 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/43/16/fc88b08840de0e0a72a2f9d8c6bae36be573e475a6326ae854bcc549fc45/nodeenv-1.9.1.tar.gz", hash = "sha256:6ec12890a2dab7946721edbfbcd91f3319c6ccc9aec47be7c7e6b7011ee6645f", size = 47437, upload-time = "2024-06-04T18:44:11.171Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/1d/1b658dbd2b9fa9c4c9f32accbfc0205d532c8c6194dc0f2a4c0428e7128a/nodeenv-1.9.1-py2.py3-none-any.whl", hash = "sha256:ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9", size = 22314, upload-time = "2024-06-04T18:44:08.352Z" },
+]
+
+[[package]]
+name = "ok"
+version = "99.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "eliot" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pygments" },
+    { name = "rich" },
+    { name = "trio" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "eliot-tree" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-trio" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "eliot", specifier = ">=1.17.5" },
+    { name = "pydantic" },
+    { name = "pydantic-settings", specifier = ">=2.10.1" },
+    { name = "pygments", specifier = ">=2.19.2" },
+    { name = "rich" },
+    { name = "trio", specifier = ">=0.30.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "eliot-tree", specifier = ">=24.0.0" },
+    { name = "pyright", specifier = ">=1.1.402" },
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-trio", specifier = ">=0.8.0" },
+    { name = "ruff", specifier = ">=0.12.2" },
 ]
 
 [[package]]

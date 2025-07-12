@@ -10,14 +10,14 @@ set_phase_mock = unittest.mock.Mock()
 log_mock = unittest.mock.Mock()
 
 
-@patch("agent.llms.base.LLMBase", llm_mock)
-@patch("agent.utils.run", run_mock)
-@patch("agent.ui.update_status", update_status_mock)
-@patch("agent.ui.set_phase", set_phase_mock)
-@patch("agent.logging.log", log_mock)
+@patch("ok.llms.base.LLMBase", llm_mock)
+@patch("ok.utils.run", run_mock)
+@patch("ok.ui.update_status", update_status_mock)
+@patch("ok.ui.set_phase", set_phase_mock)
+@patch("ok.logging.log", log_mock)
 async def test_implementation_phase() -> None:
-    from agent.task_implementation import Done, Settings, TaskVerdict, implementation_phase
-    from agent.utils import RunResult
+    from ok.task_implementation import Done, Settings, TaskVerdict, implementation_phase
+    from ok.utils import RunResult
 
     # Configure the mock's run method to return different values based on the prompt
     async def llm_run_side_effect(prompt, *args, **kwargs):

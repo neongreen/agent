@@ -6,13 +6,13 @@ import re
 from enum import StrEnum
 from typing import Literal, Optional, Type
 
-from agent.llms.base import LLMBase
-from agent.llms.claude import Claude
-from agent.llms.codex import Codex
-from agent.llms.gemini import Gemini
-from agent.llms.mock import MockLLM
-from agent.llms.opencode import Opencode
-from agent.llms.openrouter import OpenRouter
+from ok.llms.base import LLMBase
+from ok.llms.claude import Claude
+from ok.llms.codex import Codex
+from ok.llms.gemini import Gemini
+from ok.llms.mock import MockLLM
+from ok.llms.opencode import Opencode
+from ok.llms.openrouter import OpenRouter
 
 
 def get_llm(

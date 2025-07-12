@@ -8,11 +8,11 @@ from typing import Optional
 
 import trio
 
-from agent.constants import TASK_META_DIR
-from agent.llms.base import LLMBase
-from agent.logging import LLMOutputType, log
-from agent.util.eliot import log_call
-from agent.utils import run
+from ok.constants import TASK_META_DIR
+from ok.llms.base import LLMBase
+from ok.logging import LLMOutputType, log
+from ok.util.eliot import log_call
+from ok.utils import run
 
 
 def sanitize_branch_name(name: str) -> str:
@@ -68,14 +68,14 @@ async def generate_branch_name(suggestions: list[str], *, cwd: Path) -> str:
         cwd: The current working directory.
 
     Returns:
-        A unique branch name with the "agent/" prefix added.
+        A unique branch name with the "ok/" prefix added.
     """
 
     existing_branches = await get_existing_branch_names(cwd=cwd)
 
-    suggestions = ["agent/" + sanitize_branch_name(s) for s in suggestions if s.strip()]
+    suggestions = ["ok/" + sanitize_branch_name(s) for s in suggestions if s.strip()]
     if not suggestions:
-        suggestions = ["agent/idk/task"]
+        suggestions = ["ok/idk/task"]
 
     # Try suggested names first
     for suggestion in suggestions:

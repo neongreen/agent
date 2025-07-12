@@ -7,7 +7,7 @@ from typing import Optional
 
 import trio
 
-from agent.llms.base import LLMBase
+from ok.llms.base import LLMBase
 
 
 class MockLLM(LLMBase):

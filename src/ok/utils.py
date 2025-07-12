@@ -9,8 +9,8 @@ from typing import Optional
 import trio
 from eliot import start_action
 
-from agent.logging import LLMOutputType, log
-from agent.ui import update_status
+from ok.logging import LLMOutputType, log
+from ok.ui import update_status
 
 
 @dataclass(frozen=True)

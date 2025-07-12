@@ -69,9 +69,9 @@ class ImplementConfig(BaseModel):
     )
 
 
-class AgentSettings(BaseSettings):
+class OkSettings(BaseSettings):
     """
-    AgentSettings defines the configuration for the agent.
+    OkSettings defines the configuration for the ok agent.
     """
 
     default_base: str = Field(
@@ -94,7 +94,7 @@ class AgentSettings(BaseSettings):
     model_config = SettingsConfigDict(
         populate_by_name=True,
         alias_generator=kebab_alias_generator,
-        toml_file=".agent.toml",
+        toml_file=".ok.toml",
     )
 
     @model_validator(mode="before")
@@ -121,12 +121,12 @@ class AgentSettings(BaseSettings):
         Customizes the order of settings sources.
 
         Settings are loaded with the following priority:
-        1. TOML file ('.agent.toml')
+        1. TOML file ('.ok.toml')
         2. Default values
         """
         return env_settings, TomlConfigSettingsSource(settings_cls), init_settings
 
 
 # Instantiate once and reuse everywhere
-__all__ = ["AGENT_SETTINGS", "AgentSettings"]
-AGENT_SETTINGS: AgentSettings = AgentSettings()
+__all__ = ["OK_SETTINGS", "OkSettings"]
+OK_SETTINGS: OkSettings = OkSettings()

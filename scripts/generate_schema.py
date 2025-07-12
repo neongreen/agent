@@ -12,12 +12,12 @@ import json
 import sys
 from pathlib import Path
 
-from agent.config import AgentSettings
+from ok.config import OkSettings
 
 
 def generate_schema() -> dict:
     """Generate the JSON schema from the AgentSettings Pydantic model."""
-    schema = AgentSettings.model_json_schema()
+    schema = OkSettings.model_json_schema()
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["title"] = "AgentSettings"
     if "properties" in schema:

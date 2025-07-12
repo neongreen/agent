@@ -16,17 +16,17 @@ import eliot
 import rich
 import trio
 
-from agent import git_utils
-from agent.cli_settings import CLISettings
-from agent.config import AGENT_SETTINGS as config
-from agent.constants import AGENT_TEMP_DIR
-from agent.llm import get_llm
-from agent.logging import LLMOutputType
-from agent.state_manager import write_state
-from agent.task_orchestrator import process_task
-from agent.task_result import TaskResult, display_task_summary
-from agent.ui import get_ui_manager, set_phase
-from agent.utils import log
+from ok import git_utils
+from ok.cli_settings import CLISettings
+from ok.config import OK_SETTINGS as config
+from ok.constants import OK_TEMP_DIR
+from ok.llm import get_llm
+from ok.logging import LLMOutputType
+from ok.state_manager import write_state
+from ok.task_orchestrator import process_task
+from ok.task_result import TaskResult, display_task_summary
+from ok.ui import get_ui_manager, set_phase
+from ok.utils import log
 
 
 _llm_instance = None
@@ -71,8 +71,8 @@ async def work() -> None:
     cli_settings = CLISettings.model_validate(vars(args))
 
     # Create the agent dir before even doing any logging
-    if not AGENT_TEMP_DIR.exists():
-        AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    if not OK_TEMP_DIR.exists():
+        OK_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
     if cli_settings.show_config:
         rich.print(f"```json\n{config.model_dump_json(indent=2)}\n```")
@@ -97,7 +97,7 @@ async def work() -> None:
 
         # This is the only place where get_llm() should be called.
         if cli_settings.mock:
-            from agent.llms.mock import MockLLM
+            from ok.llms.mock import MockLLM
 
             _llm_instance = MockLLM(model=cli_settings.model, mock_delay=cli_settings.mock_delay)
         elif cli_settings.claude:
@@ -113,10 +113,10 @@ async def work() -> None:
 
         effective_cwd = Path(os.path.abspath(str(cli_settings.cwd) if cli_settings.cwd else os.getcwd()))
 
-        # Ensure the .agent directory exists
-        if not AGENT_TEMP_DIR.exists():
-            log(f"Creating agent directory at {AGENT_TEMP_DIR}", message_type=LLMOutputType.STATUS)
-            AGENT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        # Ensure the .ok directory exists
+        if not OK_TEMP_DIR.exists():
+            log(f"Creating agent directory at {OK_TEMP_DIR}", message_type=LLMOutputType.STATUS)
+            OK_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
         # XXX: Initialize state file if it doesn't exist.
         # But actually, always erase the state. We don't have proper resumability yet since we don't save evaluations, etc.
@@ -136,7 +136,7 @@ async def work() -> None:
 
         for i, task_prompt in enumerate(selected_tasks, 1):
             with eliot.start_action(
-                action_type="agent.task",
+                action_type="task",
                 task_number=i,
                 task=task_prompt,
             ):
@@ -157,7 +157,7 @@ async def work() -> None:
                         )
                     else:
                         # Create a new worktree for each task
-                        work_dir = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
+                        work_dir = Path(tempfile.mkdtemp(prefix=f"ok_task_{i}_"))
                         await git_utils.add_worktree(work_dir, rev=base, cwd=effective_cwd)
                         using_worktree = True
 

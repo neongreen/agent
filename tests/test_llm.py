@@ -1,6 +1,6 @@
 from enum import StrEnum, auto
 
-from agent.llm import check_verdict
+from ok.llm import check_verdict
 
 
 class SomeVerdict(StrEnum):

@@ -8,25 +8,24 @@ uv = "0.7.18"
 taplo = "latest"
 # "npm:opencode-ai" = "0.1.194"  # we need the version with print flag, see tasks.build-opencode
 
-[tasks.run]
+[tasks.ok]
 description = "Run the agent"
-run = "uvx --isolated --from . --refresh -- agent"
+run = "uvx --isolated --from . --refresh -- ok"
 
 [tasks.check]
 description = "Run all checks and tests"
 depends = ["lint", "pyright", "check-schema", "test"]
 
-
 [tasks.logs]
-description = "Show the logs of the agent (~/.agent/logs/)"
+description = "Show the logs of the agent (~/.ok/logs/)"
 quiet = true
 usage = """
-  flag "--file <file>" "The log file to view (default: latest log file in ~/.agent/logs/)"
+  flag "--file <file>" "The log file to view (default: latest log file in ~/.ok/logs/)"
   arg "[eliot_tree_args]" var=#true "Additional arguments for eliot-tree"
 """
 run = """
   if [[ -z "$usage_file" ]]; then
-    usage_file=~/.agent/logs/"$(ls -t ~/.agent/logs/ | head -n 1)"
+    usage_file=~/.ok/logs/"$(ls -t ~/.ok/logs/ | head -n 1)"
   fi
   echo "--- $usage_file ---"
   eval "args=(${usage_eliot_tree_args:-})"
@@ -38,15 +37,15 @@ run = """
 """
 
 [tasks."logs:full"]
-description = "Show the logs of the agent (~/.agent/logs/) without filtering"
+description = "Show the logs of the agent (~/.ok/logs/) without filtering"
 quiet = true
 usage = """
-  flag "--file <file>" "The log file to view (default: latest log file in ~/.agent/logs/)"
+  flag "--file <file>" "The log file to view (default: latest log file in ~/.ok/logs/)"
   arg "[eliot_tree_args]" var=#true "Additional arguments for eliot-tree"
 """
 run = """
   if [[ -z "$usage_file" ]]; then
-    usage_file=~/.agent/logs/"$(ls -t ~/.agent/logs/ | head -n 1)"
+    usage_file=~/.ok/logs/"$(ls -t ~/.ok/logs/ | head -n 1)"
   fi
   echo "--- $usage_file ---"
   eval "args=(${usage_eliot_tree_args:-})"
@@ -109,8 +108,8 @@ description = "Run all tests"
 run = ["uv run pytest -v"]
 
 [tasks.check-schema]
-description = "Check that the checked-in schema matches Pydantic and the current .agent.toml"
-run = ["uv run scripts/generate_schema.py --diff", "taplo validate .agent.toml"]
+description = "Check that the checked-in schema matches Pydantic and the current .ok.toml"
+run = ["uv run scripts/generate_schema.py --diff", "taplo validate .ok.toml"]
 
 [tasks.lint]
 description = "Run ruff to check the Python files"
@@ -128,7 +127,7 @@ run = "ty check"
 
 # https://github.com/sst/opencode/pull/533
 [tasks.build-opencode]
-description = "Build a specific commit of Opencode CLI and install it to ~/.agent/bin/opencode"
+description = "Build a specific commit of Opencode CLI and install it to ~/.ok/bin/opencode"
 tools.bun = "1.2.18"
 tools.go = "1.24.4"
 run = "uv run scripts/build_opencode.py"

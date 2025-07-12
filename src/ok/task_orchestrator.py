@@ -3,14 +3,14 @@
 from pathlib import Path
 from typing import assert_never
 
-from agent.constants import STATE_FILE, TaskState
-from agent.git_utils import resolve_commit_specifier, setup_task_branch
-from agent.llms.base import LLMBase
-from agent.logging import LLMOutputType, log
-from agent.state_manager import read_state
-from agent.task_implementation import Done, TaskVerdict, implementation_phase
-from agent.ui import set_phase, update_status
-from agent.util.eliot import log_call
+from ok.constants import STATE_FILE, TaskState
+from ok.git_utils import resolve_commit_specifier, setup_task_branch
+from ok.llms.base import LLMBase
+from ok.logging import LLMOutputType, log
+from ok.state_manager import read_state
+from ok.task_implementation import Done, TaskVerdict, implementation_phase
+from ok.ui import set_phase, update_status
+from ok.util.eliot import log_call
 
 
 @log_call(include_args=["task", "task_num", "base_rev", "cwd"])

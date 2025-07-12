@@ -27,16 +27,16 @@ from typing import Literal, Optional, assert_never
 
 from eliot import start_action
 
-from agent.config import AGENT_SETTINGS as config
-from agent.constants import PLAN_FILE
-from agent.git_utils import has_uncommitted_changes
-from agent.llm import check_verdict
-from agent.llms.base import LLMBase
-from agent.logging import LLMOutputType, log
-from agent.task_planning import planning_phase
-from agent.ui import set_phase, update_status
-from agent.util.eliot import log_call
-from agent.utils import format_tool_code_output, run
+from ok.config import OK_SETTINGS as config
+from ok.constants import PLAN_FILE
+from ok.git_utils import has_uncommitted_changes
+from ok.llm import check_verdict
+from ok.llms.base import LLMBase
+from ok.logging import LLMOutputType, log
+from ok.task_planning import planning_phase
+from ok.ui import set_phase, update_status
+from ok.util.eliot import log_call
+from ok.utils import format_tool_code_output, run
 
 
 class StepVerdict(StrEnum):
@@ -313,7 +313,7 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
     Each run is called an "attempt".
     """
 
-    from agent.logging import format_as_markdown_blockquote
+    from ok.logging import format_as_markdown_blockquote
 
     prev_attempt_feedback = (
         f"And the feedback about your previous attempt:\n\n{format_as_markdown_blockquote(state.attempts_log[-1].feedback or '')}\n\n"

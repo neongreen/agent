@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from agent.constants import AGENT_STATE_BASE_DIR
+from ok.constants import OK_STATE_BASE_DIR
 
 
 def run_command(command: list[str], cwd: Path | None = None, env=None):
@@ -22,8 +22,8 @@ def run_command(command: list[str], cwd: Path | None = None, env=None):
 
 
 def main():
-    opencode_repo_dir = AGENT_STATE_BASE_DIR / "opencode"
-    opencode_bin_dir = AGENT_STATE_BASE_DIR / "bin"
+    opencode_repo_dir = OK_STATE_BASE_DIR / "opencode"
+    opencode_bin_dir = OK_STATE_BASE_DIR / "bin"
 
     bun_bin = shutil.which("bun")
     go_bin = shutil.which("go")
@@ -38,8 +38,8 @@ def main():
     COMMIT = "a60697ce1fd0d1e0f2c4f930a456b8fe73ccbeda"
     version = "custom"
 
-    os.makedirs(AGENT_STATE_BASE_DIR, exist_ok=True)
-    os.chdir(AGENT_STATE_BASE_DIR)
+    os.makedirs(OK_STATE_BASE_DIR, exist_ok=True)
+    os.chdir(OK_STATE_BASE_DIR)
 
     if opencode_repo_dir.exists():
         shutil.rmtree(opencode_repo_dir)

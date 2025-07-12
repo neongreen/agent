@@ -3,9 +3,9 @@
 from pathlib import Path
 from typing import Optional
 
-from agent.constants import AGENT_STATE_BASE_DIR
-from agent.llms.base import LLMBase
-from agent.utils import run
+from ok.constants import OK_STATE_BASE_DIR
+from ok.llms.base import LLMBase
+from ok.utils import run
 
 
 class Opencode(LLMBase):
@@ -21,7 +21,7 @@ class Opencode(LLMBase):
         """Runs the Opencode LLM."""
         if self.model is None:
             self.model = "github-copilot/gpt-4.1"
-        opencode_path = AGENT_STATE_BASE_DIR / "bin" / "opencode"
+        opencode_path = OK_STATE_BASE_DIR / "bin" / "opencode"
         if not opencode_path.exists():
             # This is a fatal error, so we can't use the logger.
             # The logger is initialized in the main function, but this is called before that.

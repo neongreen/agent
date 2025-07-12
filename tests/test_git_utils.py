@@ -31,8 +31,8 @@ def git_repo(tmp_path: Path) -> Path:
 
 
 # First we patch, and only then we import stuff that depends on the patched functions.
-with patch("agent.logging.log"):
-    from agent.git_utils import (
+with patch("ok.logging.log"):
+    from ok.git_utils import (
         add_worktree,
         get_current_branch,
         get_current_commit_hash,
@@ -150,7 +150,7 @@ with patch("agent.logging.log"):
 
         This will fail if the `add_worktree` uses the provided revision directly without resolving it to a commit.
         """
-        from agent.git_utils import add_worktree, get_existing_branch_names
+        from ok.git_utils import add_worktree, get_existing_branch_names
 
         # Ensure 'main' branch exists (or skip if not)
         branches = await get_existing_branch_names(cwd=git_repo)

@@ -5,9 +5,9 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from agent.constants import AGENT_TEMP_DIR
-from agent.llms.base import LLMBase
-from agent.utils import run
+from ok.constants import OK_TEMP_DIR
+from ok.llms.base import LLMBase
+from ok.utils import run
 
 
 class Codex(LLMBase):
@@ -27,10 +27,8 @@ class Codex(LLMBase):
         provider_url: Optional[str] = None,
         provider_env_key: Optional[str] = None,
     ) -> Optional[str]:
-        with tempfile.NamedTemporaryFile(
-            "r", prefix="agent-codex-output", dir=AGENT_TEMP_DIR, delete=True
-        ) as temp_file:
-            temp_file_path = os.path.join(AGENT_TEMP_DIR, temp_file.name)
+        with tempfile.NamedTemporaryFile("r", prefix="ok-codex-output", dir=OK_TEMP_DIR, delete=True) as temp_file:
+            temp_file_path = os.path.join(OK_TEMP_DIR, temp_file.name)
             command = [
                 "codex",
                 *(["--dangerously-bypass-approvals-and-sandbox"] if yolo else ["--ask-for-approval=never"]),

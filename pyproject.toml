@@ -1,5 +1,5 @@
 [project]
-name = "agent"
+name = "ok"
 version = "99.0.0"
 description = "Agentic loop"
 dependencies = [
@@ -13,7 +13,7 @@ dependencies = [
 requires-python = ">=3.13"
 
 [project.scripts]
-agent = "agent.main:main"
+ok = "ok.main:main"
 
 [dependency-groups]
 dev = [
@@ -36,4 +36,4 @@ pythonpath = ["src", "tests"]
 trio_mode = true
 
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src", "tests", "scripts"]

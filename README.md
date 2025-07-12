@@ -1,8 +1,9 @@
-# Agent
+# ok
 
 ## Description
 
-This tool provides an agentic loop for processing tasks.
+This is an agentic loop for processing tasks.
+It's ok.
 
 ## Features
 
@@ -94,10 +95,10 @@ CLI tools must be installed beforehand.
 
 ## Configuration
 
-The agent can be configured using a `.agent.toml` file in the project root directory.
+The agent can be configured using a `.ok.toml` file in the project root directory.
 This file allows you to set default behaviors and provide additional instructions for the agent's planning phase.
 
-Sample `.agent.toml`:
+Sample `.ok.toml`:
 
 ```toml
 # Specifies the default base branch, commit, or git specifier to use when creating task branches.
@@ -148,13 +149,13 @@ To run from source locally, run:
 
 ```bash
 uv sync
-uv run agent
+uv run ok
 ```
 
 If running from a diffent folder:
 
 ```bash
-uvx --from ../agent --no-cache --isolated agent <prompt>
+uvx --from ../agent --no-cache --isolated ok <prompt>
 ```
 
 ### JSON Schema for Configuration
@@ -167,7 +168,7 @@ To generate the schema, run:
 mise run generate-schema
 ```
 
-To validate the schema against the current `.agent.toml`, run:
+To validate the schema against the current `.ok.toml`, run:
 
 ```bash
 mise run check-schema

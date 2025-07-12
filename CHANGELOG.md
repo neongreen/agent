@@ -1,25 +1,26 @@
 # CHANGELOG
 
-`[AGENT]` denotes changes made by this agent.
+`[OK]` denotes changes made by this agent.
 `[CLINE]` is for the Cline extension.
 
-## v0-next
-
-Changed:
+## v0-2025.07.12
 
 Added:
-- `[AGENT]` The new `post-implementation-check-command` setting runs a command after post-implementation hook.
+- `[OK]` The new `post-implementation-check-command` setting runs a command after post-implementation hook.
   If it fails, the agent will make another attempt without going to the judge first.
 - `[CLINE]` The `--mock` option to use a mock (data from a file) instead of an LLM.
 - `[CLINE]` The `--mock-delay` option to set a sleep duration for each mock LLM invocation.
 - Many more logs.
 
 Changed:
-- Logs are now written to a file in the `~/.agent/logs/` directory, one file per run.
+- The agent is now called `ok` because all the good tools have two-letter names (jj, uv, ty, rg, fd).
+  - The branch prefix is now `ok/` instead of `agent/`.
+  - The config file is now `.ok.toml` instead of `.agent.toml`.
+- Logs are now written to a file in the `~/.ok/logs/` directory, one file per run.
 
 Fixed:
-- `[AGENT]` Ctrl+C now stops the agent and shuts down the LLM process. (Partial fix)
-- `[AGENT]` Feedback about previous attempts is now rendered as a Markdown blockquote.
+- `[OK]` Ctrl+C now stops the agent and shuts down the LLM process. (Partial fix)
+- `[OK]` Feedback about previous attempts is now rendered as a Markdown blockquote.
 - `[CLINE]` Don't complain when there are no changes to commit.
 - Worked around gemini-cli outputting "Loaded cached credentials." in the response.
 - Asking LLMs to output the verdict in the last line of their response - maybe it will improve verdict detection.
@@ -29,7 +30,7 @@ Internal:
 - `[CLINE]` Moved to Trio for async code.
 - `[CLINE]` Refactored the `LLM` class, centralized logging in `LLMBase`.
 - Added a mock test for the implementation phase.
-- `mise run run` runs the agent from a separate venv.
+- `mise run ok` runs the agent from a separate venv.
 
 ## v0-2025.07.09
 
