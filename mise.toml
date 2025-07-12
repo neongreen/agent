@@ -130,3 +130,7 @@ run = '''
 '''
 tools.gron = "latest"
 tools.rg = "latest"
+
+[tasks.kill]
+description = "Kill all running agent processes"
+run = '''pgrep -afl uvx | rg '\bok\b' | awk '{print $1}' | xargs -r kill'''
