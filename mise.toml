@@ -10,7 +10,7 @@ taplo = "latest"
 
 [tasks.run]
 description = "Run the agent"
-run = "uv run agent"
+run = "uvx --isolated --from . --refresh -- agent"
 
 [tasks.check]
 description = "Run all checks and tests"
