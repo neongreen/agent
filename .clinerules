@@ -22,3 +22,6 @@
 
 - Do not use `@pytest.mark.asyncio` decorator, it will fail with
   "An asyncio.Future, a coroutine, or an awaitable is required".
+
+- "The mock LLM doesn't know how to respond to this prompt" means that
+  you need to add a case for the prompt in the `llm_run_side_effect` function.

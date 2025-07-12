@@ -319,7 +319,7 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
     from ok.log import format_as_markdown_blockquote
 
     prev_attempt_feedback = (
-        f"And the feedback about your previous attempt:\n\n{format_as_markdown_blockquote(state.attempts_log[-1].feedback or '')}\n\n"
+        f"And this feedback from the last iteration:\n\n{format_as_markdown_blockquote(state.attempts_log[-1].feedback or '')}\n\n"
         if state.attempts_log
         else ""
     )
@@ -334,11 +334,15 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
         f"{state.plan}\n"
         "\n"
         f"{prev_attempt_feedback}"
-        f"Implement the next step for task {repr(settings.task)}.\n"
+        f"Decide on, and implement the next step for task {repr(settings.task)}.\n"
         "Create files, run commands, and/or write code as needed.\n"
-        "When done, output a concise summary of what you did, starting with 'My summary of the work done here:'.\n"
-        "Your response will help the reviewer understand the changes made.\n"
-        "Finish your response with 'This is the end of the summary'.\n"
+        "After you are done, output a summary of your activities as a single message using this template:\n\n"
+        "    I am the task implementor.\n\n"
+        "    List of issues reported about the last iteration, and how I addressed them: [[list, or 'None']]\n\n"
+        "    Brief summary of code changes made in this step, and why: [[your summary, or 'None']]\n\n"
+        "    Other work done in this step that contributed to the task: [[your summary, or 'None']]\n\n"
+        "    Possible next step to take, according to the plan: [[your proposal, or 'I think the task is done']]\n\n"
+        "    End of summary.\n\n"
     )
 
     if config.implement.extra_prompt:
@@ -419,9 +423,10 @@ async def _evaluate_step(
         f"{format_tool_code_output(await run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "After you are done, output your review as a single message using this template:\n\n"
         "    I am the step judge.\n\n"
-        "    Feedback: [[your feedback on the current batch of changes]]\n\n"
+        "    Feedback: [[your feedback on the work done]]\n\n"
         "    List of objections related to the already done work: [[list of objections concerning what was already done, or 'None']]\n\n"
-        "    Next step: [[either the next unimplemented step from the plan, or 'Address the objections', or 'None']]\n\n"
+        "    My feedback on your proposed next step: [[your feedback on the proposed next step, or 'None']]\n\n"
+        "    Next step you should take: [[either the step proposed by the implementor, or the next unimplemented step from the plan, or 'Address the objections', or 'None']]\n\n"
         "    Verdict: [[your verdict]], end of step review.\n\n"
         "Your verdict must be one of the following:\n"
         "- SUCCESS SUCCESS SUCCESS if the changes are a good step forward and can be committed;\n"
