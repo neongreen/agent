@@ -158,12 +158,12 @@ def format_tool_code_output(
         if code_block_language:
             formatted_output.append(f"stdout: \n\n```{code_block_language}\n{tool_output.stdout}\n```\n")
         else:
-            formatted_output.append(f"stdout: \n{tool_output.stdout}\n")
+            formatted_output.append(f"stdout: \n\n```\n{tool_output.stdout}\n```\n")
     if tool_output.stderr:
         if code_block_language:
             formatted_output.append(f"stderr: \n\n```{code_block_language}\n{tool_output.stderr}\n```\n")
         else:
-            formatted_output.append(f"stderr: \n{tool_output.stderr}\n")
+            formatted_output.append(f"stderr: \n\n```\n{tool_output.stderr}\n```\n")
     if tool_output.error is not None:
         formatted_output.append(f"error: {tool_output.error}\n")
     if tool_output.exit_code is not None:

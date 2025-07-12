@@ -3,6 +3,12 @@
 `[OK]` denotes changes made by this agent.
 `[CLINE]` is for the Cline extension.
 
+## v0-next
+
+Fixed:
+
+- Stdout/stderr formatting (again).
+
 ## v0-2025.07.12
 
 Added:
