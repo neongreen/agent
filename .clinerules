@@ -12,6 +12,9 @@
 - You can run `mise ok --help` to see all CLI options.
   Every config option has a corresponding CLI option.
 
+- The `ai/` folder contains your learnings and notes.
+  You are encouraged to add to it, and update the existing files there as you go.
+
 ## Fixing errors
 
 - `must be called from async context` actually means **trio** context.
