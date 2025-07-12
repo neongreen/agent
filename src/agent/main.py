@@ -8,11 +8,11 @@ and orchestration of the agent's task processing.
 import argparse
 import os
 import signal
-import sys
 import tempfile
 from pathlib import Path
 
 import rich
+import trio
 
 from agent import git_utils
 from agent.cli_settings import CLISettings
@@ -29,28 +29,18 @@ from agent.utils import log
 _llm_instance = None
 
 
-def _signal_handler(signum, frame):
-    global _llm_instance
-    if _llm_instance:
-        pid = _llm_instance.terminate_llm_process()
-        if pid:
-            print(f"LLM process with PID {pid} killed.")
-    sys.exit(1)
-
-
-def main() -> None:
+async def work() -> None:
     """
-    Main entry point for the agent application.
+    This is almost the entry point for the agent.
+    The actual entry point is `main()`, which calls `_main()`, which calls `work()`.
 
-    This module handles command-line argument parsing, configuration loading,
+    This function handles command-line argument parsing, configuration loading,
     and orchestration of the agent's task processing.
 
     Parses command-line arguments, sets up the environment, and initiates
     the agentic loop for task processing.
     """
     global _llm_instance
-
-    signal.signal(signal.SIGINT, _signal_handler)
 
     parser = argparse.ArgumentParser(description="Agentic loop")
     parser.add_argument("--quiet", action="store_true", help="Suppress informational output")
@@ -160,13 +150,13 @@ def main() -> None:
                 else:
                     # Create a new worktree for each task
                     work_dir = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
-                    git_utils.add_worktree(work_dir, rev=base, cwd=effective_cwd)
+                    await git_utils.add_worktree(work_dir, rev=base, cwd=effective_cwd)
                     using_worktree = True
 
                 os.chdir(work_dir)
-                process_task(task_prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance)
+                await process_task(task_prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance)
                 task_status = "Success"
-                task_commit_hash = git_utils.get_current_commit_hash(cwd=work_dir)
+                task_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir)
             except Exception as e:
                 task_error = str(e)
                 log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
@@ -185,7 +175,7 @@ def main() -> None:
                     try:
                         # Change back to the original directory before removing worktree
                         os.chdir(effective_cwd)
-                        git_utils.remove_worktree(work_dir, cwd=effective_cwd)
+                        await git_utils.remove_worktree(work_dir, cwd=effective_cwd)
                     except Exception as e:
                         log(
                             f"Error cleaning up temporary worktree {work_dir}: {e}",
@@ -200,5 +190,32 @@ def main() -> None:
     os.chdir(effective_cwd)
 
 
-if __name__ == "__main__":
-    main()
+async def _signal_handler(nursery: trio.Nursery) -> None:
+    """Handles SIGINT signals to gracefully shut down the agent."""
+    with trio.open_signal_receiver(signal.SIGINT) as signal_chan:
+        async for _ in signal_chan:
+            if _llm_instance:
+                pid = _llm_instance.terminate_llm_process()
+                if pid:
+                    print(f"LLM process with PID {pid} killed.")
+            nursery.cancel_scope.cancel()
+            return
+
+
+async def _main() -> None:
+    """
+    Initializes the nursery, starts the signal handler and the main work function,
+    and ensures graceful shutdown.
+    """
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(_signal_handler, nursery)
+        await work()
+        nursery.cancel_scope.cancel()
+
+
+def main() -> None:
+    """
+    Entry point for the agent application.
+    """
+
+    trio.run(_main)

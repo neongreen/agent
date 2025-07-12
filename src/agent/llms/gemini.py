@@ -10,7 +10,7 @@ from agent.utils import run
 class Gemini(LLMBase):
     """Gemini LLM provider."""
 
-    def _run(
+    async def _run(
         self,
         prompt: str,
         yolo: bool,
@@ -21,7 +21,7 @@ class Gemini(LLMBase):
         gemini_model = self.model or "gemini-2.5-flash"
         command = ["gemini", "-m", gemini_model, *(["--yolo"] if yolo else []), "-p", prompt]
 
-        result = run(
+        result = await run(
             command,
             "Calling Gemini",
             command_human=command[:-1] + ["<prompt>"],
@@ -31,7 +31,6 @@ class Gemini(LLMBase):
             store_process=True,
         )
         if result.success:
-            self.llm_process = result.process
             response = result.stdout.strip()
             if response.startswith("Loaded cached credentials."):
                 response = response.split("Loaded cached credentials.", maxsplit=1)[-1].strip()

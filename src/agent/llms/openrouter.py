@@ -17,7 +17,7 @@ class OpenRouter(Codex):
         if "OPENROUTER_API_KEY" not in os.environ:
             raise ValueError("OPENROUTER_API_KEY must be set for OpenRouter.")
 
-    def _run(
+    async def _run(
         self,
         prompt: str,
         yolo: bool,
@@ -27,7 +27,7 @@ class OpenRouter(Codex):
         """Runs the OpenRouter LLM."""
         provider_url = "https://openrouter.ai/api/v1"
         provider_env_key = "OPENROUTER_API_KEY"
-        return self._run_codex(
+        return await self._run_codex(
             prompt,
             yolo,
             model=self.model,

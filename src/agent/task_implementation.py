@@ -215,7 +215,7 @@ class Settings:
     max_consecutive_failures: int = 3
 
 
-def transition(
+async def transition(
     state: State,
     event: Event,
     settings: Settings,
@@ -236,25 +236,25 @@ def transition(
         match state, event:
             case StartingTask(), Tick():
                 # TODO: this can actually be a class method?
-                result = _handle_StartingTask(settings, state)
+                result = await _handle_StartingTask(settings, state)
 
             case StartingStep(), Tick():
                 result = _handle_StartingStep(settings, state)
 
             case StartingAttempt(), Tick():
-                result = _handle_StartingAttempt(settings, state)
+                result = await _handle_StartingAttempt(settings, state)
 
             case PostAttemptHooks(), Tick():
-                result = _handle_PostAttemptHooks(settings, state)
+                result = await _handle_PostAttemptHooks(settings, state)
 
             case JudgingAttempt(), Tick():
-                result = _handle_JudgingAttempt(settings, state)
+                result = await _handle_JudgingAttempt(settings, state)
 
             case JudgingStep(), Tick():
-                result = _handle_JudgingStep(settings, state)
+                result = await _handle_JudgingStep(settings, state)
 
             case FinalizingTask(), Tick():
-                result = _handle_FinalizingTask(settings, state)
+                result = await _handle_FinalizingTask(settings, state)
 
             case Done(), Tick():
                 log("Done state reached, no further transitions.", message_type=LLMOutputType.DEBUG)
@@ -269,14 +269,14 @@ def transition(
         return result
 
 
-def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingStep | Done:
+async def _handle_StartingTask(settings: Settings, state: StartingTask) -> StartingStep | Done:
     """
     Generate a plan for the task.
     """
 
     # TODO: move into the same state machine?
 
-    plan = planning_phase(llm=settings.llm, task=settings.task, cwd=settings.cwd)
+    plan = await planning_phase(llm=settings.llm, task=settings.task, cwd=settings.cwd)
     if not plan:
         log("Failed to generate a plan for the step", message_type=LLMOutputType.ERROR)
         return Done(
@@ -303,7 +303,7 @@ def _handle_StartingStep(settings: Settings, state: StartingStep) -> StartingAtt
     )
 
 
-def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostAttemptHooks:
+async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostAttemptHooks:
     """
     Generate the implementation prompt for a single step, invoke the LLM,
     and return its summary of work done.
@@ -342,7 +342,7 @@ def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostA
 
     update_status("Implementing a step")
 
-    attempt_summary = settings.llm.run(
+    attempt_summary = await settings.llm.run(
         impl_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.LLM_RESPONSE
     )
 
@@ -354,10 +354,10 @@ def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) -> PostA
     )
 
 
-def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) -> JudgingAttempt | StartingAttempt:
+async def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) -> JudgingAttempt | StartingAttempt:
     # This one always runs and is supposed to have things like formatters, etc.
     if config.post_implementation_hook_command:
-        run(
+        await run(
             config.post_implementation_hook_command,
             "Running post-step hook",
             directory=settings.cwd,
@@ -366,7 +366,7 @@ def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) -> Jud
 
     # This one *checks* code after the attempt. If it fails, we will make another attempt.
     if config.post_implementation_check_command:
-        check_result = run(
+        check_result = await run(
             config.post_implementation_check_command,
             "Running post-implementation check",
             directory=settings.cwd,
@@ -396,15 +396,17 @@ def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) -> Jud
 
 
 @log_call(include_args=["step_summary"])
-def _evaluate_step(settings: Settings, step_summary: Optional[str]) -> tuple[Optional[StepVerdict], Optional[str]]:
+async def _evaluate_step(
+    settings: Settings, step_summary: Optional[str]
+) -> tuple[Optional[StepVerdict], Optional[str]]:
     eval_prompt = (
         f"Evaluate if these changes make progress on the task {repr(settings.task)}.\n"
         "Here is the summary of the changes, provided by their author:\n\n"
         f"{step_summary}\n\n"
         "Here are the uncommitted changes:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        f"{format_tool_code_output(await run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "Here is the diff of the changes made in previous attempts:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        f"{format_tool_code_output(await run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "After you are done, output your review as a single message using this template:\n\n"
         "    I am the step judge.\n\n"
         "    Feedback: [[your feedback on the current batch of changes]]\n\n"
@@ -421,13 +423,15 @@ def _evaluate_step(settings: Settings, step_summary: Optional[str]) -> tuple[Opt
         eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
 
     update_status("Evaluating step")
-    evaluation = settings.llm.run(eval_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.EVALUATION)
+    evaluation = await settings.llm.run(
+        eval_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.EVALUATION
+    )
     verdict = check_verdict(StepVerdict, evaluation or "")
     return verdict, evaluation
 
 
 @log_call(include_args=[])
-def _generate_commit_message(settings: Settings) -> str:
+async def _generate_commit_message(settings: Settings) -> str:
     """Generate and return a concise, single‑line commit message for the current step."""
     update_status("Generating commit message")
     commit_msg_prompt = (
@@ -435,7 +439,7 @@ def _generate_commit_message(settings: Settings) -> str:
         "You *may not* output Markdown, code blocks, or any other formatting.\n"
         "You may only output a single line.\n"
     )
-    commit_msg = settings.llm.run(
+    commit_msg = await settings.llm.run(
         commit_msg_prompt,
         yolo=False,
         cwd=settings.cwd,
@@ -447,12 +451,12 @@ def _generate_commit_message(settings: Settings) -> str:
 
 
 @log_call(include_args=["commit_msg"])
-def _commit_step(settings: Settings, commit_msg: str) -> None:
+async def _commit_step(settings: Settings, commit_msg: str) -> None:
     """Stage and commit the changes for this step."""
     update_status("Committing step")
-    if has_uncommitted_changes(cwd=settings.cwd):
-        run(["git", "add", "."], "Adding files", directory=settings.cwd)
-        run(
+    if await has_uncommitted_changes(cwd=settings.cwd):
+        await run(["git", "add", "."], "Adding files", directory=settings.cwd)
+        await run(
             ["git", "commit", "-m", f"{commit_msg[:100]}"],
             "Committing step",
             directory=settings.cwd,
@@ -462,16 +466,16 @@ def _commit_step(settings: Settings, commit_msg: str) -> None:
 
 
 @log_call(include_args=[])
-def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict], Optional[str]]:
+async def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict], Optional[str]]:
     """Ask the LLM whether the overall task is finished after this step."""
     update_status("Checking if task is complete...")
     completion_prompt = (
         f"Is the task {repr(settings.task)} now complete based on the work done?\n"
         "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
         "Here are the uncommitted changes:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        f"{format_tool_code_output(await run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "Here is the diff of the changes made in previous attempts:\n\n"
-        f"{format_tool_code_output(run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        f"{format_tool_code_output(await run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
         "After you are done, output your review as a single message using this template:\n\n"
         "    I am the task completion judge.\n\n"
         "    Task requirements: [[list of task requirements and for each - whether it was addressed]]\n\n"
@@ -485,7 +489,7 @@ def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict]
     if config.implement.completion.judge_extra_prompt:
         completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
 
-    completion_evaluation = settings.llm.run(
+    completion_evaluation = await settings.llm.run(
         completion_prompt,
         yolo=True,
         cwd=settings.cwd,
@@ -495,13 +499,15 @@ def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict]
     return completion_verdict, completion_evaluation
 
 
-def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep | FinalizingTask | StartingAttempt:
+async def _handle_JudgingStep(
+    settings: Settings, state: JudgingStep
+) -> StartingStep | FinalizingTask | StartingAttempt:
     # 1. generate commit message and commit the step
-    commit_msg = _generate_commit_message(settings)
-    _commit_step(settings, commit_msg)
+    commit_msg = await _generate_commit_message(settings)
+    await _commit_step(settings, commit_msg)
 
     # 2. ask the LLM whether the task is done
-    completion_verdict, completion_evaluation = _evaluate_task_completion(settings)
+    completion_verdict, completion_evaluation = await _evaluate_task_completion(settings)
 
     # 3. interpret the verdict and produce a StepPhaseResult
     if not completion_evaluation:
@@ -576,7 +582,7 @@ def _handle_JudgingStep(settings: Settings, state: JudgingStep) -> StartingStep 
 
 
 @log_call(include_args=["task", "base_commit", "cwd"])
-def implementation_phase(
+async def implementation_phase(
     *,
     task: str,
     base_commit: str,
@@ -603,11 +609,11 @@ def implementation_phase(
 
     try:
         # kick‑off
-        state = transition(state, Tick(), settings)
+        state = await transition(state, Tick(), settings)
 
         # main loop: keep working while we're in `Attempt`, `Evaluate`, or `ReviewCompletion`
         while not isinstance(state, Done):
-            state = transition(state, Tick(), settings)
+            state = await transition(state, Tick(), settings)
 
     except KeyboardInterrupt:
         log(
@@ -656,7 +662,7 @@ def _is_failed_attempt(attempt: AttemptResult) -> bool:
             assert_never(other)
 
 
-def _handle_JudgingAttempt(
+async def _handle_JudgingAttempt(
     settings: Settings,
     state: JudgingAttempt,
 ) -> State:
@@ -666,7 +672,7 @@ def _handle_JudgingAttempt(
 
     prev_failed_attempts = len(list(takewhile(_is_failed_attempt, reversed(state.attempts_log))))
 
-    verdict, evaluation = _evaluate_step(settings, state.attempt_summary)
+    verdict, evaluation = await _evaluate_step(settings, state.attempt_summary)
     log(f"Verdict from the judgment: {verdict}", message_type=LLMOutputType.DEBUG)
 
     if not verdict:
@@ -733,12 +739,12 @@ def _handle_JudgingAttempt(
             assert_never(other)
 
 
-def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> Done:
+async def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> Done:
     try:
-        diff = run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=settings.cwd)
+        diff = await run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=settings.cwd)
         if not diff.success:
-            run(["git", "add", "."], "Staging uncommitted changes", directory=settings.cwd)
-            run(
+            await run(["git", "add", "."], "Staging uncommitted changes", directory=settings.cwd)
+            await run(
                 ["git", "commit", "-m", "Final commit (auto)"],
                 "Final commit after step phase",
                 directory=settings.cwd,

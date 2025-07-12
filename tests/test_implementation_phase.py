@@ -15,12 +15,12 @@ log_mock = unittest.mock.Mock()
 @patch("agent.ui.update_status", update_status_mock)
 @patch("agent.ui.set_phase", set_phase_mock)
 @patch("agent.logging.log", log_mock)
-def test_implementation_phase() -> None:
+async def test_implementation_phase() -> None:
     from agent.task_implementation import Done, Settings, TaskVerdict, implementation_phase
     from agent.utils import RunResult
 
     # Configure the mock's run method to return different values based on the prompt
-    def llm_run_side_effect(prompt, *args, **kwargs):
+    async def llm_run_side_effect(prompt, *args, **kwargs):
         if "concise commit message" in prompt:
             return "feat: Implement the thing"
         if "Create a detailed implementation plan" in prompt:
@@ -38,17 +38,16 @@ def test_implementation_phase() -> None:
 
     llm_mock.run.side_effect = llm_run_side_effect
 
-    run_mock.return_value = RunResult(
-        success=True,
-        stdout="",
-        stderr="",
-        exit_code=0,
-        error=None,
-        signal=None,
-        background_pids=None,
-        process_group_pgid=None,
-        process=None,
-    )
+    async def run_side_effect(*args, **kwargs):
+        return RunResult(
+            success=True,
+            stdout="",
+            stderr="",
+            exit_code=0,
+            error=None,
+        )
+
+    run_mock.side_effect = run_side_effect
 
     settings = Settings(
         llm=llm_mock,
@@ -58,7 +57,7 @@ def test_implementation_phase() -> None:
     )
 
     # Run the implementation phase
-    result = implementation_phase(
+    result = await implementation_phase(
         task=settings.task,
         base_commit=settings.base_commit,
         cwd=settings.cwd,

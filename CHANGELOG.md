@@ -25,6 +25,7 @@ Fixed:
 - Asking LLMs to output the verdict in the last line of their response - maybe it will improve verdict detection.
 
 Internal:
+- `[CLINE]` Moved to Trio for async code.
 - `[CLINE]` Refactored the `LLM` class, centralized logging in `LLMBase`.
 - Added a mock test for the implementation phase.
 

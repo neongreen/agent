@@ -21,7 +21,7 @@ class LLMBase(ABC):
         self.model = model
         self.llm_process: Optional[subprocess.Popen] = None
 
-    def run(
+    async def run(
         self,
         prompt: str,
         yolo: bool,
@@ -50,7 +50,7 @@ class LLMBase(ABC):
 
         log(prompt, message_type=LLMOutputType.PROMPT)
         try:
-            response = self._run(prompt, yolo, cwd=cwd)
+            response = await self._run(prompt, yolo, cwd=cwd)
             if response is not None:
                 log(f"LLM response: {response}", message_type=response_type)
             return response
@@ -59,7 +59,7 @@ class LLMBase(ABC):
             return None
 
     @abstractmethod
-    def _run(
+    async def _run(
         self,
         prompt: str,
         yolo: bool,

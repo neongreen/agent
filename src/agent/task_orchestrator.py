@@ -15,7 +15,7 @@ from agent.ui import set_phase, update_status
 
 
 @log_call(include_args=["task", "task_num", "base_rev", "cwd"])
-def process_task(
+async def process_task(
     task: str,
     task_num: int,
     *,
@@ -43,7 +43,7 @@ def process_task(
 
     log((f"Attempting to set up task branch for task {task_num}"), message_type=LLMOutputType.STATUS)
 
-    resolved_base_commit_sha = resolve_commit_specifier(base_rev, cwd=cwd)
+    resolved_base_commit_sha = await resolve_commit_specifier(base_rev, cwd=cwd)
     if not resolved_base_commit_sha:
         log(f"Failed to resolve base specifier: {base_rev}", message_type=LLMOutputType.TOOL_ERROR)
         result = Done(
@@ -52,7 +52,7 @@ def process_task(
         )
 
     # Set up branch
-    elif not setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd, llm=llm):
+    elif not await setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd, llm=llm):
         log("Failed to set up task branch", message_type=LLMOutputType.TOOL_ERROR)
         result = Done(
             verdict="failed",
@@ -60,7 +60,7 @@ def process_task(
         )
 
     else:
-        result = implementation_phase(task=task, base_commit=resolved_base_commit_sha, cwd=cwd, llm=llm)
+        result = await implementation_phase(task=task, base_commit=resolved_base_commit_sha, cwd=cwd, llm=llm)
 
     # Planning phase
     # plan: Optional[str] = None

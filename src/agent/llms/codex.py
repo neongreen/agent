@@ -13,11 +13,11 @@ from agent.utils import run
 class Codex(LLMBase):
     """Codex LLM provider."""
 
-    def _run(self, prompt: str, yolo: bool, *, cwd: Path) -> Optional[str]:
+    async def _run(self, prompt: str, yolo: bool, *, cwd: Path) -> Optional[str]:
         """Runs the Codex LLM."""
-        return self._run_codex(prompt, yolo, model=self.model, cwd=cwd)
+        return await self._run_codex(prompt, yolo, model=self.model, cwd=cwd)
 
-    def _run_codex(
+    async def _run_codex(
         self,
         prompt: str,
         yolo: bool,
@@ -49,7 +49,7 @@ class Codex(LLMBase):
                 f"--output-last-message={temp_file_path}",
                 prompt,
             ]
-            result = run(
+            result = await run(
                 command,
                 "Calling Codex",
                 command_human=command[:-1] + ["<prompt>"],

@@ -11,7 +11,7 @@ from agent.utils import run
 class Opencode(LLMBase):
     """Opencode LLM provider."""
 
-    def _run(
+    async def _run(
         self,
         prompt: str,
         yolo: bool,
@@ -29,7 +29,7 @@ class Opencode(LLMBase):
             print(f"Opencode CLI (custom version) not found at {opencode_path}. Please run 'mise run build-opencode'.")
             return None
         command = [str(opencode_path), "run", "--print", "--model", self.model, prompt]
-        result = run(
+        result = await run(
             command,
             "Calling Opencode",
             command_human=command[:-1] + ["<prompt>"],

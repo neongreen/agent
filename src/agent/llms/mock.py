@@ -1,9 +1,10 @@
 """Mock LLM for testing purposes."""
 
-import time
 import tomllib
 from pathlib import Path
 from typing import Optional
+
+import trio
 
 from agent.llms.base import LLMBase
 
@@ -24,7 +25,7 @@ class MockLLM(LLMBase):
         with open("mock_llm_data.toml", "rb") as f:
             self.mock_data = tomllib.load(f)
 
-    def _run(
+    async def _run(
         self,
         prompt: str,
         yolo: bool,
@@ -42,7 +43,7 @@ class MockLLM(LLMBase):
         Returns:
             The response from the LLM, or None if an error occurred.
         """
-        time.sleep(self.mock_delay)
+        await trio.sleep(self.mock_delay)
         for item in self.mock_data.get("prompts", []):
             if item.get("prompt") == prompt:
                 return item.get("response")

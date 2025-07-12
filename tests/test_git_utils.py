@@ -19,6 +19,7 @@ def git_repo(tmp_path: Path) -> Path:
     repo_path: Path = tmp_path / "repo"
     repo_path.mkdir()
     subprocess.run(["git", "init"], cwd=repo_path, check=True)
+    subprocess.run(["git", "checkout", "-b", "main"], cwd=repo_path, check=True)
     # Set user config for commits
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, check=True)
@@ -62,18 +63,17 @@ with patch("agent.logging.log"):
         cleaned: str = sanitize_branch_name(raw)
         assert cleaned == "no-name"
 
-    def test_get_existing_branch_names(git_repo: Path) -> None:
+    async def test_get_existing_branch_names(git_repo: Path) -> None:
         """
         Test that get_existing_branch_names returns the default branch after repo init.
 
         Args:
             git_repo: Path to the temporary git repository.
         """
-
-        branches: list[str] = get_existing_branch_names(cwd=git_repo)
+        branches: list[str] = await get_existing_branch_names(cwd=git_repo)
         assert any(b in branches for b in ["master", "main"])
 
-    def test_resolve_commit_specifier(git_repo: Path) -> None:
+    async def test_resolve_commit_specifier(git_repo: Path) -> None:
         """
         Test that resolve_commit_specifier returns the correct commit hash for full hash,
         short hash, branch name, and HEAD.
@@ -82,49 +82,47 @@ with patch("agent.logging.log"):
             git_repo: Path to the temporary git repository.
         """
 
-        commit_hash: str | None = get_current_commit_hash(cwd=git_repo)
+        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo)
         if commit_hash is None:
-            pytest.skip("No commit hash available")
+            pytest.fail("No commit hash available")
         # Full hash
-        resolved_full: str | None = resolve_commit_specifier(commit_hash, cwd=git_repo)
+        resolved_full: str | None = await resolve_commit_specifier(commit_hash, cwd=git_repo)
         assert resolved_full == commit_hash
         # Short hash
         short_hash = commit_hash[:7]
-        resolved_short: str | None = resolve_commit_specifier(short_hash, cwd=git_repo)
+        resolved_short: str | None = await resolve_commit_specifier(short_hash, cwd=git_repo)
         assert resolved_short == commit_hash
         # Branch name
-        branch: str | None = get_current_branch(cwd=git_repo)
+        branch: str | None = await get_current_branch(cwd=git_repo)
         if branch is not None:
-            resolved_branch: str | None = resolve_commit_specifier(branch, cwd=git_repo)
+            resolved_branch: str | None = await resolve_commit_specifier(branch, cwd=git_repo)
             assert resolved_branch == commit_hash
         # HEAD
-        resolved_head: str | None = resolve_commit_specifier("HEAD", cwd=git_repo)
+        resolved_head: str | None = await resolve_commit_specifier("HEAD", cwd=git_repo)
         assert resolved_head == commit_hash
 
-    def test_get_current_branch(git_repo: Path) -> None:
+    async def test_get_current_branch(git_repo: Path) -> None:
         """
         Test that get_current_branch returns the default branch name.
 
         Args:
             git_repo: Path to the temporary git repository.
         """
-
-        branch: str | None = get_current_branch(cwd=git_repo)
+        branch: str | None = await get_current_branch(cwd=git_repo)
         assert branch in ["master", "main"]
 
-    def test_get_current_commit_hash(git_repo: Path) -> None:
+    async def test_get_current_commit_hash(git_repo: Path) -> None:
         """
         Test that get_current_commit_hash returns a valid commit hash.
 
         Args:
             git_repo: Path to the temporary git repository.
         """
-
-        commit_hash: str | None = get_current_commit_hash(cwd=git_repo)
+        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo)
         assert commit_hash is not None
         assert len(commit_hash) == 40
 
-    def test_add_and_remove_worktree(git_repo: Path, tmp_path: Path) -> None:
+    async def test_add_and_remove_worktree(git_repo: Path, tmp_path: Path) -> None:
         """
         Test that add_worktree creates a new worktree and remove_worktree deletes it.
 
@@ -135,31 +133,29 @@ with patch("agent.logging.log"):
 
         # Add a new worktree
         worktree_path: Path = tmp_path / "worktree"
-        commit_hash: str | None = get_current_commit_hash(cwd=git_repo)
+        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo)
         if commit_hash is None:
-            pytest.skip("No commit hash available")
-        added: bool = add_worktree(worktree_path, rev=commit_hash, cwd=git_repo)
+            pytest.fail("No commit hash available")
+        added: bool = await add_worktree(worktree_path, rev=commit_hash, cwd=git_repo)
         assert added
         assert worktree_path.exists()
         # Remove the worktree
-        removed: bool = remove_worktree(worktree_path, cwd=git_repo)
+        removed: bool = await remove_worktree(worktree_path, cwd=git_repo)
         assert removed
         assert not (worktree_path / ".git").exists()
 
-    def test_add_worktree_with_main_revision(git_repo: Path, tmp_path: Path) -> None:
+    async def test_add_worktree_with_main_revision(git_repo: Path, tmp_path: Path) -> None:
         """
         Test what happens if we have a repo at main and create a worktree with revision=main.
 
         This will fail if the `add_worktree` uses the provided revision directly without resolving it to a commit.
         """
-
         from agent.git_utils import add_worktree, get_existing_branch_names
 
         # Ensure 'main' branch exists (or skip if not)
-        branches = get_existing_branch_names(cwd=git_repo)
-        if "main" not in branches:
-            pytest.fail("No 'main' branch available in the fixture repo")
+        branches = await get_existing_branch_names(cwd=git_repo)
+        assert "main" in branches, "Main branch should exist in the test repository"
 
         worktree_path = tmp_path / "worktree_main"
-        added: bool = add_worktree(worktree_path, rev="main", cwd=git_repo)
+        added: bool = await add_worktree(worktree_path, rev="main", cwd=git_repo)
         assert added

@@ -4,6 +4,7 @@ from enum import StrEnum, auto
 from pathlib import Path
 from typing import Optional, assert_never
 
+import trio
 from eliot import log_call
 
 from agent.config import AGENT_SETTINGS as config
@@ -15,7 +16,7 @@ from agent.ui import set_phase, update_status
 
 
 @log_call(include_args=["task", "cwd"])
-def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
+async def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
     """
     Iterative planning phase with Gemini approval.
 
@@ -62,7 +63,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
             plan_prompt += f"\n\n{config.plan.planner_extra_prompt}"
 
         update_status("Getting a plan")
-        raw_plan = llm.run(
+        raw_plan = await llm.run(
             plan_prompt,
             yolo=True,
             cwd=cwd,
@@ -96,7 +97,7 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
 
         update_status("Reviewing plan")
 
-        raw_review = llm.run(
+        raw_review = await llm.run(
             review_prompt,
             yolo=True,
             cwd=cwd,
@@ -128,8 +129,8 @@ def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
 
             # Write the approved plan to a file (not committed)
             PLAN_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(PLAN_FILE, "w") as f:
-                f.write(f"# Plan for {task}\n\n{plan}")
+            async with await trio.open_file(PLAN_FILE, "w") as file:
+                await file.write(f"# Plan for {task}\n\n{plan}")
 
             return plan
 

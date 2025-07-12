@@ -4,3 +4,11 @@
 - Do not use `pip` or `poetry` (this project uses `uv`).
 - Do not edit `config.schema.json` (it is generated from Pydantic models).
 - After making changes, run `mise pyright`. If it passes, also run `mise check`.
+
+## Fixing errors
+
+- `must be called from async context` actually means **trio** context.
+  `trio.run()` is the entry point for async code and might be missing.
+
+- Do not use `@pytest.mark.asyncio` decorator, it will fail with
+  "An asyncio.Future, a coroutine, or an awaitable is required".

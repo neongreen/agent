@@ -1,12 +1,12 @@
 """Utility functions for the agent."""
 
 import shlex
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from posixpath import abspath
 from typing import Optional
 
+import trio
 from eliot import start_action
 
 from agent.logging import LLMOutputType, log
@@ -21,14 +21,10 @@ class RunResult:
     stdout: str
     stderr: str
     success: bool
-    error: Optional[str]
-    signal: Optional[int]
-    background_pids: Optional[list[int]]
-    process_group_pgid: Optional[int]
-    process: Optional[subprocess.Popen]
+    error: Optional[str] = None
 
 
-def run(
+async def run(
     command: str | list[str],
     description=None,
     command_human: Optional[list[str]] = None,
@@ -40,7 +36,7 @@ def run(
     store_process: bool = False,
 ) -> RunResult:
     """
-    Run command and log it.
+    Run command asynchronously using Trio and log it.
 
     Errors are logged but *not* raised as exceptions.
 
@@ -49,7 +45,7 @@ def run(
         description: Optional description of the command for logging.
         directory: Optional working directory to run the command in as a Path.
         command_human: If present, will be used in console output instead of the full command.
-        store_process: If True, the subprocess.Popen object will be stored in the RunResult.
+        store_process: Ignored (for compatibility).
     """
 
     if isinstance(command, str):
@@ -82,23 +78,25 @@ def run(
         )
 
         try:
-            process = subprocess.Popen(
+            result_obj = await trio.run_process(
                 command,
-                text=True,
                 cwd=abs_directory,
                 shell=shell,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_stdout=True,
+                capture_stderr=True,
+                check=False,
             )
-            stdout, stderr = process.communicate()
+            stdout = result_obj.stdout.decode() if result_obj.stdout else ""
+            stderr = result_obj.stderr.decode() if result_obj.stderr else ""
+            returncode = result_obj.returncode
 
-            if process.returncode != 0:
+            if returncode != 0:
                 log(
-                    f"Command {command_display} failed with exit code {process.returncode}\nStdout: {stdout}\nStderr: {stderr}",
+                    f"Command {command_display} failed with exit code {returncode}\nStdout: {stdout}\nStderr: {stderr}",
                     message_human=(
                         "\n\n".join(
                             [
-                                f"Command `{command_human_display}` failed with exit code {process.returncode}",
+                                f"Command `{command_human_display}` failed with exit code {returncode}",
                                 f"Stdout:\n\n```\n{stdout}\n```" if stdout.strip() else "Stdout: empty",
                                 f"Stderr:\n\n```\n{stderr}\n```" if stderr.strip() else "Stderr: empty",
                             ]
@@ -108,15 +106,10 @@ def run(
                 )
 
             result = RunResult(
-                exit_code=process.returncode,
+                exit_code=returncode,
                 stdout=stdout,
                 stderr=stderr,
-                success=process.returncode == 0,
-                error=None,
-                signal=None,
-                background_pids=None,
-                process_group_pgid=process.pid,
-                process=process,  # Always store the process object
+                success=returncode == 0,
             )
 
             action.add_success_fields(
@@ -135,10 +128,6 @@ def run(
                 stderr=str(e),
                 success=False,
                 error=str(e),
-                signal=None,
-                background_pids=None,
-                process_group_pgid=None,
-                process=None,
             )
 
             action.add_success_fields(
@@ -179,10 +168,4 @@ def format_tool_code_output(
         formatted_output.append(f"error: {tool_output.error}\n")
     if tool_output.exit_code is not None:
         formatted_output.append(f"exit_code: {tool_output.exit_code}\n")
-    if tool_output.signal is not None:
-        formatted_output.append(f"signal: {tool_output.signal}\n")
-    if tool_output.background_pids:
-        formatted_output.append(f"background_pids: {tool_output.background_pids}\n")
-    if tool_output.process_group_pgid is not None:
-        formatted_output.append(f"process_group_pgid: {tool_output.process_group_pgid}\n")
     return "\n".join(formatted_output)

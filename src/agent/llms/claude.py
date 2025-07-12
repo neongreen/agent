@@ -10,10 +10,10 @@ from agent.utils import run
 class Claude(LLMBase):
     """Claude LLM provider."""
 
-    def _run(self, prompt: str, yolo: bool, *, cwd: Path) -> Optional[str]:
+    async def _run(self, prompt: str, yolo: bool, *, cwd: Path) -> Optional[str]:
         """Runs the Claude LLM."""
         command = ["claude", *(["--dangerously-skip-permissions"] if yolo else []), "-p", prompt]
-        result = run(
+        result = await run(
             command,
             "Calling Claude",
             command_human=command[:-1] + ["<prompt>"],
