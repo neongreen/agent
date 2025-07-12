@@ -19,13 +19,13 @@ Overview of the state machine:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import StrEnum, auto
 from itertools import takewhile
 from pathlib import Path
 from typing import Literal, Optional, assert_never
 
-from eliot import log_call, start_action
+from eliot import start_action
 
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
@@ -35,6 +35,7 @@ from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
 from agent.task_planning import planning_phase
 from agent.ui import set_phase, update_status
+from agent.util.eliot import log_call
 from agent.utils import format_tool_code_output, run
 
 
@@ -229,9 +230,9 @@ async def transition(
     """
 
     with start_action(
-        action_type=f"transition: {state.__class__.__name__}, {event.__class__.__name__}",
-        **({"state": state.__dataclass_fields__} if state.__dataclass_fields__ else {}),
-        **({"event": event.__dataclass_fields__} if event.__dataclass_fields__ else {}),
+        action_type=f"transition({state.__class__.__name__}, {event.__class__.__name__})",
+        **({"state": asdict(state)} if asdict(state) else {}),
+        **({"event": asdict(event)} if asdict(event) else {}),
     ) as action:
         match state, event:
             case StartingTask(), Tick():
@@ -264,7 +265,7 @@ async def transition(
                 assert_never(state)
                 assert_never(event)
 
-        action.addSuccessFields(_=result.__class__.__name__, **result.__dataclass_fields__)
+        action.addSuccessFields(_=result.__class__.__name__, **asdict(result))
 
         return result
 

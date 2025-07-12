@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Optional
 
 import trio
-from eliot import log_call
 
 from agent.constants import TASK_META_DIR
 from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, log
+from agent.util.eliot import log_call
 from agent.utils import run
 
 

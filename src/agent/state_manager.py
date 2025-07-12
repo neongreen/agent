@@ -3,9 +3,8 @@
 import json
 from typing import Dict
 
-from eliot import log_call
-
 from agent.constants import STATE_FILE, TaskState
+from agent.util.eliot import log_call
 
 
 @log_call

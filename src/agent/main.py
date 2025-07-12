@@ -11,6 +11,7 @@ import signal
 import tempfile
 from pathlib import Path
 
+import eliot
 import rich
 import trio
 
@@ -132,55 +133,60 @@ async def work() -> None:
         task_results = []
 
         for i, task_prompt in enumerate(selected_tasks, 1):
-            log(f"Processing task {i}/{len(selected_tasks)}: '{task_prompt}'", LLMOutputType.STATUS)
-            work_dir: Path | None = None
-            using_worktree: bool = False
-            task_status = "Failed"
-            task_commit_hash = "N/A"
-            task_error = None
+            with eliot.start_action(
+                action_type="agent.task",
+                task_number=i,
+                task=task_prompt,
+            ):
+                log(f"Processing task {i}/{len(selected_tasks)}: '{task_prompt}'", LLMOutputType.STATUS)
+                work_dir: Path | None = None
+                using_worktree: bool = False
+                task_status = "Failed"
+                task_commit_hash = "N/A"
+                task_error = None
 
-            try:
-                if cli_settings.no_worktree:
-                    # If no worktree is specified, use the effective_cwd directly
-                    work_dir = effective_cwd
-                    log(
-                        f"Worktrees disabled, using working directory for the task: {work_dir}",
-                        LLMOutputType.STATUS,
-                    )
-                else:
-                    # Create a new worktree for each task
-                    work_dir = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
-                    await git_utils.add_worktree(work_dir, rev=base, cwd=effective_cwd)
-                    using_worktree = True
-
-                os.chdir(work_dir)
-                await process_task(task_prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance)
-                task_status = "Success"
-                task_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir)
-            except Exception as e:
-                task_error = str(e)
-                log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
-            finally:
-                task_results.append(
-                    {
-                        "prompt": task_prompt,
-                        "status": task_status,
-                        "work_dir": str(work_dir) if work_dir else None,
-                        "commit_hash": task_commit_hash,
-                        "error": task_error,
-                    }
-                )
-                # Clean up worktree and return to original directory
-                if using_worktree and work_dir and work_dir.exists():
-                    try:
-                        # Change back to the original directory before removing worktree
-                        os.chdir(effective_cwd)
-                        await git_utils.remove_worktree(work_dir, cwd=effective_cwd)
-                    except Exception as e:
+                try:
+                    if cli_settings.no_worktree:
+                        # If no worktree is specified, use the effective_cwd directly
+                        work_dir = effective_cwd
                         log(
-                            f"Error cleaning up temporary worktree {work_dir}: {e}",
-                            LLMOutputType.TOOL_ERROR,
+                            f"Worktrees disabled, using working directory for the task: {work_dir}",
+                            LLMOutputType.STATUS,
                         )
+                    else:
+                        # Create a new worktree for each task
+                        work_dir = Path(tempfile.mkdtemp(prefix=f"agent_task_{i}_"))
+                        await git_utils.add_worktree(work_dir, rev=base, cwd=effective_cwd)
+                        using_worktree = True
+
+                    os.chdir(work_dir)
+                    await process_task(task_prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance)
+                    task_status = "Success"
+                    task_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir)
+                except Exception as e:
+                    task_error = str(e)
+                    log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
+                finally:
+                    task_results.append(
+                        {
+                            "prompt": task_prompt,
+                            "status": task_status,
+                            "work_dir": str(work_dir) if work_dir else None,
+                            "commit_hash": task_commit_hash,
+                            "error": task_error,
+                        }
+                    )
+                    # Clean up worktree and return to original directory
+                    if using_worktree and work_dir and work_dir.exists():
+                        try:
+                            # Change back to the original directory before removing worktree
+                            os.chdir(effective_cwd)
+                            await git_utils.remove_worktree(work_dir, cwd=effective_cwd)
+                        except Exception as e:
+                            log(
+                                f"Error cleaning up temporary worktree {work_dir}: {e}",
+                                LLMOutputType.TOOL_ERROR,
+                            )
 
         log("Agentic loop completed", LLMOutputType.STATUS)
         set_phase("Agentic loop completed")
@@ -207,10 +213,13 @@ async def _main() -> None:
     Initializes the nursery, starts the signal handler and the main work function,
     and ensures graceful shutdown.
     """
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(_signal_handler, nursery)
-        await work()
-        nursery.cancel_scope.cancel()
+    with eliot.start_action(
+        action_type="main",
+    ):
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(_signal_handler, nursery)
+            await work()
+            nursery.cancel_scope.cancel()
 
 
 def main() -> None:

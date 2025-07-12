@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional, assert_never
 
 import trio
-from eliot import log_call
 
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import PLAN_FILE
@@ -13,6 +12,7 @@ from agent.llm import check_verdict
 from agent.llms.base import LLMBase
 from agent.logging import LLMOutputType, format_as_markdown_blockquote, log
 from agent.ui import set_phase, update_status
+from agent.util.eliot import log_call
 
 
 @log_call(include_args=["task", "cwd"])
