@@ -380,6 +380,12 @@ async def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) 
             feedback = (
                 f"Post-implementation check command failed with exit code {check_result.exit_code}.\n"
                 + format_tool_code_output(check_result)
+                + "\n\n"
+                "Note that this is an automated check, not a judge reviewing your work.\n"
+                "You will *not* be able to proceed to the next step until this check passes.\n"
+                "Your next step is either to fix the issues reported by the check, or to undo your changes and try a different approach.\n"
+                "If the failure is expected, e.g. an expected test failure, "
+                "you still have to find some other way to report the failure without triggering the check.\n"
             )
             attempt_result = AttemptResult(
                 verdict=StepVerdict.PARTIAL,
