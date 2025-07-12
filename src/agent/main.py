@@ -21,9 +21,10 @@ from agent.cli_settings import CLISettings
 from agent.config import AGENT_SETTINGS as config
 from agent.constants import AGENT_TEMP_DIR
 from agent.llm import get_llm
-from agent.logging import LLMOutputType, display_task_summary
+from agent.logging import LLMOutputType
 from agent.state_manager import write_state
 from agent.task_orchestrator import process_task
+from agent.task_result import TaskResult, display_task_summary
 from agent.ui import get_ui_manager, set_phase
 from agent.utils import log
 
@@ -131,7 +132,7 @@ async def work() -> None:
         set_phase("Agent initialized")
 
         selected_tasks = cli_settings.prompt or []
-        task_results = []
+        task_results: list[TaskResult] = []
 
         for i, task_prompt in enumerate(selected_tasks, 1):
             with eliot.start_action(
@@ -143,7 +144,7 @@ async def work() -> None:
                 work_dir: Path | None = None
                 using_worktree: bool = False
                 task_status = "Failed"
-                task_commit_hash = "N/A"
+                last_commit_hash = "N/A"
                 task_error = None
 
                 try:
@@ -163,19 +164,18 @@ async def work() -> None:
                     os.chdir(work_dir)
                     await process_task(task_prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance)
                     task_status = "Success"
-                    task_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir)
+                    last_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir)
                 except Exception as e:
                     task_error = str(e)
                     log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
                 finally:
                     task_results.append(
-                        {
-                            "prompt": task_prompt,
-                            "status": task_status,
-                            "work_dir": str(work_dir) if work_dir else None,
-                            "commit_hash": task_commit_hash,
-                            "error": task_error,
-                        }
+                        TaskResult(
+                            task=task_prompt,
+                            status=task_status,
+                            last_commit_hash=last_commit_hash,
+                            error=task_error,
+                        )
                     )
                     # Clean up worktree and return to original directory
                     if using_worktree and work_dir and work_dir.exists():

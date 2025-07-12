@@ -23,11 +23,13 @@ Fixed:
 - `[CLINE]` Don't complain when there are no changes to commit.
 - Worked around gemini-cli outputting "Loaded cached credentials." in the response.
 - Asking LLMs to output the verdict in the last line of their response - maybe it will improve verdict detection.
+- The summary table works now.
 
 Internal:
 - `[CLINE]` Moved to Trio for async code.
 - `[CLINE]` Refactored the `LLM` class, centralized logging in `LLMBase`.
 - Added a mock test for the implementation phase.
+- `mise run run` runs the agent from a separate venv.
 
 ## v0-2025.07.09
 

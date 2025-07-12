@@ -1,9 +1,27 @@
 # This will be used when the agent is run with the `--mock` flag.
 
-[[prompts]]
-prompt = "Hello"
-response = "Hi there!"
+# Happy path
 
 [[prompts]]
-prompt = "What is your name?"
-response = "I am a mock LLM."
+prompt = "Generate.*branch names.*task=happy"
+response = "success-branch"
+
+[[prompts]]
+prompt = "Create a detailed implementation plan.*task=happy"
+response = """plan=approved"""
+
+[[prompts]]
+prompt = "Review this plan.*plan=approved"
+response = """APPROVED APPROVED APPROVED"""
+
+[[prompts]]
+prompt = "Execution phase.*task=happy.*plan=approved"
+response = """implementation=success"""
+
+[[prompts]]
+prompt = "Evaluate if these changes make progress.*implementation=success"
+response = """SUCCESS SUCCESS SUCCESS, end of step review."""
+
+[[prompts]]
+prompt = "Is the task.*task=happy.*now complete"
+response = "COMPLETE COMPLETE COMPLETE"

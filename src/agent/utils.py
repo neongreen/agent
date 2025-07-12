@@ -169,3 +169,13 @@ def format_tool_code_output(
     if tool_output.exit_code is not None:
         formatted_output.append(f"exit_code: {tool_output.exit_code}\n")
     return "\n".join(formatted_output)
+
+
+@dataclass(frozen=True)
+class TaskResult:
+    """Represents the result of processing a task."""
+
+    task: str
+    status: str
+    last_commit_hash: str | None
+    error: str | None = None
