@@ -10,6 +10,7 @@ import os
 import signal
 import tempfile
 from pathlib import Path
+from typing import assert_never
 
 import eliot
 import rich
@@ -208,7 +209,7 @@ async def _signal_handler(nursery: trio.Nursery) -> None:
             return
 
 
-async def _main() -> None:
+async def _main() -> None | SystemExit:
     """
     Initializes the nursery, starts the signal handler and the main work function,
     and ensures graceful shutdown.
@@ -217,9 +218,13 @@ async def _main() -> None:
         action_type="main",
     ):
         async with trio.open_nursery() as nursery:
-            nursery.start_soon(_signal_handler, nursery)
-            await work()
-            nursery.cancel_scope.cancel()
+            try:
+                nursery.start_soon(_signal_handler, nursery)
+                await work()
+            except SystemExit as e:
+                return e
+            finally:
+                nursery.cancel_scope.cancel()
 
 
 def main() -> None:
@@ -227,4 +232,11 @@ def main() -> None:
     Entry point for the agent application.
     """
 
-    trio.run(_main)
+    result = trio.run(_main)
+    match result:
+        case None:
+            exit(0)
+        case SystemExit():
+            raise result
+        case _:
+            assert_never(result)
