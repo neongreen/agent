@@ -44,5 +44,5 @@ judge-extra-prompt = """
   For example, if the task is "write a test for function Abc", then the plan can include writing and running a test for function `Abc`.
 
   If rejecting the plan, you must explain in detail why you are rejecting it.
-  You must also give the planner the entire rejection criteria from the above, so that it will adhere to all of them in the next planning round.
+  For each objection, you must provide the relevant rule from the judging criteria *and* concretely explain how the plan violates it.
 """
