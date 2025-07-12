@@ -3,7 +3,7 @@
 import json
 from typing import Dict
 
-from .constants import STATE_FILE, TaskState
+from agent.constants import STATE_FILE, TaskState
 
 
 def read_state() -> Dict[str, TaskState]:

@@ -10,9 +10,9 @@ import eliot
 from eliot import FileDestination, log_message
 from rich.console import Console
 
-from .constants import AGENT_STATE_BASE_DIR
-from .output_formatter import LLMOutputType, print_formatted_message
-from .ui import status_manager
+from agent.constants import AGENT_STATE_BASE_DIR
+from agent.output_formatter import LLMOutputType, print_formatted_message
+from agent.ui import status_manager
 
 
 console = Console()

@@ -23,14 +23,13 @@ from itertools import takewhile
 from pathlib import Path
 from typing import Literal, Optional, assert_never
 
+from agent.config import AGENT_SETTINGS as config
+from agent.constants import PLAN_FILE
+from agent.llm import LLM, check_verdict
+from agent.output_formatter import LLMOutputType, print_formatted_message
 from agent.task_planning import planning_phase
-
-from .config import AGENT_SETTINGS as config
-from .constants import PLAN_FILE
-from .llm import LLM, check_verdict
-from .output_formatter import LLMOutputType, print_formatted_message
-from .ui import status_manager
-from .utils import format_tool_code_output, log, run
+from agent.ui import status_manager
+from agent.utils import format_tool_code_output, log, run
 
 
 class StepVerdict(Enum):

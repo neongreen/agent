@@ -4,12 +4,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, assert_never
 
-from .config import AGENT_SETTINGS as config
-from .constants import PLAN_FILE
-from .llm import LLM, check_verdict
-from .output_formatter import LLMOutputType, print_formatted_message
-from .ui import status_manager
-from .utils import format_as_markdown_blockquote, log
+from agent.config import AGENT_SETTINGS as config
+from agent.constants import PLAN_FILE
+from agent.llm import LLM, check_verdict
+from agent.output_formatter import LLMOutputType, print_formatted_message
+from agent.ui import status_manager
+from agent.utils import format_as_markdown_blockquote, log
 
 
 def planning_phase(task: str, *, cwd: Path, llm: LLM) -> Optional[str]:

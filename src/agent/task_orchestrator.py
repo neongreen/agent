@@ -3,14 +3,14 @@
 from pathlib import Path
 from typing import assert_never
 
-from .constants import STATE_FILE, TaskState
-from .git_utils import resolve_commit_specifier, setup_task_branch
-from .llm import LLM
-from .output_formatter import LLMOutputType, print_formatted_message
-from .state_manager import read_state
-from .task_implementation import Done, TaskVerdict, implementation_phase
-from .ui import status_manager
-from .utils import log
+from agent.constants import STATE_FILE, TaskState
+from agent.git_utils import resolve_commit_specifier, setup_task_branch
+from agent.llm import LLM
+from agent.output_formatter import LLMOutputType, print_formatted_message
+from agent.state_manager import read_state
+from agent.task_implementation import Done, TaskVerdict, implementation_phase
+from agent.ui import status_manager
+from agent.utils import log
 
 
 def process_task(

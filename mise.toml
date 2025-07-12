@@ -47,7 +47,7 @@ run = """
 
 [tasks.xformat]
 description = "Run 'format' across all commits"
-run = """jj x -r 'mutable()' 'MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run format'"""
+run = """jj x 'MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run format'"""
 
 [tasks.clean-branches]
 description = "Remove all agent branches (bookmarks) below main"
