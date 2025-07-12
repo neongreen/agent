@@ -10,7 +10,7 @@ import trio
 
 from ok.constants import TASK_META_DIR
 from ok.llms.base import LLMBase
-from ok.logging import LLMOutputType, log
+from ok.log import LLMOutputType, log
 from ok.util.eliot import log_call
 from ok.utils import run
 

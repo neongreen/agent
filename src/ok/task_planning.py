@@ -6,13 +6,17 @@ from typing import Optional, assert_never
 
 import trio
 
-from ok.config import OK_SETTINGS as config
+from ok.config import OkSettings
 from ok.constants import PLAN_FILE
 from ok.llm import check_verdict
 from ok.llms.base import LLMBase
-from ok.logging import LLMOutputType, format_as_markdown_blockquote, log
+from ok.log import LLMOutputType, format_as_markdown_blockquote, log
 from ok.ui import set_phase, update_status
 from ok.util.eliot import log_call
+
+
+# TODO: where is this config filled?
+config = OkSettings()
 
 
 @log_call(include_args=["task", "cwd"])

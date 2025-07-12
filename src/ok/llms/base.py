@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from ok.logging import LLMOutputType, log
+from ok.log import LLMOutputType, log
 
 
 class LLMBase(ABC):

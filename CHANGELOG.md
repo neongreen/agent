@@ -5,6 +5,15 @@
 
 ## v0-next
 
+Added:
+
+- All config options are now available as CLI flags, and vice versa.
+
+Changed:
+
+- The default base commit is now `HEAD` instead of `main`.
+- The default base config option is just `base` instead of `default_base`.
+
 Fixed:
 
 - Stdout/stderr formatting (again).

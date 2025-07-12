@@ -14,7 +14,7 @@ log_mock = unittest.mock.Mock()
 @patch("ok.utils.run", run_mock)
 @patch("ok.ui.update_status", update_status_mock)
 @patch("ok.ui.set_phase", set_phase_mock)
-@patch("ok.logging.log", log_mock)
+@patch("ok.log.log", log_mock)
 async def test_implementation_phase() -> None:
     from ok.task_implementation import Done, Settings, TaskVerdict, implementation_phase
     from ok.utils import RunResult

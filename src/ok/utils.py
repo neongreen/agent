@@ -9,7 +9,7 @@ from typing import Optional
 import trio
 from eliot import start_action
 
-from ok.logging import LLMOutputType, log
+from ok.log import LLMOutputType, log
 from ok.ui import update_status
 
 

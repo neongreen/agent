@@ -17,6 +17,10 @@ run = "uvx --isolated --from . --refresh -- ok"
 description = "Run all checks and tests"
 depends = ["lint", "pyright", "check-schema", "test"]
 
+[tasks."check:ai"]
+description = "Run only the checks that we want agents to run (don't hassle them about import ordering, etc.)"
+depends = ["lint:ai", "pyright", "test"]
+
 [tasks.logs]
 description = "Show the logs of the agent (~/.ok/logs/)"
 quiet = true
@@ -100,6 +104,11 @@ run = ["uv run scripts/generate_schema.py --diff", "taplo validate .ok.toml"]
 description = "Run ruff to check the Python files"
 run = "ruff check"
 
+[tasks."lint:ai"]
+description = "Run ruff to check the Python files, but don't hassle agents about import ordering, etc."
+# E402 = import ordering
+run = "ruff check --exclude E402"
+
 [tasks.pyright]
 description = "Run pyright to check types in the Python files"
 run = "uv run pyright --project ."
@@ -117,3 +126,13 @@ description = "Build a specific commit of Opencode CLI and install it to ~/.ok/b
 tools.bun = "1.2.18"
 tools.go = "1.24.4"
 run = "uv run scripts/build_opencode.py"
+
+[tasks."logs:find-lints"]
+description = "Find all lints and errors in agent logs"
+run = '''
+  for f in ~/.ok/logs/*.json ~/.agent/logs/*.json; do
+    gron -s $f
+  done | rg --pcre2 '\\n\\n([^ ]+\.py)(:\d+:(\d+:)?) *(.*?)\\n' -or '$4' | sort | uniq -c | sort -nr
+'''
+tools.gron = "latest"
+tools.rg = "latest"

@@ -2,39 +2,42 @@
 
 # Partial config, see full documentation in the README.md
 
-default-base = "HEAD"
-
 post-implementation-hook-command = """
   MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run format
+  MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run generate-schema
 """
 
 post-implementation-check-command = """
-  MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run --jobs=1 check
+  MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run --jobs=1 check:ai
 """
 
 [plan]
 planner-extra-prompt = """
-  Do not propose writing tests, running automatic tests, or doing testing manually.
+  Do not propose doing testing manually.
   If you do, your plan will be rejected.
   The exception is if the **task** explicitly asks to write or run tests.
 
-  Please include updating the changelog in your plan, if the task results in a change to the codebase.
-  The changelog entry for your changes must start with "(*)".
-
-  Please note in your plan that all agent-generated commits must start with (AGENT) in the commit message,
-  and the task statement (cleaned up if needed) in the commit message body.
+  Read the .clinerules file before writing your plan.
+  It contains important rules and helpful knowledge about the project.
 """
 
 judge-extra-prompt = """
   You must reject the plan if:
-  - The plan proposes writing tests for anything other than pure functions that can be easily unit-tested.
-  - The plan proposes to run automatic tests or do testing manually, including "basic sanity checks" or "smoke testing".
-    Note that linters or type checkers *are allowed*.
-    Running tests written for pure functions is also allowed.
-  - The plan proposes to run the agent tool itself (src/agent/main.py).
+
+  - The plan proposes writing tests that are not very similar to the ones that already exist.
+    For example, adding a test to `tests/git_utils.py` is fine.
+    Writing an integration test or a test involving network is not fine, since we don't have any tests like that yet.
+  
+  - The plan proposes to do testing manually, including "basic sanity checks" or "smoke testing" or "visual inspection".
+    Note that linters or type checkers *are allowed*. Running existing tests is also allowed.
+
+  - The plan proposes to run the agent tool itself (`src/ok/main.py`).
+
   - The plan proposes using `pip` or `poetry` (this project uses `uv`).
     Also, dependencies must be added with `uv add`, not `uv pip`.
+  
   - The plan proposes pushing commits or creating pull requests.
+  
   - The plan proposes to edit `config.schema.json` (it is generated from Pydantic models).
 
   The exception is if the **task** explicitly asks to do any of these things.
@@ -42,10 +45,4 @@ judge-extra-prompt = """
 
   If rejecting the plan, you must explain in detail why you are rejecting it.
   You must also give the planner the entire rejection criteria from the above, so that it will adhere to all of them in the next planning round.
-"""
-
-[implement]
-completion.judge-extra-prompt = """
-  You must not accept the implementation until:
-  - The changelog has been updated accordingly (if the task results in a change to the codebase).
 """

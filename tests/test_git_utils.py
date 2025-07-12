@@ -31,7 +31,7 @@ def git_repo(tmp_path: Path) -> Path:
 
 
 # First we patch, and only then we import stuff that depends on the patched functions.
-with patch("ok.logging.log"):
+with patch("ok.log.log"):
     from ok.git_utils import (
         add_worktree,
         get_current_branch,

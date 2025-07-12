@@ -9,6 +9,7 @@ dependencies = [
     "eliot>=1.17.5",
     "trio>=0.30.0",
     "pygments>=2.19.2",
+    "patchy>=2.9.0",
 ]
 requires-python = ">=3.13"
 

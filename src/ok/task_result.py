@@ -1,6 +1,6 @@
 from rich.table import Table
 
-from ok.logging import console
+from ok.log import console
 from ok.utils import TaskResult
 
 

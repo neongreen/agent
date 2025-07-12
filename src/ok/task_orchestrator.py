@@ -6,7 +6,7 @@ from typing import assert_never
 from ok.constants import STATE_FILE, TaskState
 from ok.git_utils import resolve_commit_specifier, setup_task_branch
 from ok.llms.base import LLMBase
-from ok.logging import LLMOutputType, log
+from ok.log import LLMOutputType, log
 from ok.state_manager import read_state
 from ok.task_implementation import Done, TaskVerdict, implementation_phase
 from ok.ui import set_phase, update_status

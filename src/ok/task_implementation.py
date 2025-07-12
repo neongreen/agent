@@ -27,16 +27,19 @@ from typing import Literal, Optional, assert_never
 
 from eliot import start_action
 
-from ok.config import OK_SETTINGS as config
+from ok.config import OkSettings
 from ok.constants import PLAN_FILE
 from ok.git_utils import has_uncommitted_changes
 from ok.llm import check_verdict
 from ok.llms.base import LLMBase
-from ok.logging import LLMOutputType, log
+from ok.log import LLMOutputType, log
 from ok.task_planning import planning_phase
 from ok.ui import set_phase, update_status
 from ok.util.eliot import log_call
 from ok.utils import format_tool_code_output, run
+
+
+config = OkSettings()
 
 
 class StepVerdict(StrEnum):
@@ -313,7 +316,7 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
     Each run is called an "attempt".
     """
 
-    from ok.logging import format_as_markdown_blockquote
+    from ok.log import format_as_markdown_blockquote
 
     prev_attempt_feedback = (
         f"And the feedback about your previous attempt:\n\n{format_as_markdown_blockquote(state.attempts_log[-1].feedback or '')}\n\n"

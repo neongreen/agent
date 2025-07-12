@@ -47,6 +47,53 @@
       "title": "ImplementConfig",
       "type": "object"
     },
+    "LLMConfig": {
+      "description": "Configuration for the LLM used by the agent.",
+      "properties": {
+        "engine": {
+          "default": "gemini",
+          "description": "LLM engine to use (e.g., 'gemini', 'claude', 'codex', 'openrouter', 'opencode', 'mock')",
+          "enum": [
+            "gemini",
+            "claude",
+            "codex",
+            "openrouter",
+            "opencode",
+            "mock"
+          ],
+          "title": "Engine",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model name to use for the specified LLM engine",
+          "title": "Model"
+        }
+      },
+      "title": "LLMConfig",
+      "type": "object"
+    },
+    "MockLLMConfig": {
+      "description": "Configuration for the --mock LLM.",
+      "properties": {
+        "delay": {
+          "default": 5,
+          "description": "Set a 'sleep' inside each mock llm invocation",
+          "title": "Delay",
+          "type": "integer"
+        }
+      },
+      "title": "MockLLMConfig",
+      "type": "object"
+    },
     "PlanConfig": {
       "description": "Configuration for the planning phase of the agent.",
       "properties": {
@@ -65,16 +112,70 @@
       },
       "title": "PlanConfig",
       "type": "object"
+    },
+    "TaskConfig": {
+      "description": "Configuration for the task to be executed by the agent.",
+      "properties": {
+        "prompt": {
+          "description": "Task description or prompt to execute",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "cwd": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Working directory for task execution",
+          "title": "Cwd"
+        },
+        "base": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Base branch, commit, or git specifier",
+          "title": "Base"
+        },
+        "no-worktree": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Work directly in the target directory rather than in a temporary Git worktree.",
+          "title": "No-Worktree"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "TaskConfig",
+      "type": "object"
     }
   },
   "additionalProperties": false,
   "description": "OkSettings defines the configuration for the ok agent.",
   "properties": {
-    "default-base": {
-      "default": "main",
-      "description": "Default base branch, commit, or git specifier to switch to before creating a task branch",
-      "title": "Default-Base",
-      "type": "string"
+    "quiet": {
+      "default": false,
+      "description": "Suppress informational output",
+      "title": "Quiet",
+      "type": "boolean"
     },
     "plan": {
       "$ref": "#/$defs/PlanConfig",
@@ -83,6 +184,21 @@
     "implement": {
       "$ref": "#/$defs/ImplementConfig",
       "description": "Configuration for the implementation phase."
+    },
+    "llm": {
+      "$ref": "#/$defs/LLMConfig"
+    },
+    "mock-cfg": {
+      "$ref": "#/$defs/MockLLMConfig"
+    },
+    "tasks": {
+      "default": [],
+      "description": "Configuration for the tasks to be executed by the agent.",
+      "items": {
+        "$ref": "#/$defs/TaskConfig"
+      },
+      "title": "Tasks",
+      "type": "array"
     },
     "post-implementation-hook-command": {
       "default": "",
@@ -95,6 +211,31 @@
       "description": "Shell command to run after the post-implementation-hook-command. If it fails, the agent makes another attempt and its stdout/stderr is the feedback.",
       "title": "Post-Implementation-Check-Command",
       "type": "string"
+    },
+    "cwd": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Working directory for task execution. (default: current working directory)",
+      "title": "Cwd"
+    },
+    "base": {
+      "default": "HEAD",
+      "description": "Base branch, commit, or git specifier for tasks.",
+      "title": "Base",
+      "type": "string"
+    },
+    "no-worktree": {
+      "default": false,
+      "description": "Work directly in the target directory rather than in a temporary Git worktree.",
+      "title": "No-Worktree",
+      "type": "boolean"
     },
     "$schema": {
       "type": "string",

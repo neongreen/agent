@@ -1,9 +1,16 @@
 # Rules
 
-- Update the changelog in your plan, if the task results in a change to the codebase.
 - Do not use `pip` or `poetry` (this project uses `uv`).
+
 - Do not edit `config.schema.json` (it is generated from Pydantic models).
-- After making changes, run `mise pyright`. If it passes, also run `mise check`.
+  If you changed the schema in `config.py`, run `mise generate-schema` to regenerate it.
+
+- After making changes, run `mise pyright`. If it passes, also run `mise check:ai`.
+
+## Useful info
+
+- You can run `mise ok --help` to see all CLI options.
+  Every config option has a corresponding CLI option.
 
 ## Fixing errors
 

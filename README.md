@@ -102,11 +102,8 @@ Sample `.ok.toml`:
 
 ```toml
 # Specifies the default base branch, commit, or git specifier to use when creating task branches.
-# If not set, `main` is used as the default.
-default-base = "HEAD"
-
-# If set to true, suppresses informational output from the agent.
-quiet-mode = false
+# If not set, `HEAD` is used as the default.
+base = "main"
 
 # Specifies a shell command to execute after each implementation phase round.
 # This command will be executed after Gemini provides an implementation, but before it is evaluated.
