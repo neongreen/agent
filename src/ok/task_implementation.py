@@ -1,3 +1,22 @@
+from dataclasses import asdict, dataclass
+from enum import StrEnum, auto
+from pathlib import Path
+from typing import Literal, Optional, assert_never
+
+from eliot import start_action
+
+from ok.config import OkSettings
+from ok.constants import PLAN_FILE
+from ok.git_utils import has_uncommitted_changes
+from ok.llm import check_verdict
+from ok.llms.base import LLMBase
+from ok.log import LLMOutputType, log
+from ok.task_planning import planning_phase
+from ok.ui import set_phase, update_status
+from ok.util.eliot import log_call
+from ok.utils import format_tool_code_output, run
+
+
 """
 Manages the iterative step phase of a task, including code generation, execution, and evaluation.
 
@@ -16,30 +35,6 @@ Overview of the state machine:
     - if the task is complete, we will be returning to the main loop
     - if the task is not complete, we will be starting a new step
 """
-
-from __future__ import annotations
-
-from dataclasses import asdict, dataclass
-from enum import StrEnum, auto
-from itertools import takewhile
-from pathlib import Path
-from typing import Literal, Optional, assert_never
-
-from eliot import start_action
-
-from ok.config import OkSettings
-from ok.constants import PLAN_FILE
-from ok.git_utils import has_uncommitted_changes
-from ok.llm import check_verdict
-from ok.llms.base import LLMBase
-from ok.log import LLMOutputType, log
-from ok.task_planning import planning_phase
-from ok.ui import set_phase, update_status
-from ok.util.eliot import log_call
-from ok.utils import format_tool_code_output, run
-
-
-config = OkSettings()
 
 
 class StepVerdict(StrEnum):
@@ -215,8 +210,7 @@ class Settings:
     base_commit: str
     cwd: Path
     llm: LLMBase
-    max_step_attempts: int = 10
-    max_consecutive_failures: int = 3
+    config: OkSettings
 
 
 async def transition(
@@ -280,7 +274,7 @@ async def _handle_StartingTask(settings: Settings, state: StartingTask) -> Start
 
     # TODO: move into the same state machine?
 
-    plan = await planning_phase(llm=settings.llm, task=settings.task, cwd=settings.cwd)
+    plan = await planning_phase(llm=settings.llm, task=settings.task, cwd=settings.cwd, config=settings.config)
     if not plan:
         log("Failed to generate a plan for the step", message_type=LLMOutputType.ERROR)
         return Done(
@@ -327,7 +321,7 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
     # TODO: get rid of settings, they can all be in TaskState
     impl_prompt = (
         f"Execution phase. You are implementing this task: {repr(settings.task)}.\n"
-        f"This is your attempt #{len(state.attempts_log) + 1} out of {settings.max_step_attempts}.\n"
+        f"This is your attempt #{len(state.attempts_log) + 1}.\n"
         "\n"
         "Based on this plan:\n"
         "\n"
@@ -345,8 +339,8 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
         "    End of summary.\n\n"
     )
 
-    if config.implement.extra_prompt:
-        impl_prompt += f"""\n\n{config.implement.extra_prompt}"""
+    if settings.config.implement.extra_prompt:
+        impl_prompt += f"\n\n{settings.config.implement.extra_prompt}"
 
     update_status("Implementing a step")
 
@@ -364,18 +358,18 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
 
 async def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) -> JudgingAttempt | StartingAttempt:
     # This one always runs and is supposed to have things like formatters, etc.
-    if config.post_implementation_hook_command:
+    if settings.config.post_implementation_hook_command:
         await run(
-            config.post_implementation_hook_command,
+            settings.config.post_implementation_hook_command,
             "Running post-step hook",
             directory=settings.cwd,
             shell=True,
         )
 
     # This one *checks* code after the attempt. If it fails, we will make another attempt.
-    if config.post_implementation_check_command:
+    if settings.config.post_implementation_check_command:
         check_result = await run(
-            config.post_implementation_check_command,
+            settings.config.post_implementation_check_command,
             "Running post-implementation check",
             directory=settings.cwd,
             shell=True,
@@ -434,8 +428,8 @@ async def _evaluate_step(
         "- FAILURE FAILURE FAILURE if the changes are not useful and the author must rethink the approach.\n"
     )
 
-    if config.implement.judge_extra_prompt:
-        eval_prompt += f"\n\n{config.implement.judge_extra_prompt}"
+    if settings.config.implement.judge_extra_prompt:
+        eval_prompt += f"\n\n{settings.config.implement.judge_extra_prompt}"
 
     update_status("Evaluating step")
     evaluation = await settings.llm.run(
@@ -501,8 +495,8 @@ async def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVe
         "- CONTINUE CONTINUE CONTINUE if more work is needed.\n"
     )
 
-    if config.implement.completion.judge_extra_prompt:
-        completion_prompt += f"\n\n{config.implement.completion.judge_extra_prompt}"
+    if settings.config.implement.completion.judge_extra_prompt:
+        completion_prompt += f"\n\n{settings.config.implement.completion.judge_extra_prompt}"
 
     completion_evaluation = await settings.llm.run(
         completion_prompt,
@@ -603,6 +597,7 @@ async def implementation_phase(
     base_commit: str,
     cwd: Path,
     llm: LLMBase,
+    config: OkSettings,
 ) -> Done:
     """
     high‑level driver that repeatedly feeds events into the state‑machine
@@ -620,6 +615,7 @@ async def implementation_phase(
         base_commit=base_commit,
         cwd=cwd,
         llm=llm,
+        config=config,
     )
 
     try:
@@ -685,8 +681,6 @@ async def _handle_JudgingAttempt(
     This is called after each attempt to judge if the step is done
     """
 
-    prev_failed_attempts = len(list(takewhile(_is_failed_attempt, reversed(state.attempts_log))))
-
     verdict, evaluation = await _evaluate_step(settings, state.attempt_summary)
     log(f"Verdict from the judgment: {verdict}", message_type=LLMOutputType.DEBUG)
 
@@ -695,61 +689,45 @@ async def _handle_JudgingAttempt(
             verdict=None,
             feedback=evaluation or "Failed to evaluate step",
         )
-        if prev_failed_attempts >= settings.max_consecutive_failures:
-            return JudgingStep(
-                plan=state.plan,
-                steps_log=state.steps_log,
-                attempts_log=state.attempts_log + [attempt_result],
-            )
-        else:
-            return StartingAttempt(
-                plan=state.plan,
-                steps_log=state.steps_log,
-                attempts_log=state.attempts_log + [attempt_result],
-            )
+        new_attempts_log = state.attempts_log + [attempt_result]
+        if no_progress_in_last_n(new_attempts_log, n=5):
+            log("No progress in 5 attempts, terminating.", message_type=LLMOutputType.ERROR)
+            return Done(verdict="failed", status="No progress in 5 attempts")
+        return StartingAttempt(
+            plan=state.plan,
+            steps_log=state.steps_log,
+            attempts_log=new_attempts_log,
+        )
 
     # 3️⃣  branch on verdict ------------------------------------------------------
     attempt_result = AttemptResult(
         verdict=verdict,
         feedback=evaluation,
     )
+    new_attempts_log = state.attempts_log + [attempt_result]
+    if no_progress_in_last_n(new_attempts_log, n=5):
+        log("No progress in 5 attempts, terminating.", message_type=LLMOutputType.ERROR)
+        return Done(verdict="failed", status="No progress in 5 attempts")
 
     match verdict:
         case StepVerdict.SUCCESS:
-            # hand over to the completion‑review state
-
-            # 2. head over to the completion‑review state
             return JudgingStep(
                 plan=state.plan,
                 steps_log=state.steps_log,
-                attempts_log=state.attempts_log + [attempt_result],
+                attempts_log=new_attempts_log,
             )
-
         case StepVerdict.PARTIAL:
             return StartingAttempt(
                 plan=state.plan,
                 steps_log=state.steps_log,
-                attempts_log=state.attempts_log + [attempt_result],
+                attempts_log=new_attempts_log,
             )
-
         case StepVerdict.FAILURE:
-            if prev_failed_attempts >= settings.max_consecutive_failures:
-                log(
-                    f"Reached maximum consecutive failures ({settings.max_consecutive_failures}), finishing this step.",
-                    message_type=LLMOutputType.ERROR,
-                )
-                return JudgingStep(
-                    plan=state.plan,
-                    steps_log=state.steps_log,
-                    attempts_log=state.attempts_log + [attempt_result],
-                )
-            else:
-                return StartingAttempt(
-                    plan=state.plan,
-                    steps_log=state.steps_log,
-                    attempts_log=state.attempts_log + [attempt_result],
-                )
-
+            return StartingAttempt(
+                plan=state.plan,
+                steps_log=state.steps_log,
+                attempts_log=new_attempts_log,
+            )
         case other:
             assert_never(other)
 
@@ -773,4 +751,9 @@ async def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> D
     )
 
 
-# TODO: bring back checking for max step attempts
+def no_progress_in_last_n(attempts_log, n=5):
+    """Return True if the last n feedbacks are the same and not empty."""
+    if len(attempts_log) < n:
+        return False
+    last_feedbacks = [a.feedback for a in attempts_log[-n:]]
+    return all(f == last_feedbacks[0] and f for f in last_feedbacks)

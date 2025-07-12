@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import assert_never
 
+from ok.config import OkSettings
 from ok.constants import STATE_FILE, TaskState
 from ok.git_utils import resolve_commit_specifier, setup_task_branch
 from ok.llms.base import LLMBase
@@ -21,6 +22,7 @@ async def process_task(
     base_rev: str,
     cwd: Path,
     llm: LLMBase,
+    config: OkSettings,
 ) -> Done:
     """
     Processes a single task through its planning and implementation phases.
@@ -59,7 +61,13 @@ async def process_task(
         )
 
     else:
-        result = await implementation_phase(task=task, base_commit=resolved_base_commit_sha, cwd=cwd, llm=llm)
+        result = await implementation_phase(
+            task=task,
+            base_commit=resolved_base_commit_sha,
+            cwd=cwd,
+            llm=llm,
+            config=config,
+        )
 
     # Planning phase
     # plan: Optional[str] = None

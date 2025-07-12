@@ -17,7 +17,7 @@ import rich
 import trio
 
 from ok import git_utils
-from ok.config import init_settings
+from ok.config import get_config
 from ok.constants import OK_TEMP_DIR
 from ok.llm import get_llm
 from ok.llms.mock import MockLLM
@@ -45,7 +45,7 @@ async def work() -> None:
     global _llm_instance
 
     # Populate OkSettings from parsed args and config file
-    init_settings_result = init_settings()
+    init_settings_result = get_config()
     config = init_settings_result.ok_settings
 
     # Create the agent dir before even doing any logging
@@ -121,7 +121,7 @@ async def work() -> None:
                         using_worktree = True
 
                     os.chdir(work_dir)
-                    await process_task(prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance)
+                    await process_task(prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance, config=config)
                     task_status = "Success"
                     last_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir)
                 except Exception as e:

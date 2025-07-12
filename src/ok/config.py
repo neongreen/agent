@@ -321,12 +321,12 @@ class CliSettings(OkSettings, cli_hide_none_type=True):
 
 
 @dataclass(frozen=True)
-class InitSettingsResult:
+class FullConfig:
     ok_settings: OkSettings
     show_config: bool
 
 
-def init_settings() -> InitSettingsResult:
+def get_config() -> FullConfig:
     """
     Initializes the settings from config files, CLI, etc.
     """
@@ -334,7 +334,7 @@ def init_settings() -> InitSettingsResult:
         CliSettings,
         cli_settings_source=ok.util.pydantic.CliSettingsSource(CliSettings),
     )
-    return InitSettingsResult(ok_settings=cli_settings, show_config=cli_settings.show_config)
+    return FullConfig(ok_settings=cli_settings, show_config=cli_settings.show_config)
 
 
 if __name__ == "__main__":
@@ -343,9 +343,10 @@ if __name__ == "__main__":
     #
     #     python src/ok/config.py --help
     #
-    result = init_settings()
+    result = get_config()
     if result.show_config:
         print(result.ok_settings.model_dump_json(indent=2))
         exit(0)
 
-__all__ = ["InitSettingsResult", "OkSettings", "init_settings"]
+# TODO: how to avoid exporting the OkSettings constructor?
+__all__ = ["FullConfig", "OkSettings", "get_config"]

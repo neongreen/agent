@@ -2,6 +2,8 @@ import unittest.mock
 from pathlib import Path
 from unittest.mock import patch
 
+from ok.config import OkSettings
+
 
 llm_mock = unittest.mock.Mock()
 run_mock = unittest.mock.Mock()
@@ -31,10 +33,10 @@ async def test_implementation_phase() -> None:
             return "Excellent progress\nSUCCESS SUCCESS SUCCESS"
         if "now complete based on the work done" in prompt:
             return "Looks good\nCOMPLETE COMPLETE COMPLETE"
-        if "Implement the next step" in prompt and "This is your attempt #1" in prompt:
+        if "Execution phase" in prompt and "This is your attempt #1" in prompt:
             return "I think I'm done here."
         else:
-            raise ValueError(f"The mock LLM doesn't know how to respond to this prompt: {prompt}")
+            raise ValueError(f"The mock LLM doesn't know how to respond to this prompt: {repr(prompt)}")
 
     llm_mock.run.side_effect = llm_run_side_effect
 
@@ -54,6 +56,7 @@ async def test_implementation_phase() -> None:
         task="test task",
         cwd=Path("/test/cwd"),
         base_commit="main",
+        config=OkSettings(),
     )
 
     # Run the implementation phase
@@ -62,6 +65,7 @@ async def test_implementation_phase() -> None:
         base_commit=settings.base_commit,
         cwd=settings.cwd,
         llm=settings.llm,
+        config=settings.config,
     )
 
     # Assert the final result

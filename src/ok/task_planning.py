@@ -15,12 +15,8 @@ from ok.ui import set_phase, update_status
 from ok.util.eliot import log_call
 
 
-# TODO: where is this config filled?
-config = OkSettings()
-
-
 @log_call(include_args=["task", "cwd"])
-async def planning_phase(task: str, *, cwd: Path, llm: LLMBase) -> Optional[str]:
+async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: OkSettings) -> Optional[str]:
     """
     Iterative planning phase with Gemini approval.
 
