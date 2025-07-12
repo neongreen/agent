@@ -8,6 +8,7 @@
 Added:
 
 - All config options are now available as CLI flags, and vice versa.
+- `[OK]` Log file location is printed at the end of the run.
 
 Changed:
 

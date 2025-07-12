@@ -18,4 +18,4 @@ def display_task_summary(task_results: list[TaskResult]) -> None:
         table.add_row(result.task, result.status, result.last_commit_hash, result.error or "-")
 
     console.print(table)
-    console.print("\n\n", end="")
+    console.print("\n", end="")

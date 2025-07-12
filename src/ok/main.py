@@ -21,7 +21,7 @@ from ok.config import init_settings
 from ok.constants import OK_TEMP_DIR
 from ok.llm import get_llm
 from ok.llms.mock import MockLLM
-from ok.log import LLMOutputType, log
+from ok.log import LLMOutputType, console, get_log_file_path, log
 from ok.state_manager import write_state
 from ok.task_orchestrator import process_task
 from ok.task_result import TaskResult, display_task_summary
@@ -151,6 +151,8 @@ async def work() -> None:
         log("Agentic loop completed", LLMOutputType.STATUS)
         set_phase("Agentic loop completed")
         display_task_summary(task_results)
+        log_file_path = get_log_file_path()
+        console.print(f"Session log file: {log_file_path}\n\n", style="bold green")
 
 
 async def _signal_handler(nursery: trio.Nursery) -> None:

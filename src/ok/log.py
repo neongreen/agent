@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from enum import StrEnum, auto
+from pathlib import Path
 
 import eliot
 import eliot.json
@@ -55,19 +56,25 @@ def log_json_encoder(obj):
 
 
 _logging_initialized = False
+_log_file_path: Path | None = None
 
 
 def init_logging() -> None:
     global _logging_initialized
+    global _log_file_path
     if _logging_initialized:
         return
     _logging_initialized = True
 
     # Initialize Eliot logging
     timestamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
-    log_file = OK_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    eliot.add_destinations(FileDestination(file=open(log_file, "ab"), json_default=log_json_encoder))
+    _log_file_path = OK_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
+    _log_file_path.parent.mkdir(parents=True, exist_ok=True)
+    eliot.add_destinations(FileDestination(file=open(_log_file_path, "ab"), json_default=log_json_encoder))
+
+
+def get_log_file_path() -> Path | None:
+    return _log_file_path
 
 
 def __print_formatted_message(message: str, message_type: LLMOutputType):
