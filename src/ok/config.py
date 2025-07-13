@@ -108,7 +108,9 @@ class LLMEngineModel(BaseModel):
     )
     model: str | None = Field(
         default=None,
-        description="Model name to use for the specified LLM engine",
+        description=(
+            "Model to use for the specified LLM engine. For `gemini`, you can use shortcuts 'pro' and 'flash'."
+        ),
     )
 
     model_config = SettingsConfigDict(

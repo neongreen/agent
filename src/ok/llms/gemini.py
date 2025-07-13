@@ -19,7 +19,12 @@ class Gemini(LLMBase):
         cwd: Path,
     ) -> Optional[str]:
         """Runs the Gemini LLM."""
+        # TODO: I wonder if we can get Gemini to switch to Flash if the user runs out of Pro mid-session.
         gemini_model = self.model or "gemini-2.5-flash"
+        if gemini_model == "pro":
+            gemini_model = "gemini-2.5-pro"
+        elif gemini_model == "flash":
+            gemini_model = "gemini-2.5-flash"
         command = ["gemini", "-m", gemini_model, *(["--yolo"] if yolo else []), "-p", prompt]
 
         result = await env.run(

@@ -33,6 +33,7 @@ Internal:
 
 Added:
 
+- `[OK+EMILY]` Gemini now understands "pro" and "flash" as synonyms for `gemini-2.5-pro` and `gemini-2.5-flash`.
 - `[OK]` The new `post-implementation-check-command` setting runs a command after post-implementation hook.
   If it fails, the agent will make another attempt without going to the judge first.
 - `[CLINE]` The `--mock` option to use a mock (data from a file) instead of an LLM.
