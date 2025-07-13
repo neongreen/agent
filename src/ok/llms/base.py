@@ -51,6 +51,7 @@ class LLMBase(ABC):
                 env.log(f"LLM response: {response}", message_type=response_type)
             return response
         except Exception as e:
+            env.log_debug("Caught an exception", exc=repr(e))
             env.log(f"Error running LLM: {e}", message_type=LLMOutputType.ERROR)
             return None
 
@@ -81,7 +82,8 @@ class LLMBase(ABC):
             self.llm_process.terminate()
             try:
                 self.llm_process.wait(timeout=5)  # Wait for 5 seconds for graceful termination
-            except subprocess.TimeoutExpired:
+            except subprocess.TimeoutExpired as e:
+                env.log_debug("Caught an exception", exc=repr(e))
                 env.log(
                     f"LLM process {pid} did not terminate gracefully, killing it.", message_type=LLMOutputType.STATUS
                 )

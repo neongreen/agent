@@ -30,6 +30,8 @@ class Env(Protocol):
 
     def log(self, message: str, message_type: LLMOutputType, message_human: str | None = None) -> None: ...
 
+    def log_debug(self, message: str, **kwargs) -> None: ...
+
     async def run(
         self,
         command: str | list[str],

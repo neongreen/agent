@@ -113,6 +113,7 @@ async def process_task(
             env.log("Agent state file removed.", message_type=LLMOutputType.STATUS)
             update_status("Agent state file removed.")
     except OSError as e:
+        env.log_debug("Caught an exception", exc=repr(e))
         env.log(f"Error removing agent state file: {e}", message_type=LLMOutputType.ERROR)
         update_status("Error removing agent state file.", style="red")
 

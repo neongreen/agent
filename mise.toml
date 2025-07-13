@@ -58,6 +58,10 @@ run = """
   echo "--- $usage_file ---"
 """
 
+[tasks."logs:filter"]
+description = "Filter the logs of the agent (~/.ok/logs/)"
+run = "uv run scripts/show_eliot_logs.py"
+
 [tasks.format]
 description = "Format everything"
 run = "dprint fmt"

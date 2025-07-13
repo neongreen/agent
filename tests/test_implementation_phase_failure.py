@@ -15,6 +15,9 @@ class MockEnv(Env):
     def log(self, message: str, message_type=None, message_human: str | None = None) -> None:
         pass
 
+    def log_debug(self, message: str, **kwargs) -> None:
+        pass
+
     async def run(
         self,
         command: str | list[str],

@@ -48,7 +48,10 @@ class MockEnv(Env):
         self.config = ConfigModel(run_timeout_seconds=5, llm_timeout_seconds=5)
 
     def log(self, message: str, message_type=None, message_human: str | None = None) -> None:
-        pass
+        print(f"{message_type}: {message}")
+
+    def log_debug(self, message: str, **kwargs) -> None:
+        print(f"DEBUG: {message} {kwargs}")
 
     async def run(
         self,

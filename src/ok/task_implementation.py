@@ -44,7 +44,13 @@ class StepVerdict(StrEnum):
     SUCCESS = auto()
     """Work done here is a good step forward."""
     PARTIAL = auto()
-    """Keep work done in this step so far, but it needs more iteration."""
+    """
+    Keep work done in this step so far, but it needs more iteration.
+    """
+    AUTO_CHECK_FAILED = auto()
+    """
+    Automated check (e.g. lint, tests) failed, distinct from PARTIAL.
+    """
     FAILURE = auto()
     """Work done in this step is not useful and should be discarded."""
 
@@ -325,6 +331,11 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
 
     from ok.log import format_as_markdown_blockquote
 
+    settings.env.log_debug(
+        "StartingAttempt, previous attempt was:",
+        previous_attempt=state.attempts_log[-1] if state.attempts_log else None,
+    )
+
     prev_attempt_feedback = (
         f"And this feedback from the last iteration:\n\n{format_as_markdown_blockquote(state.attempts_log[-1].feedback or '')}\n\n"
         if state.attempts_log
@@ -401,7 +412,7 @@ async def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) 
                 "you still have to find some other way to report the failure without triggering the check.\n"
             )
             attempt_result = AttemptResult(
-                verdict=StepVerdict.PARTIAL,
+                verdict=StepVerdict.AUTO_CHECK_FAILED,
                 feedback=feedback,
             )
             return StartingAttempt(
@@ -702,7 +713,8 @@ async def implementation_phase(
         while not isinstance(state, Done):
             state = await transition(state, Tick(), settings)
 
-    except KeyboardInterrupt:
+    except* KeyboardInterrupt as group:
+        env.log_debug("Caught an exception group", exc=[repr(e) for e in group.exceptions])
         settings.env.log(
             "Interrupted by user (KeyboardInterrupt)",
             message_type=LLMOutputType.ERROR,
@@ -735,19 +747,6 @@ async def implementation_phase(
 
 
 # ────────────────────────────── Transitions ──────────────────────────────
-
-
-def _is_failed_attempt(attempt: AttemptResult) -> bool:
-    """
-    Check if the attempt is a failed attempt.
-    """
-    match attempt.verdict:
-        case StepVerdict.SUCCESS | StepVerdict.PARTIAL:
-            return False
-        case StepVerdict.FAILURE | None:
-            return True
-        case other:
-            assert_never(other)
 
 
 async def _handle_JudgingAttempt(
@@ -793,7 +792,7 @@ async def _handle_JudgingAttempt(
                 steps_log=state.steps_log,
                 attempts_log=new_attempts_log,
             )
-        case StepVerdict.PARTIAL:
+        case StepVerdict.PARTIAL | StepVerdict.AUTO_CHECK_FAILED:
             return StartingAttempt(
                 plan=state.plan,
                 steps_log=state.steps_log,
@@ -831,6 +830,7 @@ async def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> D
                 run_timeout_seconds=settings.config.run_timeout_seconds,
             )
     except Exception as e:
+        settings.env.log_debug("Caught an exception", exc=repr(e))
         settings.env.log(f"Failed to make final commit: {e}", message_type=LLMOutputType.TOOL_ERROR)
 
     return Done(
@@ -840,8 +840,23 @@ async def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> D
 
 
 def no_progress_in_last_n(attempts_log, n=5):
-    """Return True if the last n feedbacks are the same and not empty."""
+    """
+    Return True if there is no progress in the last n attempts.
+    Progress is only SUCCESS, or a flip between PARTIAL and AUTO_CHECK_FAILED.
+    If verdicts are all the same and not SUCCESS, or just flip endlessly, return True.
+    """
     if len(attempts_log) < n:
         return False
-    last_feedbacks = [a.feedback for a in attempts_log[-n:]]
-    return all(f == last_feedbacks[0] and f for f in last_feedbacks)
+    last_verdicts = [a.verdict for a in attempts_log[-n:]]
+    # If any is SUCCESS, progress is made
+    if any(v == StepVerdict.SUCCESS for v in last_verdicts):
+        return False
+    # If verdicts just flip between PARTIAL and AUTO_CHECK_FAILED, and nothing else
+    allowed = {StepVerdict.PARTIAL, StepVerdict.AUTO_CHECK_FAILED}
+    if set(last_verdicts).issubset(allowed):
+        # Check if they just alternate
+        pattern1 = [StepVerdict.PARTIAL, StepVerdict.AUTO_CHECK_FAILED] * (n // 2 + 1)
+        pattern2 = [StepVerdict.AUTO_CHECK_FAILED, StepVerdict.PARTIAL] * (n // 2 + 1)
+        if last_verdicts == pattern1[:n] or last_verdicts == pattern2[:n]:
+            return True
+    return False

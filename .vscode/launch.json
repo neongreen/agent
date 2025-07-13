@@ -6,7 +6,18 @@
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
+      "justMyCode": false,
       "args": "${command:pickArgs}"
+    },
+    {
+      "name": "Python Debugger: Main",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/ok/main.py",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "args": "${command:pickArgs}",
+      "python": "${command:python.interpreterPath}"
     }
   ]
 }

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import eliot
 import eliot.json
-from eliot import FileDestination
+from eliot import FileDestination, register_exception_extractor
 from rich.console import Console
 from rich.errors import MarkupError
 from rich.markdown import Markdown
@@ -55,6 +55,7 @@ def log_json_encoder(obj):
         return repr(obj)
 
 
+# TODO: get rid of this global state
 _logging_initialized = False
 _log_file_path: Path | None = None
 
@@ -71,6 +72,9 @@ def init_logging() -> None:
     _log_file_path = OK_STATE_BASE_DIR / "logs" / f"log-{timestamp}_{os.getpid()}.json"
     _log_file_path.parent.mkdir(parents=True, exist_ok=True)
     eliot.add_destinations(FileDestination(file=open(_log_file_path, "ab"), json_default=log_json_encoder))
+
+    # For Trio
+    register_exception_extractor(BaseExceptionGroup, lambda e: {"str": repr(e)})
 
 
 def get_log_file_path() -> Path | None:
@@ -132,7 +136,8 @@ def real_log(
     init_logging()
 
     if not quiet:
-        __print_formatted_message(message_human or message, message_type)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        __print_formatted_message(now + ": " + (message_human or message), message_type)
 
     eliot.log_message(f"log.{message_type}", str=message, **({"human": message_human} if message_human else {}))
 

@@ -7,7 +7,6 @@ and orchestration of the agent's task processing.
 
 import os
 import shutil
-import signal
 import tempfile
 from pathlib import Path
 from typing import Optional, assert_never
@@ -16,13 +15,14 @@ import eliot
 import rich
 import trio
 
+import ok.log
 from ok import git_utils
 from ok.config import ConfigModel, get_settings
 from ok.constants import OK_TEMP_DIR
 from ok.env import Env, RunResult
 from ok.llm import get_llm
 from ok.llms.mock import MockLLM
-from ok.log import LLMOutputType, console, get_log_file_path, init_logging, real_log
+from ok.log import LLMOutputType
 from ok.state_manager import write_state
 from ok.task_orchestrator import process_task
 from ok.task_result import TaskResult, display_task_summary
@@ -37,10 +37,13 @@ class RealEnv(Env):
 
     def __init__(self, config: ConfigModel) -> None:
         self.config = config
-        init_logging()
+        ok.log.init_logging()
 
-    def log(self, message: str, message_type: LLMOutputType, message_human: str | None = None) -> None:
-        real_log(message, message_type, message_human=message_human)
+    def log(self, message: str, message_type: ok.log.LLMOutputType, message_human: str | None = None) -> None:
+        ok.log.real_log(message, message_type, message_human=message_human)
+
+    def log_debug(self, message: str, **kwargs) -> None:
+        eliot.log_message("log", message=message, **kwargs)
 
     async def run(
         self,
@@ -104,15 +107,6 @@ async def work(nursery: trio.Nursery) -> None:
         else:
             llm_instance = get_llm(engine=config.llm.engine, model=config.llm.model)
 
-        # Handles SIGINT signals to gracefully shut down the agent.
-        with trio.open_signal_receiver(signal.SIGINT) as signal_chan:
-            async for _ in signal_chan:
-                pid = llm_instance.terminate_llm_process(env)
-                if pid:
-                    print(f"LLM process with PID {pid} killed.")
-                nursery.cancel_scope.cancel()
-                return
-
         task_results: list[TaskResult] = []
 
         for i, task in enumerate(config.tasks):
@@ -169,6 +163,7 @@ async def work(nursery: trio.Nursery) -> None:
                     task_status = "Success"
                     last_commit_hash = await git_utils.get_current_commit_hash(env, cwd=work_dir)
                 except Exception as e:
+                    env.log_debug("Caught an exception", exc=repr(e))
                     task_error = str(e)
                     env.log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
                 finally:
@@ -187,6 +182,7 @@ async def work(nursery: trio.Nursery) -> None:
                             os.chdir(cwd)
                             await git_utils.remove_worktree(env, work_dir, cwd=cwd)
                         except Exception as e:
+                            env.log_debug("Caught an exception", exc=repr(e))
                             env.log(
                                 f"Error cleaning up temporary worktree {work_dir}: {e}",
                                 LLMOutputType.TOOL_ERROR,
@@ -195,15 +191,11 @@ async def work(nursery: trio.Nursery) -> None:
         env.log("Agentic loop completed", LLMOutputType.STATUS)
         set_phase("Agentic loop completed")
         display_task_summary(task_results)
-        log_file_path = get_log_file_path()
-        console.print(f"Session log file: {log_file_path}\n\n", style="bold green")
+        log_file_path = ok.log.get_log_file_path()
+        ok.log.console.print(f"Session log file: {log_file_path}\n\n", style="bold green")
 
 
 async def _main() -> None | SystemExit:
-    """
-    Initializes the nursery, starts the signal handler and the main work function,
-    and ensures graceful shutdown.
-    """
     with eliot.start_action(
         action_type="main",
     ):

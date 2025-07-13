@@ -17,9 +17,11 @@ Changed:
 
 - The default base commit is now `HEAD` instead of `main`.
 - The default base config option is just `base` instead of `default_base`.
+- `[COPILOT]` Tinkering with the lack-of-progress stopping.
 
 Fixed:
 
+- Ctrl+C now works for real!!! (I spent half a day on this.)
 - Stdout/stderr formatting (again).
 
 Internal:
