@@ -13,9 +13,9 @@ from ok.utils import run
 class Codex(LLMBase):
     """Codex LLM provider."""
 
-    async def _run(self, prompt: str, yolo: bool, *, cwd: Path) -> Optional[str]:
+    async def _run(self, prompt: str, yolo: bool, *, cwd: Path, config) -> Optional[str]:
         """Runs the Codex LLM."""
-        return await self._run_codex(prompt, yolo, model=self.model, cwd=cwd)
+        return await self._run_codex(prompt, yolo, model=self.model, cwd=cwd, config=config)
 
     async def _run_codex(
         self,
@@ -26,6 +26,7 @@ class Codex(LLMBase):
         model: Optional[str] = None,
         provider_url: Optional[str] = None,
         provider_env_key: Optional[str] = None,
+        config=None,
     ) -> Optional[str]:
         with tempfile.NamedTemporaryFile("r", prefix="ok-codex-output", dir=OK_TEMP_DIR, delete=True) as temp_file:
             temp_file_path = os.path.join(OK_TEMP_DIR, temp_file.name)
@@ -52,8 +53,7 @@ class Codex(LLMBase):
                 "Calling Codex",
                 command_human=command[:-1] + ["<prompt>"],
                 directory=cwd,
-                log_stdout=False,
-                store_process=True,
+                run_timeout_seconds=config.llm_timeout_seconds if config else 60,
             )
             if result.success:
                 response = temp_file.read().strip()

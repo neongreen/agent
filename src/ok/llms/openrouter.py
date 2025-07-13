@@ -23,6 +23,7 @@ class OpenRouter(Codex):
         yolo: bool,
         *,
         cwd: Path,
+        config,
     ) -> Optional[str]:
         """Runs the OpenRouter LLM."""
         provider_url = "https://openrouter.ai/api/v1"
@@ -34,4 +35,5 @@ class OpenRouter(Codex):
             provider_url=provider_url,
             provider_env_key=provider_env_key,
             cwd=cwd,
+            config=config,
         )

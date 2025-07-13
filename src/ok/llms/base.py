@@ -27,6 +27,7 @@ class LLMBase(ABC):
         yolo: bool,
         *,
         cwd: Path,
+        config,
         phase: Optional[str] = None,
         step_number: Optional[int] = None,
         attempt_number: Optional[int] = None,
@@ -50,7 +51,7 @@ class LLMBase(ABC):
 
         log(prompt, message_type=LLMOutputType.PROMPT)
         try:
-            response = await self._run(prompt, yolo, cwd=cwd)
+            response = await self._run(prompt, yolo, cwd=cwd, config=config)
             if response is not None:
                 log(f"LLM response: {response}", message_type=response_type)
             return response
@@ -65,6 +66,7 @@ class LLMBase(ABC):
         yolo: bool,
         *,
         cwd: Path,
+        config,
     ) -> Optional[str]:
         """
         Runs the LLM with the given prompt. No logging, no status updates, etc.

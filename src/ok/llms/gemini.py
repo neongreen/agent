@@ -16,6 +16,7 @@ class Gemini(LLMBase):
         yolo: bool,
         *,
         cwd: Path,
+        config,
     ) -> Optional[str]:
         """Runs the Gemini LLM."""
         gemini_model = self.model or "gemini-2.5-flash"
@@ -27,8 +28,7 @@ class Gemini(LLMBase):
             command_human=command[:-1] + ["<prompt>"],
             directory=cwd,
             status_message="Calling Gemini",
-            log_stdout=False,
-            store_process=True,
+            run_timeout_seconds=config.llm_timeout_seconds,
         )
         if result.success:
             response = result.stdout.strip()

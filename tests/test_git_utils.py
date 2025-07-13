@@ -63,6 +63,10 @@ with patch("ok.log.log"):
         cleaned: str = sanitize_branch_name(raw)
         assert cleaned == "no-name"
 
+    from ok.config import ConfigModel
+
+    dummy_config = ConfigModel(run_timeout_seconds=10, llm_timeout_seconds=5)
+
     async def test_get_existing_branch_names(git_repo: Path) -> None:
         """
         Test that get_existing_branch_names returns the default branch after repo init.
@@ -70,7 +74,7 @@ with patch("ok.log.log"):
         Args:
             git_repo: Path to the temporary git repository.
         """
-        branches: list[str] = await get_existing_branch_names(cwd=git_repo)
+        branches: list[str] = await get_existing_branch_names(cwd=git_repo, config=dummy_config)
         assert any(b in branches for b in ["master", "main"])
 
     async def test_resolve_commit_specifier(git_repo: Path) -> None:
@@ -82,23 +86,23 @@ with patch("ok.log.log"):
             git_repo: Path to the temporary git repository.
         """
 
-        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo)
+        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo, config=dummy_config)
         if commit_hash is None:
             pytest.fail("No commit hash available")
         # Full hash
-        resolved_full: str | None = await resolve_commit_specifier(commit_hash, cwd=git_repo)
+        resolved_full: str | None = await resolve_commit_specifier(commit_hash, cwd=git_repo, config=dummy_config)
         assert resolved_full == commit_hash
         # Short hash
         short_hash = commit_hash[:7]
-        resolved_short: str | None = await resolve_commit_specifier(short_hash, cwd=git_repo)
+        resolved_short: str | None = await resolve_commit_specifier(short_hash, cwd=git_repo, config=dummy_config)
         assert resolved_short == commit_hash
         # Branch name
-        branch: str | None = await get_current_branch(cwd=git_repo)
+        branch: str | None = await get_current_branch(cwd=git_repo, config=dummy_config)
         if branch is not None:
-            resolved_branch: str | None = await resolve_commit_specifier(branch, cwd=git_repo)
+            resolved_branch: str | None = await resolve_commit_specifier(branch, cwd=git_repo, config=dummy_config)
             assert resolved_branch == commit_hash
         # HEAD
-        resolved_head: str | None = await resolve_commit_specifier("HEAD", cwd=git_repo)
+        resolved_head: str | None = await resolve_commit_specifier("HEAD", cwd=git_repo, config=dummy_config)
         assert resolved_head == commit_hash
 
     async def test_get_current_branch(git_repo: Path) -> None:
@@ -108,7 +112,7 @@ with patch("ok.log.log"):
         Args:
             git_repo: Path to the temporary git repository.
         """
-        branch: str | None = await get_current_branch(cwd=git_repo)
+        branch: str | None = await get_current_branch(cwd=git_repo, config=dummy_config)
         assert branch in ["master", "main"]
 
     async def test_get_current_commit_hash(git_repo: Path) -> None:
@@ -118,7 +122,7 @@ with patch("ok.log.log"):
         Args:
             git_repo: Path to the temporary git repository.
         """
-        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo)
+        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo, config=dummy_config)
         assert commit_hash is not None
         assert len(commit_hash) == 40
 
@@ -133,14 +137,14 @@ with patch("ok.log.log"):
 
         # Add a new worktree
         worktree_path: Path = tmp_path / "worktree"
-        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo)
+        commit_hash: str | None = await get_current_commit_hash(cwd=git_repo, config=dummy_config)
         if commit_hash is None:
             pytest.fail("No commit hash available")
-        added: bool = await add_worktree(worktree_path, rev=commit_hash, cwd=git_repo)
+        added: bool = await add_worktree(worktree_path, rev=commit_hash, cwd=git_repo, config=dummy_config)
         assert added
         assert worktree_path.exists()
         # Remove the worktree
-        removed: bool = await remove_worktree(worktree_path, cwd=git_repo)
+        removed: bool = await remove_worktree(worktree_path, cwd=git_repo, config=dummy_config)
         assert removed
         assert not (worktree_path / ".git").exists()
 
@@ -153,9 +157,9 @@ with patch("ok.log.log"):
         from ok.git_utils import add_worktree, get_existing_branch_names
 
         # Ensure 'main' branch exists (or skip if not)
-        branches = await get_existing_branch_names(cwd=git_repo)
+        branches = await get_existing_branch_names(cwd=git_repo, config=dummy_config)
         assert "main" in branches, "Main branch should exist in the test repository"
 
         worktree_path = tmp_path / "worktree_main"
-        added: bool = await add_worktree(worktree_path, rev="main", cwd=git_repo)
+        added: bool = await add_worktree(worktree_path, rev="main", cwd=git_repo, config=dummy_config)
         assert added

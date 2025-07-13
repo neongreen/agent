@@ -13,7 +13,7 @@ from ok.log import LLMOutputType, log
 from ok.ui import update_status
 
 
-@dataclass(frozen=True)
+@dataclass
 class RunResult:
     """Represents the result of a shell command execution."""
 
@@ -32,8 +32,7 @@ async def run(
     *,
     directory: Path,
     shell: bool = False,
-    log_stdout: bool = True,
-    store_process: bool = False,
+    run_timeout_seconds: int,
 ) -> RunResult:
     """
     Run command asynchronously using Trio and log it.
@@ -45,7 +44,7 @@ async def run(
         description: Optional description of the command for logging.
         directory: Optional working directory to run the command in as a Path.
         command_human: If present, will be used in console output instead of the full command.
-        store_process: Ignored (for compatibility).
+        run_timeout_seconds: Timeout for the command execution in seconds. Expected to come from `ConfigModel`.
     """
 
     if isinstance(command, str):
@@ -77,7 +76,9 @@ async def run(
             message_type=LLMOutputType.TOOL_EXECUTION,
         )
 
-        try:
+    try:
+        result_obj = None
+        with trio.move_on_after(run_timeout_seconds) as cancel_scope:
             result_obj = await trio.run_process(
                 command,
                 cwd=abs_directory,
@@ -86,58 +87,60 @@ async def run(
                 capture_stderr=True,
                 check=False,
             )
-            stdout = result_obj.stdout.decode() if result_obj.stdout else ""
-            stderr = result_obj.stderr.decode() if result_obj.stderr else ""
-            returncode = result_obj.returncode
+        if cancel_scope.cancel_called or result_obj is None:
+            raise TimeoutError(f"Command timed out after {run_timeout_seconds} seconds")
+        stdout = result_obj.stdout.decode() if result_obj.stdout else ""
+        stderr = result_obj.stderr.decode() if result_obj.stderr else ""
+        returncode = result_obj.returncode
 
-            if returncode != 0:
-                log(
-                    f"Command {command_display} failed with exit code {returncode}\nStdout: {stdout}\nStderr: {stderr}",
-                    message_human=(
-                        "\n\n".join(
-                            [
-                                f"Command `{command_human_display}` failed with exit code {returncode}",
-                                f"Stdout:\n\n```\n{stdout}\n```" if stdout.strip() else "Stdout: empty",
-                                f"Stderr:\n\n```\n{stderr}\n```" if stderr.strip() else "Stderr: empty",
-                            ]
-                        )
-                    ),
-                    message_type=LLMOutputType.TOOL_ERROR,
-                )
-
-            result = RunResult(
-                exit_code=returncode,
-                stdout=stdout,
-                stderr=stderr,
-                success=returncode == 0,
+        if returncode != 0:
+            log(
+                f"Command {command_display} failed with exit code {returncode}\nStdout: {stdout}\nStderr: {stderr}",
+                message_human=(
+                    "\n\n".join(
+                        [
+                            f"Command `{command_human_display}` failed with exit code {returncode}",
+                            f"Stdout:\n\n```\n{stdout}\n```" if stdout.strip() else "Stdout: empty",
+                            f"Stderr:\n\n```\n{stderr}\n```" if stderr.strip() else "Stderr: empty",
+                        ]
+                    )
+                ),
+                message_type=LLMOutputType.TOOL_ERROR,
             )
 
-            action.add_success_fields(
-                **({"exit_code": result.exit_code} if result.exit_code != 0 else {}),
-                **({"stdout": result.stdout} if result.stdout.strip() else {}),
-                **({"stderr": result.stderr} if result.stderr.strip() else {}),
-            )
+        result = RunResult(
+            exit_code=returncode,
+            stdout=stdout,
+            stderr=stderr,
+            success=returncode == 0,
+        )
 
-            return result
+        action.add_success_fields(
+            **({"exit_code": result.exit_code} if result.exit_code != 0 else {}),
+            **({"stdout": result.stdout} if result.stdout.strip() else {}),
+            **({"stderr": result.stderr} if result.stderr.strip() else {}),
+        )
 
-        except Exception as e:
-            log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
-            result = RunResult(
-                exit_code=-1,
-                stdout="",
-                stderr=str(e),
-                success=False,
-                error=str(e),
-            )
+        return result
 
-            action.add_success_fields(
-                exit_code=result.exit_code,
-                stdout=result.stdout,
-                stderr=result.stderr,
-                error=result.error,
-            )
+    except Exception as e:
+        log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
+        result = RunResult(
+            exit_code=-1,
+            stdout="",
+            stderr=str(e),
+            success=False,
+            error=str(e),
+        )
 
-            return result
+        action.add_success_fields(
+            exit_code=result.exit_code,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            error=result.error,
+        )
+
+        return result
 
 
 # TODO: this seems weird
@@ -171,7 +174,7 @@ def format_tool_code_output(
     return "\n".join(formatted_output)
 
 
-@dataclass(frozen=True)
+@dataclass
 class TaskResult:
     """Represents the result of processing a task."""
 

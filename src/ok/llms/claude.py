@@ -10,7 +10,7 @@ from ok.utils import run
 class Claude(LLMBase):
     """Claude LLM provider."""
 
-    async def _run(self, prompt: str, yolo: bool, *, cwd: Path) -> Optional[str]:
+    async def _run(self, prompt: str, yolo: bool, *, cwd: Path, config) -> Optional[str]:
         """Runs the Claude LLM."""
         command = ["claude", *(["--dangerously-skip-permissions"] if yolo else []), "-p", prompt]
         result = await run(
@@ -18,8 +18,7 @@ class Claude(LLMBase):
             "Calling Claude",
             command_human=command[:-1] + ["<prompt>"],
             directory=cwd,
-            log_stdout=False,
-            store_process=True,
+            run_timeout_seconds=config.llm_timeout_seconds,
         )
         if result.success:
             response = result.stdout.strip()

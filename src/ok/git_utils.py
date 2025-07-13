@@ -8,6 +8,7 @@ from typing import Optional
 
 import trio
 
+from ok.config import ConfigModel
 from ok.constants import TASK_META_DIR
 from ok.llms.base import LLMBase
 from ok.log import LLMOutputType, log
@@ -35,8 +36,8 @@ def sanitize_branch_name(name: str) -> str:
     return name
 
 
-@log_call
-async def get_existing_branch_names(*, cwd: Path) -> list[str]:
+@log_call(include_args=["cwd"])
+async def get_existing_branch_names(*, cwd: Path, config: ConfigModel) -> list[str]:
     """
     Gets a list of all local Git branch names.
 
@@ -50,6 +51,7 @@ async def get_existing_branch_names(*, cwd: Path) -> list[str]:
         ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/"],
         "Listing existing branches",
         directory=cwd,
+        run_timeout_seconds=config.run_timeout_seconds,
     )
     if not result.success:
         log("Failed to list existing branches.", LLMOutputType.TOOL_ERROR)
@@ -57,8 +59,8 @@ async def get_existing_branch_names(*, cwd: Path) -> list[str]:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
-@log_call
-async def generate_branch_name(suggestions: list[str], *, cwd: Path) -> str:
+@log_call(include_args=["suggestions", "cwd"])
+async def generate_branch_name(suggestions: list[str], *, cwd: Path, config: ConfigModel) -> str:
     """
     Generates a unique branch name by trying suggestions first.
     If all of the suggestions are taken (branch already exists), it appends a numerical suffix to the first suggestion.
@@ -71,7 +73,7 @@ async def generate_branch_name(suggestions: list[str], *, cwd: Path) -> str:
         A unique branch name with the "ok/" prefix added.
     """
 
-    existing_branches = await get_existing_branch_names(cwd=cwd)
+    existing_branches = await get_existing_branch_names(cwd=cwd, config=config)
 
     suggestions = ["ok/" + sanitize_branch_name(s) for s in suggestions if s.strip()]
     if not suggestions:
@@ -91,8 +93,8 @@ async def generate_branch_name(suggestions: list[str], *, cwd: Path) -> str:
     return new_branch_name
 
 
-@log_call
-async def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str]:
+@log_call(include_args=["specifier", "cwd"])
+async def resolve_commit_specifier(specifier: str, *, cwd: Path, config: ConfigModel) -> Optional[str]:
     """
     Resolves a Git commit specifier (branch, tag, SHA, relative) to a full commit SHA.
 
@@ -105,7 +107,9 @@ async def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str
     """
     log(f"Resolving commit specifier: {specifier}", LLMOutputType.STATUS)
     command = ["git", "rev-parse", "--verify", specifier]
-    result = await run(command, f"Resolving {specifier} to commit SHA", directory=cwd)
+    result = await run(
+        command, f"Resolving {specifier} to commit SHA", directory=cwd, run_timeout_seconds=config.run_timeout_seconds
+    )
 
     if result.success and result.stdout.strip():
         log(f"Resolved {specifier} to {result.stdout.strip()}", LLMOutputType.STATUS)
@@ -119,7 +123,7 @@ async def resolve_commit_specifier(specifier: str, *, cwd: Path) -> Optional[str
 
 
 @log_call(include_args=["task", "task_num", "base_rev", "cwd"])
-async def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLMBase) -> bool:
+async def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LLMBase, config: ConfigModel) -> bool:
     """
     Set up git branch for task.
 
@@ -161,19 +165,22 @@ async def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LL
         "You may only output a single line."
     )
 
-    suggestions_response = await llm.run(branch_prompt, yolo=False, cwd=cwd, response_type=LLMOutputType.LLM_RESPONSE)
+    suggestions_response = await llm.run(
+        branch_prompt, yolo=False, cwd=cwd, config=config, response_type=LLMOutputType.LLM_RESPONSE
+    )
     if suggestions_response:
         suggestions = [s.strip() for s in suggestions_response.split(",") if s.strip()]
     else:
         suggestions = []
 
-    branch_name = await generate_branch_name(suggestions, cwd=cwd)
+    branch_name = await generate_branch_name(suggestions, cwd=cwd, config=config)
 
     # Create the branch
     result = await run(
         ["git", "switch", "-c", branch_name, base_rev],
         f"Creating task branch {branch_name}",
         directory=cwd,
+        run_timeout_seconds=config.run_timeout_seconds,
     )
 
     if not result.success:
@@ -201,8 +208,8 @@ async def setup_task_branch(task, task_num, *, base_rev: str, cwd: Path, llm: LL
     return True
 
 
-@log_call
-async def get_current_branch(*, cwd: Path) -> Optional[str]:
+@log_call(include_args=["cwd"])
+async def get_current_branch(*, cwd: Path, config: ConfigModel) -> Optional[str]:
     """
     Gets the current active Git branch name.
 
@@ -212,7 +219,12 @@ async def get_current_branch(*, cwd: Path) -> Optional[str]:
     Returns:
         The current branch name, or None if not found.
     """
-    result = await run(["git", "rev-parse", "--abbrev-ref", "HEAD"], "Getting current branch", directory=cwd)
+    result = await run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        "Getting current branch",
+        directory=cwd,
+        run_timeout_seconds=config.run_timeout_seconds,
+    )
     if result.success:
         return result.stdout.strip()
     else:
@@ -220,8 +232,8 @@ async def get_current_branch(*, cwd: Path) -> Optional[str]:
         return None
 
 
-@log_call
-async def get_current_commit_hash(*, cwd: Path) -> Optional[str]:
+@log_call(include_args=["cwd"])
+async def get_current_commit_hash(*, cwd: Path, config: ConfigModel) -> Optional[str]:
     """
     Gets the current commit hash.
 
@@ -231,7 +243,12 @@ async def get_current_commit_hash(*, cwd: Path) -> Optional[str]:
     Returns:
         The current commit hash, or None if not found.
     """
-    result = await run(["git", "rev-parse", "HEAD"], "Getting current commit hash", directory=cwd)
+    result = await run(
+        ["git", "rev-parse", "HEAD"],
+        "Getting current commit hash",
+        directory=cwd,
+        run_timeout_seconds=config.run_timeout_seconds,
+    )
     if result.success:
         return result.stdout.strip()
     else:
@@ -242,8 +259,8 @@ async def get_current_commit_hash(*, cwd: Path) -> Optional[str]:
         return None
 
 
-@log_call
-async def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
+@log_call(include_args=["path", "rev", "cwd"])
+async def add_worktree(path: Path, *, rev: str, cwd: Path, config: ConfigModel) -> bool:
     """
     Adds a new git worktree at the specified path, based on the given revision.
 
@@ -256,12 +273,14 @@ async def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
         True if the worktree was added successfully, False otherwise.
     """
     log(f"Adding worktree at {path} for revision {rev}", LLMOutputType.STATUS)
-    commit = await resolve_commit_specifier(rev, cwd=cwd)
+    commit = await resolve_commit_specifier(rev, cwd=cwd, config=config)
     if not commit:
         log(f"Could not resolve revision {rev} to a commit.", message_type=LLMOutputType.TOOL_ERROR)
         return False
     command = ["git", "worktree", "add", str(path), commit]
-    result = await run(command, f"Adding worktree at {path}", directory=cwd)
+    result = await run(
+        command, f"Adding worktree at {path}", directory=cwd, run_timeout_seconds=config.run_timeout_seconds
+    )
     if result.success:
         log(f"Successfully added worktree at {path}", message_type=LLMOutputType.STATUS)
         return True
@@ -273,8 +292,8 @@ async def add_worktree(path: Path, *, rev: str, cwd: Path) -> bool:
         return False
 
 
-@log_call
-async def remove_worktree(path: Path, *, cwd: Path) -> bool:
+@log_call(include_args=["path", "cwd"])
+async def remove_worktree(path: Path, *, cwd: Path, config: ConfigModel) -> bool:
     """
     Removes a git worktree at the specified path.
 
@@ -287,7 +306,9 @@ async def remove_worktree(path: Path, *, cwd: Path) -> bool:
     """
     log(f"Removing worktree at {path}", message_type=LLMOutputType.STATUS)
     command = ["git", "worktree", "remove", "--force", str(path)]
-    result = await run(command, f"Removing worktree {path}", directory=cwd)
+    result = await run(
+        command, f"Removing worktree {path}", directory=cwd, run_timeout_seconds=config.run_timeout_seconds
+    )
     if result.success:
         log(f"Successfully removed worktree at {path}", message_type=LLMOutputType.STATUS)
         return True
@@ -299,8 +320,8 @@ async def remove_worktree(path: Path, *, cwd: Path) -> bool:
         return False
 
 
-@log_call
-async def has_uncommitted_changes(*, cwd: Path) -> bool:
+@log_call(include_args=["cwd"])
+async def has_uncommitted_changes(*, cwd: Path, config: ConfigModel) -> bool:
     """
     Checks if there are any uncommitted changes (staged or unstaged) in the repository.
 
@@ -310,7 +331,12 @@ async def has_uncommitted_changes(*, cwd: Path) -> bool:
     Returns:
         True if there are uncommitted changes, False otherwise.
     """
-    result = await run(["git", "status", "--porcelain"], "Checking for uncommitted changes", directory=cwd)
+    result = await run(
+        ["git", "status", "--porcelain"],
+        "Checking for uncommitted changes",
+        directory=cwd,
+        run_timeout_seconds=config.run_timeout_seconds,
+    )
     if result.success:
         return bool(result.stdout.strip())
     else:

@@ -17,6 +17,7 @@ class Opencode(LLMBase):
         yolo: bool,
         *,
         cwd: Path,
+        config,
     ) -> Optional[str]:
         """Runs the Opencode LLM."""
         if self.model is None:
@@ -35,8 +36,7 @@ class Opencode(LLMBase):
             command_human=command[:-1] + ["<prompt>"],
             directory=cwd,
             status_message="Calling Opencode",
-            log_stdout=False,
-            store_process=True,
+            run_timeout_seconds=config.llm_timeout_seconds,
         )
         if result.success:
             response = result.stdout.strip()

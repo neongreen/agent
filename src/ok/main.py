@@ -17,7 +17,7 @@ import rich
 import trio
 
 from ok import git_utils
-from ok.config import get_config
+from ok.config import ConfigModel, get_settings
 from ok.constants import OK_TEMP_DIR
 from ok.llm import get_llm
 from ok.llms.mock import MockLLM
@@ -45,15 +45,14 @@ async def work() -> None:
     global _llm_instance
 
     # Populate OkSettings from parsed args and config file
-    init_settings_result = get_config()
-    config = init_settings_result.ok_settings
+    settings = get_settings()
+    config: ConfigModel = settings
 
     # Create the agent dir before even doing any logging
     if not OK_TEMP_DIR.exists():
         OK_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    if init_settings_result.show_config:
-        # TODO: remove CLI-only fields from this dump?
+    if settings.show_config:
         rich.print(f"```json\n{config.model_dump_json(indent=2)}\n```")
         exit(0)
 
@@ -117,13 +116,13 @@ async def work() -> None:
                     else:
                         # Create a new worktree for each task
                         work_dir = Path(tempfile.mkdtemp(prefix=f"ok_task_{i}_"))
-                        await git_utils.add_worktree(work_dir, rev=base, cwd=cwd)
+                        await git_utils.add_worktree(work_dir, rev=base, cwd=cwd, config=config)
                         using_worktree = True
 
                     os.chdir(work_dir)
                     await process_task(prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance, config=config)
                     task_status = "Success"
-                    last_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir)
+                    last_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir, config=config)
                 except Exception as e:
                     task_error = str(e)
                     log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
@@ -141,7 +140,7 @@ async def work() -> None:
                         try:
                             # Change back to the original directory before removing worktree
                             os.chdir(cwd)
-                            await git_utils.remove_worktree(work_dir, cwd=cwd)
+                            await git_utils.remove_worktree(work_dir, cwd=cwd, config=config)
                         except Exception as e:
                             log(
                                 f"Error cleaning up temporary worktree {work_dir}: {e}",

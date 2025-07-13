@@ -5,7 +5,7 @@ from typing import Literal, Optional, assert_never
 
 from eliot import start_action
 
-from ok.config import OkSettings
+from ok.config import ConfigModel
 from ok.constants import PLAN_FILE
 from ok.git_utils import has_uncommitted_changes
 from ok.llm import check_verdict
@@ -210,7 +210,7 @@ class Settings:
     base_commit: str
     cwd: Path
     llm: LLMBase
-    config: OkSettings
+    config: ConfigModel
 
 
 async def transition(
@@ -345,7 +345,7 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
     update_status("Implementing a step")
 
     attempt_summary = await settings.llm.run(
-        impl_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.LLM_RESPONSE
+        impl_prompt, yolo=True, cwd=settings.cwd, config=settings.config, response_type=LLMOutputType.LLM_RESPONSE
     )
 
     return PostAttemptHooks(
@@ -364,6 +364,7 @@ async def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) 
             "Running post-step hook",
             directory=settings.cwd,
             shell=True,
+            run_timeout_seconds=settings.config.run_timeout_seconds,
         )
 
     # This one *checks* code after the attempt. If it fails, we will make another attempt.
@@ -373,6 +374,7 @@ async def _handle_PostAttemptHooks(settings: Settings, state: PostAttemptHooks) 
             "Running post-implementation check",
             directory=settings.cwd,
             shell=True,
+            run_timeout_seconds=settings.config.run_timeout_seconds,
         )
         if check_result.exit_code != 0:
             feedback = (
@@ -412,9 +414,9 @@ async def _evaluate_step(
         "Here is the summary of the changes, provided by their author:\n\n"
         f"{step_summary}\n\n"
         "Here are the uncommitted changes:\n\n"
-        f"{format_tool_code_output(await run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        f"{format_tool_code_output(await run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd, run_timeout_seconds=settings.config.run_timeout_seconds), 'diff')}\n\n"
         "Here is the diff of the changes made in previous attempts:\n\n"
-        f"{format_tool_code_output(await run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        f"{format_tool_code_output(await run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd, run_timeout_seconds=settings.config.run_timeout_seconds), 'diff')}\n\n"
         "After you are done, output your review as a single message using this template:\n\n"
         "    I am the step judge.\n\n"
         "    Feedback: [[your feedback on the work done]]\n\n"
@@ -433,7 +435,7 @@ async def _evaluate_step(
 
     update_status("Evaluating step")
     evaluation = await settings.llm.run(
-        eval_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.EVALUATION
+        eval_prompt, yolo=True, cwd=settings.cwd, config=settings.config, response_type=LLMOutputType.EVALUATION
     )
     verdict = check_verdict(StepVerdict, evaluation or "")
     return verdict, evaluation
@@ -452,6 +454,7 @@ async def _generate_commit_message(settings: Settings) -> str:
         commit_msg_prompt,
         yolo=False,
         cwd=settings.cwd,
+        config=settings.config,
         response_type=LLMOutputType.LLM_RESPONSE,
     )
     if not commit_msg:
@@ -463,12 +466,18 @@ async def _generate_commit_message(settings: Settings) -> str:
 async def _commit_step(settings: Settings, commit_msg: str) -> None:
     """Stage and commit the changes for this step."""
     update_status("Committing step")
-    if await has_uncommitted_changes(cwd=settings.cwd):
-        await run(["git", "add", "."], "Adding files", directory=settings.cwd)
+    if await has_uncommitted_changes(cwd=settings.cwd, config=settings.config):
+        await run(
+            ["git", "add", "."],
+            "Adding files",
+            directory=settings.cwd,
+            run_timeout_seconds=settings.config.run_timeout_seconds,
+        )
         await run(
             ["git", "commit", "-m", f"{commit_msg[:100]}"],
             "Committing step",
             directory=settings.cwd,
+            run_timeout_seconds=settings.config.run_timeout_seconds,
         )
     else:
         log("No changes to commit.", message_type=LLMOutputType.STATUS)
@@ -482,9 +491,27 @@ async def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVe
         f"Is the task {repr(settings.task)} now complete based on the work done?\n"
         "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
         "Here are the uncommitted changes:\n\n"
-        f"{format_tool_code_output(await run(['git', 'diff', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        f"{
+            format_tool_code_output(
+                await run(
+                    ['git', 'diff', '--', f':!{PLAN_FILE}'],
+                    directory=settings.cwd,
+                    run_timeout_seconds=settings.config.run_timeout_seconds,
+                ),
+                'diff',
+            )
+        }\n\n"
         "Here is the diff of the changes made in previous attempts:\n\n"
-        f"{format_tool_code_output(await run(['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'], directory=settings.cwd), 'diff')}\n\n"
+        f"{
+            format_tool_code_output(
+                await run(
+                    ['git', 'diff', settings.base_commit + '..HEAD', '--', f':!{PLAN_FILE}'],
+                    directory=settings.cwd,
+                    run_timeout_seconds=settings.config.run_timeout_seconds,
+                ),
+                'diff',
+            )
+        }\n\n"
         "After you are done, output your review as a single message using this template:\n\n"
         "    I am the task completion judge.\n\n"
         "    Task requirements: [[list of task requirements and for each - whether it was addressed]]\n\n"
@@ -502,6 +529,7 @@ async def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVe
         completion_prompt,
         yolo=True,
         cwd=settings.cwd,
+        config=settings.config,
         response_type=LLMOutputType.EVALUATION,
     )
     completion_verdict = check_verdict(TaskVerdict, completion_evaluation or "")
@@ -597,7 +625,7 @@ async def implementation_phase(
     base_commit: str,
     cwd: Path,
     llm: LLMBase,
-    config: OkSettings,
+    config: ConfigModel,
 ) -> Done:
     """
     high‑level driver that repeatedly feeds events into the state‑machine
@@ -734,13 +762,24 @@ async def _handle_JudgingAttempt(
 
 async def _handle_FinalizingTask(settings: Settings, state: FinalizingTask) -> Done:
     try:
-        diff = await run(["git", "diff", "--quiet"], "Checking for uncommitted changes", directory=settings.cwd)
+        diff = await run(
+            ["git", "diff", "--quiet"],
+            "Checking for uncommitted changes",
+            directory=settings.cwd,
+            run_timeout_seconds=settings.config.run_timeout_seconds,
+        )
         if not diff.success:
-            await run(["git", "add", "."], "Staging uncommitted changes", directory=settings.cwd)
+            await run(
+                ["git", "add", "."],
+                "Staging uncommitted changes",
+                directory=settings.cwd,
+                run_timeout_seconds=settings.config.run_timeout_seconds,
+            )
             await run(
                 ["git", "commit", "-m", "Final commit (auto)"],
                 "Final commit after step phase",
                 directory=settings.cwd,
+                run_timeout_seconds=settings.config.run_timeout_seconds,
             )
     except Exception as e:
         log(f"Failed to make final commit: {e}", message_type=LLMOutputType.TOOL_ERROR)

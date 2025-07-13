@@ -2,7 +2,7 @@ import unittest.mock
 from pathlib import Path
 from unittest.mock import patch
 
-from ok.config import OkSettings
+from ok.config import ConfigModel
 
 
 llm_mock = unittest.mock.Mock()
@@ -64,7 +64,7 @@ async def test_implementation_phase_failure() -> None:
         task="test failing task",
         cwd=Path("/test/cwd"),
         base_commit="main",
-        config=OkSettings(),
+        config=ConfigModel(),
     )
 
     # Run the implementation phase
@@ -73,7 +73,7 @@ async def test_implementation_phase_failure() -> None:
         base_commit=settings.base_commit,
         cwd=settings.cwd,
         llm=settings.llm,
-        config=OkSettings(),
+        config=ConfigModel(),
     )
 
     # Assert the final result is a failure (Done with verdict 'failed')

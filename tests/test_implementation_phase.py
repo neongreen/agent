@@ -2,7 +2,7 @@ import unittest.mock
 from pathlib import Path
 from unittest.mock import patch
 
-from ok.config import OkSettings
+from ok.config import ConfigModel
 
 
 llm_mock = unittest.mock.Mock()
@@ -56,7 +56,7 @@ async def test_implementation_phase() -> None:
         task="test task",
         cwd=Path("/test/cwd"),
         base_commit="main",
-        config=OkSettings(),
+        config=ConfigModel(),
     )
 
     # Run the implementation phase

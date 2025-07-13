@@ -4,9 +4,13 @@ Configuration management for the agent.
 This module defines the data structures and logic for managing agent settings,
 including plan and implementation configurations, and handles loading settings
 from TOML files.
+
+Terminology:
+- "Model" is the *data model* -- it is the config type that the agent actually wants to use.
+- "Settings" is the *reader* -- it is an auxiliary type that we use to parse the configuration.
+  It will be similar to the model, but not exactly the same.
 """
 
-from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic import AliasGenerator, BaseModel, Field, model_validator
@@ -32,7 +36,7 @@ kebab_alias_generator = AliasGenerator(
 """Alias generator to convert snake_case field names to kebab-case for TOML settings."""
 
 
-class PlanConfig(BaseModel):
+class PlanModel(BaseModel):
     """Configuration for the planning phase of the agent."""
 
     planner_extra_prompt: str = Field(default="", description="Additional instructions for *generating* the plan.")
@@ -44,7 +48,7 @@ class PlanConfig(BaseModel):
     )
 
 
-class ImplementCompletionConfig(BaseModel):
+class ImplementCompletionModel(BaseModel):
     """Configuration for the completion phase of implementation."""
 
     judge_extra_prompt: str = Field(
@@ -58,7 +62,7 @@ class ImplementCompletionConfig(BaseModel):
     )
 
 
-class ImplementConfig(BaseModel):
+class ImplementModel(BaseModel):
     """Configuration for the implementation phase of the agent."""
 
     extra_prompt: str = Field(default="", description="Additional prompt for *implementing* the plan.")
@@ -69,8 +73,9 @@ class ImplementConfig(BaseModel):
     max_consecutive_failures: int = Field(
         default=3, description="Maximum number of consecutive failures before giving up."
     )
-    completion: ImplementCompletionConfig = Field(
-        default_factory=ImplementCompletionConfig,
+
+    completion: ImplementCompletionModel = Field(
+        default_factory=ImplementCompletionModel,
         description="Configuration for the completion phase of implementation.",
     )
 
@@ -80,7 +85,7 @@ class ImplementConfig(BaseModel):
     )
 
 
-class MockLLMConfig(BaseModel):
+class MockLLMModel(BaseModel):
     """Configuration for the --mock LLM."""
 
     delay: int = Field(
@@ -94,7 +99,7 @@ class MockLLMConfig(BaseModel):
     )
 
 
-class LLMConfig(BaseModel):
+class LLMEngineModel(BaseModel):
     """Configuration for the LLM used by the agent."""
 
     engine: Literal["gemini", "claude", "codex", "openrouter", "opencode", "mock"] = Field(
@@ -112,7 +117,7 @@ class LLMConfig(BaseModel):
     )
 
 
-class TaskConfig(BaseModel):
+class TaskModel(BaseModel):
     """
     Configuration for the task to be executed by the agent.
     """
@@ -121,7 +126,7 @@ class TaskConfig(BaseModel):
         description="Task description or prompt to execute",
     )
 
-    # All of these will use the defaults from the top level OkSettings if not specified.
+    # All of these will use the defaults from the top level ConfigModel if not specified.
 
     cwd: str | None = Field(
         default=None,
@@ -142,23 +147,38 @@ class TaskConfig(BaseModel):
     )
 
 
-class OkSettings(BaseSettings):
+class ConfigModel(BaseModel, populate_by_name=True, alias_generator=kebab_alias_generator):
     """
-    OkSettings defines the configuration for the ok agent.
+    ConfigModel defines the configuration for the agent.
+    Currently it is equivalent to the `.ok.toml` config file.
+    It's intended to be used by most of the agent code.
     """
+
+    # Timeout for any shell command run with `run` (in seconds)
+    run_timeout_seconds: int = Field(
+        default=10,
+        description="Maximum time (in seconds) allowed for any shell command, excluding LLM calls",
+    )
+    # Timeout for LLM calls (in seconds)
+    llm_timeout_seconds: int = Field(
+        default=300,
+        description="Maximum time (in seconds) allowed for any LLM call",
+    )
 
     quiet: bool = Field(
         default=False,
         description="Suppress informational output",
     )
 
-    plan: PlanConfig = Field(default_factory=PlanConfig, description="Configuration for the planning phase.")
-    implement: ImplementConfig = Field(
-        default_factory=ImplementConfig, description="Configuration for the implementation phase."
+    plan: PlanModel = Field(default_factory=PlanModel, description="Configuration for the planning phase.")
+    implement: ImplementModel = Field(
+        default_factory=ImplementModel, description="Configuration for the implementation phase."
     )
-    llm: LLMConfig = Field(default_factory=LLMConfig, description="Configuration for the LLM used by the agent.")
-    mock_cfg: MockLLMConfig = Field(default_factory=MockLLMConfig, description="Configuration for the --mock LLM.")
-    tasks: list[TaskConfig] = with_metadata(
+    llm: LLMEngineModel = Field(
+        default_factory=LLMEngineModel, description="Configuration for the LLM used by the agent."
+    )
+    mock_cfg: MockLLMModel = Field(default_factory=MockLLMModel, description="Configuration for the --mock LLM.")
+    tasks: list[TaskModel] = with_metadata(
         Field([], description="Configuration for the tasks to be executed by the agent.", alias="tasks"),
         _CliHideDefault,
     )
@@ -195,11 +215,11 @@ class OkSettings(BaseSettings):
         description="Work directly in the target directory rather than in a temporary Git worktree.",
     )
 
-    model_config = SettingsConfigDict(
-        populate_by_name=True,
-        alias_generator=kebab_alias_generator,
-        toml_file=".ok.toml",
-    )
+
+class ConfigFileSettings(ConfigModel, BaseSettings, toml_file=".ok.toml"):
+    """
+    Reading `ConfigModel` from the config file.
+    """
 
     @model_validator(mode="before")
     @classmethod
@@ -221,47 +241,53 @@ class OkSettings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """
-        Customizes the order of settings sources.
-
-        Settings are loaded with the following priority:
-        1. TOML file ('.ok.toml')
-        2. Default values
-        """
-        return env_settings, TomlConfigSettingsSource(settings_cls), init_settings
+        return TomlConfigSettingsSource(settings_cls), init_settings
 
 
-class CliSettings(OkSettings, cli_hide_none_type=True):
-    # CliSettings extends OkSettings for command-line interface usage.
-    # It allows for CLI-specific configurations and overrides.
+class CliSettings(ConfigFileSettings, cli_hide_none_type=True):
+    # CliSettings extends ConfigFileSettings with a) CLI-specific fields and b) CLI overrides for config values.
 
     """
     ok agent
     """
 
+    # `exclude` means that this field is not part of the config model, just a CLI-only field.
+
+    show_config: bool = Field(
+        default=False,
+        description="Print the current configuration and exit",
+        exclude=True,
+    )
+
     gemini: bool = Field(
         default=False,  # It is actually going to be the default since we set it in the model_validator
         description="Use gemini-cli as the LLM",
+        exclude=True,
     )
     claude: bool = Field(
         default=False,
         description="Use Claude Code as the LLM",
+        exclude=True,
     )
     codex: bool = Field(
         default=False,
         description="Use Codex CLI as the LLM",
+        exclude=True,
     )
     openrouter: bool = Field(
         default=False,
         description="Use openrouter (via Codex) as the LLM",
+        exclude=True,
     )
     opencode: bool = Field(
         default=False,
         description="Use OpenCode as the LLM",
+        exclude=True,
     )
     mock: bool = Field(
         default=False,
         description="Use mock LLM (for testing purposes)",
+        exclude=True,
     )
 
     # TODO: what is before/after?
@@ -298,9 +324,10 @@ class CliSettings(OkSettings, cli_hide_none_type=True):
                 self.llm.engine = "mock"
         return self
 
-    prompt: CliPositionalArg[list[str]] = Field(
+    prompts: CliPositionalArg[list[str]] = Field(
         default=[],
         description="Task prompt, can be specified multiple times to do multiple tasks in a row",
+        exclude=True,
     )
 
     @model_validator(mode="after")
@@ -309,32 +336,20 @@ class CliSettings(OkSettings, cli_hide_none_type=True):
         Translate positional task arguments into the task prompt list.
         """
 
-        if self.tasks and self.prompt:
+        if self.tasks and self.prompts:
             raise ValueError("Cannot specify both --tasks and positional task arguments. Use one or the other.")
-        self.tasks = [TaskConfig(prompt=prompt) for prompt in self.prompt]
+        self.tasks = [TaskModel(prompt=prompt) for prompt in self.prompts]
         return self
 
-    show_config: bool = Field(
-        default=False,
-        description="(CLI-only) Print the current configuration and exit",
-    )
 
-
-@dataclass(frozen=True)
-class FullConfig:
-    ok_settings: OkSettings
-    show_config: bool
-
-
-def get_config() -> FullConfig:
+def get_settings() -> CliSettings:
     """
-    Initializes the settings from config files, CLI, etc.
+    Gets everything from config files, CLI, etc.
     """
-    cli_settings = CliApp.run(
+    return CliApp.run(
         CliSettings,
         cli_settings_source=ok.util.pydantic.CliSettingsSource(CliSettings),
     )
-    return FullConfig(ok_settings=cli_settings, show_config=cli_settings.show_config)
 
 
 if __name__ == "__main__":
@@ -343,10 +358,7 @@ if __name__ == "__main__":
     #
     #     python src/ok/config.py --help
     #
-    result = get_config()
-    if result.show_config:
-        print(result.ok_settings.model_dump_json(indent=2))
+    settings = get_settings()
+    if settings.show_config:
+        print(settings.model_dump_json(indent=2))
         exit(0)
-
-# TODO: how to avoid exporting the OkSettings constructor?
-__all__ = ["FullConfig", "OkSettings", "get_config"]

@@ -39,6 +39,7 @@ class MockLLM(LLMBase):
         yolo: bool,
         *,
         cwd: Path,
+        config,
     ) -> Optional[str]:
         """
         Runs the LLM with the given prompt.

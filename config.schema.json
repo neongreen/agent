@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "ImplementCompletionConfig": {
+    "ImplementCompletionModel": {
       "description": "Configuration for the completion phase of implementation.",
       "properties": {
         "judge-extra-prompt": {
@@ -10,10 +10,10 @@
           "type": "string"
         }
       },
-      "title": "ImplementCompletionConfig",
+      "title": "ImplementCompletionModel",
       "type": "object"
     },
-    "ImplementConfig": {
+    "ImplementModel": {
       "description": "Configuration for the implementation phase of the agent.",
       "properties": {
         "extra-prompt": {
@@ -41,13 +41,13 @@
           "type": "integer"
         },
         "completion": {
-          "$ref": "#/$defs/ImplementCompletionConfig"
+          "$ref": "#/$defs/ImplementCompletionModel"
         }
       },
-      "title": "ImplementConfig",
+      "title": "ImplementModel",
       "type": "object"
     },
-    "LLMConfig": {
+    "LLMEngineModel": {
       "description": "Configuration for the LLM used by the agent.",
       "properties": {
         "engine": {
@@ -78,10 +78,10 @@
           "title": "Model"
         }
       },
-      "title": "LLMConfig",
+      "title": "LLMEngineModel",
       "type": "object"
     },
-    "MockLLMConfig": {
+    "MockLLMModel": {
       "description": "Configuration for the --mock LLM.",
       "properties": {
         "delay": {
@@ -91,10 +91,10 @@
           "type": "integer"
         }
       },
-      "title": "MockLLMConfig",
+      "title": "MockLLMModel",
       "type": "object"
     },
-    "PlanConfig": {
+    "PlanModel": {
       "description": "Configuration for the planning phase of the agent.",
       "properties": {
         "planner-extra-prompt": {
@@ -110,10 +110,10 @@
           "type": "string"
         }
       },
-      "title": "PlanConfig",
+      "title": "PlanModel",
       "type": "object"
     },
-    "TaskConfig": {
+    "TaskModel": {
       "description": "Configuration for the task to be executed by the agent.",
       "properties": {
         "prompt": {
@@ -164,13 +164,24 @@
       "required": [
         "prompt"
       ],
-      "title": "TaskConfig",
+      "title": "TaskModel",
       "type": "object"
     }
   },
-  "additionalProperties": false,
-  "description": "OkSettings defines the configuration for the ok agent.",
+  "description": "ConfigModel defines the configuration for the agent.\nCurrently it is equivalent to the `.ok.toml` config file.\nIt's intended to be used by most of the agent code.",
   "properties": {
+    "run-timeout-seconds": {
+      "default": 10,
+      "description": "Maximum time (in seconds) allowed for any shell command, excluding LLM calls",
+      "title": "Run-Timeout-Seconds",
+      "type": "integer"
+    },
+    "llm-timeout-seconds": {
+      "default": 300,
+      "description": "Maximum time (in seconds) allowed for any LLM call",
+      "title": "Llm-Timeout-Seconds",
+      "type": "integer"
+    },
     "quiet": {
       "default": false,
       "description": "Suppress informational output",
@@ -178,24 +189,24 @@
       "type": "boolean"
     },
     "plan": {
-      "$ref": "#/$defs/PlanConfig",
+      "$ref": "#/$defs/PlanModel",
       "description": "Configuration for the planning phase."
     },
     "implement": {
-      "$ref": "#/$defs/ImplementConfig",
+      "$ref": "#/$defs/ImplementModel",
       "description": "Configuration for the implementation phase."
     },
     "llm": {
-      "$ref": "#/$defs/LLMConfig"
+      "$ref": "#/$defs/LLMEngineModel"
     },
     "mock-cfg": {
-      "$ref": "#/$defs/MockLLMConfig"
+      "$ref": "#/$defs/MockLLMModel"
     },
     "tasks": {
       "default": [],
       "description": "Configuration for the tasks to be executed by the agent.",
       "items": {
-        "$ref": "#/$defs/TaskConfig"
+        "$ref": "#/$defs/TaskModel"
       },
       "title": "Tasks",
       "type": "array"

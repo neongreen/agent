@@ -6,7 +6,7 @@ from typing import Optional, assert_never
 
 import trio
 
-from ok.config import OkSettings
+from ok.config import ConfigModel
 from ok.constants import PLAN_FILE
 from ok.llm import check_verdict
 from ok.llms.base import LLMBase
@@ -16,7 +16,7 @@ from ok.util.eliot import log_call
 
 
 @log_call(include_args=["task", "cwd"])
-async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: OkSettings) -> Optional[str]:
+async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: ConfigModel) -> Optional[str]:
     """
     Iterative planning phase with Gemini approval.
 
@@ -67,6 +67,7 @@ async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: OkSettin
             plan_prompt,
             yolo=True,
             cwd=cwd,
+            config=config,
             phase="Getting a plan",
             step_number=1,
             attempt_number=round_num,
@@ -101,6 +102,7 @@ async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: OkSettin
             review_prompt,
             yolo=True,
             cwd=cwd,
+            config=config,
             phase="Reviewing plan",
             step_number=1,
             attempt_number=round_num,

@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import assert_never
 
-from ok.config import OkSettings
+from ok.config import ConfigModel
 from ok.constants import STATE_FILE, TaskState
 from ok.git_utils import resolve_commit_specifier, setup_task_branch
 from ok.llms.base import LLMBase
@@ -22,7 +22,7 @@ async def process_task(
     base_rev: str,
     cwd: Path,
     llm: LLMBase,
-    config: OkSettings,
+    config: ConfigModel,
 ) -> Done:
     """
     Processes a single task through its planning and implementation phases.
@@ -44,7 +44,7 @@ async def process_task(
 
     log((f"Attempting to set up task branch for task {task_num}"), message_type=LLMOutputType.STATUS)
 
-    resolved_base_commit_sha = await resolve_commit_specifier(base_rev, cwd=cwd)
+    resolved_base_commit_sha = await resolve_commit_specifier(base_rev, cwd=cwd, config=config)
     if not resolved_base_commit_sha:
         log(f"Failed to resolve base specifier: {base_rev}", message_type=LLMOutputType.TOOL_ERROR)
         result = Done(
@@ -53,7 +53,9 @@ async def process_task(
         )
 
     # Set up branch
-    elif not await setup_task_branch(task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd, llm=llm):
+    elif not await setup_task_branch(
+        task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd, llm=llm, config=config
+    ):
         log("Failed to set up task branch", message_type=LLMOutputType.TOOL_ERROR)
         result = Done(
             verdict="failed",
