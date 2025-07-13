@@ -2,12 +2,16 @@ line-length = 120
 
 [lint]
 extend-select = [
-  "TID252", # Use absolute imports
-  # "PTH", # Use pathlib
-  "B", # Just nice rules, https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
-  # "FBT", # Positional bools
-  "ASYNC",  # Async functions
-  "TID251", # banned-api
+    "TID252", # Use absolute imports
+    # "PTH", # Use pathlib
+    "B", # Just nice rules, https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+    # "FBT", # Positional bools
+    "ASYNC", # Async functions
+    "TID251", # banned-api
+
+    # Docstrings
+    "D213",
+    "D209",
 ]
 
 [lint.flake8-tidy-imports]

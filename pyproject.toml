@@ -22,6 +22,7 @@ dev = [
     "pytest>=8.4.1",
     "ruff>=0.12.2",
     "pytest-trio>=0.8.0",
+    "autoimport>=1.6.1",
 ]
 
 [build-system]
@@ -37,3 +38,6 @@ trio_mode = true
 
 [tool.pyright]
 include = ["src", "tests", "scripts"]
+
+[tool.autoimport]
+disable_move_to_top = true

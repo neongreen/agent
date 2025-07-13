@@ -6,6 +6,7 @@ python = "3.13.5"
 uv = "0.7.18"
 "pipx:ty" = "latest"
 taplo = "latest"
+dprint = "latest"
 # "npm:opencode-ai" = "0.1.194"  # we need the version with print flag, see tasks.build-opencode
 
 [tasks.ok]
@@ -53,19 +54,9 @@ run = """
   echo "--- $usage_file ---"
 """
 
-# Note: this includes some formatting rules that are *not* checked by the linter.
-# This is because some of the linter warns are completely harmless.
-#
-# D213, D209 - format multiline docstrings
-# I, RUF022 - sort imports
 [tasks.format]
-description = "Format the Python files"
-run = """
-  ruff check --fix-only \
-    --extend-select D213,D209,I,RUF022 \
-    --config lint.isort.lines-after-imports=2; \
-  ruff format
-  """
+description = "Format everything"
+run = "dprint fmt"
 
 [tasks.generate-schema]
 description = "Generate config.schema.json from Pydantic"
@@ -76,14 +67,8 @@ run = "uv run scripts/generate_schema.py"
 [tasks.x-add-types]
 description = "Auto-add types to the Python files, across all commits"
 run = [
-  'jj x fd .py -x uv run --with=autotyping --isolated python -m autotyping {} --safe',
+    'jj x fd .py -x uv run --with=autotyping --isolated python -m autotyping {} --safe',
 ]
-
-[tasks.x-autoimport]
-description = "Add missing imports to the Python files, across all commits"
-run = """
-  jj x 'fd .py | xargs uvx --isolated autoimport'
-"""
 
 [tasks.xformat]
 description = "Run 'format' across all commits"
@@ -126,6 +111,7 @@ description = "Run ty to check types in the Python files (doesn't fully work yet
 run = "ty check"
 
 # https://github.com/sst/opencode/pull/533
+
 [tasks.build-opencode]
 description = "Build a specific commit of Opencode CLI and install it to ~/.ok/bin/opencode"
 tools.bun = "1.2.18"
