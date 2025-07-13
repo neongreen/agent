@@ -16,7 +16,15 @@ from ok.util.eliot import log_call
 
 
 @log_call(include_args=["task", "cwd"])
-async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: ConfigModel) -> Optional[str]:
+async def planning_phase(
+    task: str,
+    *,
+    cwd: Path,
+    llm: LLMBase,
+    config: ConfigModel,
+    previous_plan: Optional[str] = None,
+    previous_review: Optional[str] = None,
+) -> Optional[str]:
     """
     Iterative planning phase with Gemini approval.
 
@@ -33,15 +41,16 @@ async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: ConfigMo
     max_planning_rounds = 5
 
     plan: Optional[str] = None
-    previous_plan: Optional[str] = None
-    previous_review: Optional[str] = None
+    # Use arguments if provided
+    prev_plan = previous_plan
+    prev_review = previous_review
 
     for round_num in range(1, max_planning_rounds + 1):
         set_phase("Planning", f"{round_num}/{max_planning_rounds}")
         log((f"Planning round {round_num}"), message_type=LLMOutputType.STATUS)
 
         # Ask Gemini to create/revise plan
-        if round_num == 1:
+        if round_num == 1 and not (prev_plan and prev_review):
             plan_prompt = (
                 f"Create a detailed implementation plan for this task: {repr(task)}. Break it down into specific, actionable steps.\n"
                 "You are granted access to tools, commands, and code execution for the *sole purpose* of gaining knowledge.\n"
@@ -52,9 +61,9 @@ async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: ConfigMo
             plan_prompt = (
                 f"Revise the following plan for task {repr(task)} based on the feedback provided:\n\n"
                 "Previous Plan:\n"
-                f"{previous_plan}\n\n"
+                f"{prev_plan}\n\n"
                 "Reviewer Feedback:\n"
-                f"{previous_review}\n\n"
+                f"{prev_review}\n\n"
                 "Create a better implementation plan.\n"
                 'Output the text of the plan, and then "This is the end of the plan". You may not output anything after that.'
             ).strip()
@@ -139,8 +148,8 @@ async def planning_phase(task: str, *, cwd: Path, llm: LLMBase, config: ConfigMo
         elif current_verdict == PlanVerdict.REJECTED:
             update_status(f"Plan rejected in round {round_num}.")
             log(f"Plan rejected in round {round_num}", message_type=LLMOutputType.STATUS)
-            previous_plan = current_plan  # Store for next round's prompt
-            previous_review = current_review  # Store for next round's prompt
+            prev_plan = current_plan  # Store for next round's prompt
+            prev_review = current_review  # Store for next round's prompt
 
         else:
             assert_never(current_verdict)

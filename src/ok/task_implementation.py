@@ -102,6 +102,13 @@ class AttemptState(StepState):
 
 
 # State machine states
+@dataclass(frozen=True, slots=True)
+class RefiningPlan(TaskState):
+    """
+    State for refining the plan after completion judge feedback.
+    """
+
+    feedback: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +196,7 @@ type State = (
     | PostAttemptHooks
     | JudgingAttempt
     | JudgingStep
+    | RefiningPlan
     | FinalizingTask
     | Done
 )
@@ -250,6 +258,9 @@ async def transition(
 
             case JudgingStep(), Tick():
                 result = await _handle_JudgingStep(settings, state)
+
+            case RefiningPlan(), Tick():
+                result = await _handle_RefiningPlan(settings, state)
 
             case FinalizingTask(), Tick():
                 result = await _handle_FinalizingTask(settings, state)
@@ -538,7 +549,7 @@ async def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVe
 
 async def _handle_JudgingStep(
     settings: Settings, state: JudgingStep
-) -> StartingStep | FinalizingTask | StartingAttempt:
+) -> StartingStep | FinalizingTask | StartingAttempt | RefiningPlan:
     # 1. generate commit message and commit the step
     commit_msg = await _generate_commit_message(settings)
     await _commit_step(settings, commit_msg)
@@ -602,20 +613,62 @@ async def _handle_JudgingStep(
         case TaskVerdict.CONTINUE:
             update_status("Task not complete, continuing step.")
             log("Task not complete, continuing step", message_type=LLMOutputType.STATUS)
-            return StartingStep(
-                plan=state.plan,
-                steps_log=state.steps_log
-                + [
-                    StepResult(
-                        verdict=completion_verdict,
-                        feedback=completion_evaluation,
-                        history=state.attempts_log,
-                    )
-                ],
+            # If there is feedback, go to RefiningPlan
+            feedback = (
+                completion_evaluation.strip() if completion_evaluation and completion_evaluation.strip() else None
             )
+            if feedback:
+                return RefiningPlan(
+                    plan=state.plan,
+                    steps_log=state.steps_log
+                    + [
+                        StepResult(
+                            verdict=completion_verdict,
+                            feedback=completion_evaluation,
+                            history=state.attempts_log,
+                        )
+                    ],
+                    feedback=feedback,
+                )
+            else:
+                return StartingStep(
+                    plan=state.plan,
+                    steps_log=state.steps_log
+                    + [
+                        StepResult(
+                            verdict=completion_verdict,
+                            feedback=completion_evaluation,
+                            history=state.attempts_log,
+                        )
+                    ],
+                )
 
         case _:
-            assert_never(state)
+            assert_never(completion_verdict)
+
+
+async def _handle_RefiningPlan(settings: Settings, state: RefiningPlan) -> StartingStep:
+    """
+    Refine the plan using the previous plan and feedback, then continue with the new plan.
+    """
+    from ok.task_planning import planning_phase
+
+    # Use the feedback and previous plan to get a revised plan
+    revised_plan = await planning_phase(
+        task=settings.task,
+        cwd=settings.cwd,
+        llm=settings.llm,
+        config=settings.config,
+        previous_plan=state.plan,
+        previous_review=state.feedback,
+    )
+    # If planning fails, keep the old plan
+    if not revised_plan:
+        revised_plan = state.plan
+    return StartingStep(
+        plan=revised_plan,
+        steps_log=state.steps_log,
+    )
 
 
 @log_call(include_args=["task", "base_commit", "cwd"])
@@ -672,6 +725,7 @@ async def implementation_phase(
                 | PostAttemptHooks()
                 | JudgingAttempt()
                 | JudgingStep()
+                | RefiningPlan()
             ):
                 status = ""
             case _:

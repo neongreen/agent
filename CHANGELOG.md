@@ -2,6 +2,7 @@
 
 `[OK]` denotes changes made by this agent.
 `[CLINE]` is for the Cline extension.
+`[COPILOT]` is for GitHub Copilot.
 
 ## v0-next
 
@@ -10,6 +11,7 @@ Added:
 - All config options are now available as CLI flags, and vice versa.
 - `[OK]` Log file location is printed at the end of the run.
 - Shell command and LLM call timeouts.
+- `[COPILOT]` The agent does plan refinement before starting another step.
 
 Changed:
 
