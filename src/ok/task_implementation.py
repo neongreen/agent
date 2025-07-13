@@ -274,7 +274,7 @@ async def transition(
                 result = await _handle_FinalizingTask(settings, state)
 
             case Done(), Tick():
-                settings.env.log("Done state reached, no further transitions.", message_type=LLMOutputType.DEBUG)
+                settings.env.log_debug("Done state reached, no further transitions.")
                 result = state
 
             case _, _:
@@ -758,7 +758,7 @@ async def _handle_JudgingAttempt(
     """
 
     verdict, evaluation = await _evaluate_step(settings, state.attempt_summary)
-    settings.env.log(f"Verdict from the judgment: {verdict}", message_type=LLMOutputType.DEBUG)
+    settings.env.log_debug("Verdict from judgment", verdict=verdict)
 
     if not verdict:
         attempt_result = AttemptResult(

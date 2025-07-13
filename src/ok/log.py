@@ -25,8 +25,7 @@ class LLMOutputType(StrEnum):
     """Evaluation by the judge."""
     STATUS = auto()
     """Some kind of status message."""
-    DEBUG = auto()
-    """Debug message."""
+
     ERROR = auto()
     """Error message."""
     PROMPT = auto()
@@ -88,8 +87,7 @@ def __print_formatted_message(message: str, message_type: LLMOutputType):
     try:
         if message_type == LLMOutputType.STATUS:
             print_to_main(Panel(Markdown(message), title="Status", title_align="left", border_style="magenta"))
-        elif message_type == LLMOutputType.DEBUG:
-            print_to_main(Panel(Markdown(message), title="Debug", title_align="left", border_style="slate_blue3"))
+
         elif message_type == LLMOutputType.PLAN:
             print_to_main(Panel(Markdown(message), title="Proposed plan", title_align="left", border_style="green"))
         elif message_type == LLMOutputType.EVALUATION:

@@ -118,7 +118,7 @@ async def work(nursery: trio.Nursery) -> None:
 
             # Ensure the session directory exists.
             # TODO: this will break if we do tasks in parallel.
-            env.log(f"Creating session directory at {OK_TEMP_DIR}", message_type=LLMOutputType.DEBUG)
+            env.log_debug("Creating session directory", session_directory=str(OK_TEMP_DIR))
             if OK_TEMP_DIR.exists():
                 shutil.rmtree(OK_TEMP_DIR, ignore_errors=True)
             OK_TEMP_DIR.mkdir(parents=True, exist_ok=True)

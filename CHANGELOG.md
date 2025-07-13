@@ -10,7 +10,7 @@ Added:
 
 - All config options are now available as CLI flags, and vice versa.
 - `[OK]` Log file location is printed at the end of the run.
-- Shell command and LLM call timeouts.
+- Added support for timeouts for shell command and LLM calls.
 - `[COPILOT]` The agent does plan refinement before starting another step.
 
 Changed:
@@ -27,6 +27,7 @@ Fixed:
 Internal:
 
 - `[COPILOT+EMILY]` Refactored everything to use `Env` instead of mocking `run` and `log`.
+- `[OK+EMILY]` Removed some user-facing debug output.
 - Switched to dprint for formatting.
 
 ## v0-2025.07.12
