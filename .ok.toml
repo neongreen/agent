@@ -19,30 +19,81 @@ planner-extra-prompt = """
 
   Read the .clinerules file before writing your plan.
   It contains important rules and helpful knowledge about the project.
+
+  If the task needs research before making a proper plan, do this research during the planning phase.
+  For example, if the task says "logging function", find the logging function's name and location before writing the plan.
+  Do not write a plan that says "I will research the logging function".
+  The plan must be actionable and specific.
+
+  Steps like "research X" are not allowed.
+  Research steps must be either "research X and document findings in .ok/some_file.md", or
+  "research X and do code changes in the same step".
+  
+  Keep in mind that the implementor has no memory between the steps.
+  Also keep in mind that the implementor's progress will be judged after each step, based purely on the git diff.
+  If a step does not result in a git diff, it is not a valid step.
+  Intermediate results must be stored in the `.ok` folder in the repo.
+
+  If you did research during the planning and found that a step is not needed or already done,
+  you *must* mark it in the plan as "✅ already done" or "✅ not needed".
 """
 
 judge-extra-prompt = """
-  You must reject the plan if:
+  Pay attention to the following rules when judging the plan:
 
-  - The plan proposes writing tests that are not very similar to the ones that already exist.
+  - It is not allowed to write tests that are not very similar to the ones that already exist.
     For example, adding a test to `tests/git_utils.py` is fine.
     Writing an integration test or a test involving network is not fine, since we don't have any tests like that yet.
   
-  - The plan proposes to do testing manually, including "basic sanity checks" or "smoke testing" or "visual inspection".
+  - It is not allowed to do testing manually, including "basic sanity checks" or "smoke testing" or "visual inspection".
     Note that linters or type checkers *are allowed*. Running existing tests is also allowed.
 
-  - The plan proposes to run the agent tool itself (`src/ok/main.py`).
+  - It is not allowed to run the agent tool itself (`src/ok/main.py`).
 
-  - The plan proposes using `pip` or `poetry` (this project uses `uv`).
+  - It is not allowed to use `pip` or `poetry` (this project uses `uv`).
     Also, dependencies must be added with `uv add`, not `uv pip`.
-  
-  - The plan proposes pushing commits or creating pull requests.
-  
-  - The plan proposes to edit `config.schema.json` (it is generated from Pydantic models).
+
+  - It is not allowed to push commits or create pull requests.
+
+  - It is not allowed to edit `config.schema.json` (it is generated from Pydantic models).
+
+  - Purely research steps like "research X" or "Identify occurrences of Y" are not allowed.
+    Each step must result in a diff. For example:
+    
+    - "research X and document findings in .ok/some_file.md",
+    - "research X and do code changes in the same step",
+    - "identify occurrences of Y and list them in .ok/some_file.md".
+
+    Pure research steps marked with "✅" are allowed, since they won't be executed.
+
+  - The implementor has no memory between the steps.
+    The implementor is allowed to use the `.ok` folder in the repo to store intermediate results.
 
   The exception is if the **task** explicitly asks to do any of these things.
   For example, if the task is "write a test for function Abc", then the plan can include writing and running a test for function `Abc`.
 
   If rejecting the plan, you must explain in detail why you are rejecting it.
   For each objection, you must provide the relevant rule from the judging criteria *and* concretely explain how the plan violates it.
+"""
+
+[implement]
+extra-prompt = """
+  If your step requires research, you must either do it in the same step or document your findings in a Markdown file in the `.ok` folder.
+  The `.ok` folder is free for you to use to store intermediate results.
+  If it doesn't exist, you must create it.
+
+  If your step requires no work - 
+  for example, if you are asked to "replace usages of X" and you find no usages of `X` in the codebase -
+  you must save a log of running `grep` or `rg` into the `.ok` folder.
+
+  Your work during the step *must* result in a git diff.
+"""
+
+[implement.completion]
+judge-extra-prompt = """
+  Extra things to pay attention to when judging the implementation:
+
+  - If the task says "whenever X", you must double-check that it's indeed *in all cases*.
+    For example, if the task says "whenever we use `log`, switch it to `log_debug`, you must go and look for `log` in the codebase.
+    The implementor might have missed some occurrences.
 """

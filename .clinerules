@@ -7,6 +7,19 @@
 
 - After making changes, run `mise pyright`. If it passes, also run `mise check:ai`.
 
+## Logging rules
+
+- Use `env.log_debug` for any debug messages that are not user-facing.
+
+- Use the `@log_call` decorator when it makes sense to log the function call.
+  You must list the arguments you want to log explicitly:
+
+  ```python
+  @log_call(include_args=["arg1", "arg2"])
+  ```
+
+  Don't include big object arguments like `env`.
+
 ## Useful info
 
 - You can run `mise ok --help` to see all CLI options.
