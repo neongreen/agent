@@ -22,6 +22,11 @@ Fixed:
 
 - Stdout/stderr formatting (again).
 
+Internal:
+
+- `[COPILOT+EMILY]` Refactored everything to use `Env` instead of mocking `run` and `log`.
+- Switched to dprint for formatting.
+
 ## v0-2025.07.12
 
 Added:

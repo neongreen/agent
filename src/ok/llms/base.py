@@ -5,7 +5,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
 
-from ok.log import LLMOutputType, log
+from ok.env import Env
+from ok.log import LLMOutputType
 
 
 class LLMBase(ABC):
@@ -23,14 +24,11 @@ class LLMBase(ABC):
 
     async def run(
         self,
+        env: Env,
         prompt: str,
         yolo: bool,
         *,
         cwd: Path,
-        config,
-        phase: Optional[str] = None,
-        step_number: Optional[int] = None,
-        attempt_number: Optional[int] = None,
         response_type: LLMOutputType,
     ) -> Optional[str]:
         """
@@ -40,40 +38,37 @@ class LLMBase(ABC):
             prompt: The prompt to run.
             yolo: Whether to bypass safety checks.
             cwd: The current working directory.
-            phase: The current phase of the agent.
-            step_number: The current step number.
-            attempt_number: The current attempt number.
             response_type: The type of response to log.
 
         Returns:
             The response from the LLM, or None if an error occurred.
         """
 
-        log(prompt, message_type=LLMOutputType.PROMPT)
+        env.log(prompt, message_type=LLMOutputType.PROMPT)
         try:
-            response = await self._run(prompt, yolo, cwd=cwd, config=config)
+            response = await self._run(env, prompt, yolo, cwd=cwd)
             if response is not None:
-                log(f"LLM response: {response}", message_type=response_type)
+                env.log(f"LLM response: {response}", message_type=response_type)
             return response
         except Exception as e:
-            log(f"Error running LLM: {e}", message_type=LLMOutputType.ERROR)
+            env.log(f"Error running LLM: {e}", message_type=LLMOutputType.ERROR)
             return None
 
     @abstractmethod
     async def _run(
         self,
+        env: Env,
         prompt: str,
         yolo: bool,
         *,
         cwd: Path,
-        config,
     ) -> Optional[str]:
         """
         Runs the LLM with the given prompt. No logging, no status updates, etc.
         """
         raise NotImplementedError
 
-    def terminate_llm_process(self) -> Optional[int]:
+    def terminate_llm_process(self, env: Env) -> Optional[int]:
         """
         Terminates the LLM process if it's running.
 
@@ -82,12 +77,14 @@ class LLMBase(ABC):
         """
         if self.llm_process and self.llm_process.poll() is None:
             pid = self.llm_process.pid
-            log(f"Terminating LLM process with PID: {pid}", message_type=LLMOutputType.STATUS)
+            env.log(f"Terminating LLM process with PID: {pid}", message_type=LLMOutputType.STATUS)
             self.llm_process.terminate()
             try:
                 self.llm_process.wait(timeout=5)  # Wait for 5 seconds for graceful termination
             except subprocess.TimeoutExpired:
-                log(f"LLM process {pid} did not terminate gracefully, killing it.", message_type=LLMOutputType.STATUS)
+                env.log(
+                    f"LLM process {pid} did not terminate gracefully, killing it.", message_type=LLMOutputType.STATUS
+                )
                 self.llm_process.kill()
             self.llm_process = None
             return pid

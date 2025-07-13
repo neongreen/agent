@@ -2,7 +2,42 @@ import unittest.mock
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from ok.config import ConfigModel
+from ok.env import Env, RunResult
+
+
+class MockEnv(Env):
+    def __init__(self):
+        self.config = ConfigModel(run_timeout_seconds=5, llm_timeout_seconds=5)
+
+    def log(self, message: str, message_type=None, message_human: str | None = None) -> None:
+        pass
+
+    async def run(
+        self,
+        command: str | list[str],
+        description=None,
+        command_human=None,
+        status_message=None,
+        *,
+        directory: Path,
+        shell: bool = False,
+        run_timeout_seconds: int = 5,
+    ) -> RunResult:
+        return RunResult(
+            success=True,
+            stdout="",
+            stderr="",
+            exit_code=0,
+            error=None,
+        )
+
+
+@pytest.fixture
+def env() -> MockEnv:
+    return MockEnv()
 
 
 llm_mock = unittest.mock.Mock()
@@ -13,11 +48,9 @@ log_mock = unittest.mock.Mock()
 
 
 @patch("ok.llms.base.LLMBase", llm_mock)
-@patch("ok.utils.run", run_mock)
 @patch("ok.ui.update_status", update_status_mock)
 @patch("ok.ui.set_phase", set_phase_mock)
-@patch("ok.log.log", log_mock)
-async def test_implementation_phase_failure() -> None:
+async def test_implementation_phase_failure(env: Env) -> None:
     """
     Tests the implementation_phase function's behavior when the LLM and run mocks simulate repeated failures at various steps.
 
@@ -31,7 +64,7 @@ async def test_implementation_phase_failure() -> None:
     from ok.utils import RunResult
 
     # Configure the mock's run method to simulate repeated failures
-    async def llm_run_side_effect(prompt, *args, **kwargs):
+    async def llm_run_side_effect(env_arg, prompt, *args, **kwargs):
         if "concise commit message" in prompt:
             return "fail: Could not complete the task"
         if "implementation plan" in prompt:
@@ -60,20 +93,21 @@ async def test_implementation_phase_failure() -> None:
     run_mock.side_effect = run_side_effect
 
     settings = Settings(
+        env=env,
         llm=llm_mock,
         task="test failing task",
         cwd=Path("/test/cwd"),
         base_commit="main",
-        config=ConfigModel(),
+        config=env.config,
     )
 
     # Run the implementation phase
     result = await implementation_phase(
+        env,
         task=settings.task,
         base_commit=settings.base_commit,
         cwd=settings.cwd,
         llm=settings.llm,
-        config=ConfigModel(),
     )
 
     # Assert the final result is a failure (Done with verdict 'failed')

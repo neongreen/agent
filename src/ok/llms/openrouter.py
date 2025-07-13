@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from ok.env import Env
 from ok.llms.codex import Codex
 
 
@@ -19,21 +20,21 @@ class OpenRouter(Codex):
 
     async def _run(
         self,
+        env: Env,
         prompt: str,
         yolo: bool,
         *,
         cwd: Path,
-        config,
     ) -> Optional[str]:
         """Runs the OpenRouter LLM."""
         provider_url = "https://openrouter.ai/api/v1"
         provider_env_key = "OPENROUTER_API_KEY"
         return await self._run_codex(
+            env,
             prompt,
             yolo,
             model=self.model,
             provider_url=provider_url,
             provider_env_key=provider_env_key,
             cwd=cwd,
-            config=config,
         )

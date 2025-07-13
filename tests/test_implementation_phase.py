@@ -1,6 +1,12 @@
 import unittest.mock
 from pathlib import Path
+from typing import Optional
 from unittest.mock import patch
+
+import pytest
+
+from ok.config import ConfigModel
+from ok.env import Env, RunResult
 
 
 llm_mock = unittest.mock.Mock()
@@ -10,26 +16,52 @@ set_phase_mock = unittest.mock.Mock()
 log_mock = unittest.mock.Mock()
 
 
-# TODO: figure out a more robust way to do these mocks, LLM is struggling with writing tests
+class MockEnv(Env):
+    def __init__(self):
+        self.config = ConfigModel(run_timeout_seconds=5, llm_timeout_seconds=5)
+
+    def log(self, message: str, message_type=None, message_human: str | None = None) -> None:
+        pass
+
+    async def run(
+        self,
+        command: str | list[str],
+        description=None,
+        command_human: Optional[list[str]] = None,
+        status_message: Optional[str] = None,
+        *,
+        directory: Path,
+        shell: bool = False,
+        run_timeout_seconds: int,
+    ) -> RunResult:
+        return RunResult(
+            success=True,
+            stdout="",
+            stderr="",
+            exit_code=0,
+            error=None,
+        )
+
+
+@pytest.fixture
+def env() -> MockEnv:
+    """Fixture to provide a mock environment for testing."""
+    return MockEnv()
 
 
 @patch("ok.llms.base.LLMBase", llm_mock)
-@patch("ok.utils.run", run_mock)
 @patch("ok.ui.update_status", update_status_mock)
 @patch("ok.ui.set_phase", set_phase_mock)
-@patch("ok.log.log", log_mock)
-async def test_implementation_phase_with_refinement() -> None:
+async def test_implementation_phase_with_refinement(env: Env) -> None:
     """
     Test the implementation phase when the completion judge returns feedback, triggering planner refinement.
     """
-    from ok.config import ConfigModel
     from ok.task_implementation import Settings, implementation_phase
-    from ok.utils import RunResult
 
     call_log = []
     refinement_called = [False]
 
-    async def llm_run_side_effect(prompt, *args, **kwargs):
+    async def llm_run_side_effect(env_arg, prompt, *args, **kwargs):
         call_log.append(prompt)
         if "Create a detailed implementation plan" in prompt:
             return "Initial plan."
@@ -54,31 +86,21 @@ async def test_implementation_phase_with_refinement() -> None:
 
     llm_mock.run.side_effect = llm_run_side_effect
 
-    async def run_side_effect(*args, **kwargs):
-        return RunResult(
-            success=True,
-            stdout="",
-            stderr="",
-            exit_code=0,
-            error=None,
-        )
-
-    run_mock.side_effect = run_side_effect
-
     settings = Settings(
+        env=env,
         llm=llm_mock,
         task="test task with refinement",
         cwd=Path("/test/cwd"),
         base_commit="main",
-        config=ConfigModel(),
+        config=env.config,
     )
 
     result = await implementation_phase(
+        env,
         task=settings.task,
         base_commit=settings.base_commit,
         cwd=settings.cwd,
         llm=settings.llm,
-        config=settings.config,
     )
 
     # The planner should have been called twice: initial and refinement
@@ -91,17 +113,14 @@ async def test_implementation_phase_with_refinement() -> None:
 
 
 @patch("ok.llms.base.LLMBase", llm_mock)
-@patch("ok.utils.run", run_mock)
 @patch("ok.ui.update_status", update_status_mock)
 @patch("ok.ui.set_phase", set_phase_mock)
-@patch("ok.log.log", log_mock)
-async def test_implementation_phase() -> None:
-    from ok.config import ConfigModel
+async def test_implementation_phase(env: Env) -> None:
     from ok.task_implementation import Done, Settings, TaskVerdict, implementation_phase
     from ok.utils import RunResult
 
     # Configure the mock's run method to return different values based on the prompt
-    async def llm_run_side_effect(prompt, *args, **kwargs):
+    async def llm_run_side_effect(env_arg, prompt, *args, **kwargs):
         if "concise commit message" in prompt:
             return "feat: Implement the thing"
         if "Create a detailed implementation plan" in prompt:
@@ -131,20 +150,21 @@ async def test_implementation_phase() -> None:
     run_mock.side_effect = run_side_effect
 
     settings = Settings(
+        env=env,
         llm=llm_mock,
         task="test task",
         cwd=Path("/test/cwd"),
         base_commit="main",
-        config=ConfigModel(),
+        config=env.config,
     )
 
     # Run the implementation phase
     result = await implementation_phase(
+        env,
         task=settings.task,
         base_commit=settings.base_commit,
         cwd=settings.cwd,
         llm=settings.llm,
-        config=settings.config,
     )
 
     # Assert the final result

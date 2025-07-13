@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Optional
 
 from ok.constants import OK_STATE_BASE_DIR
+from ok.env import Env
 from ok.llms.base import LLMBase
-from ok.utils import run
 
 
 class Opencode(LLMBase):
@@ -13,11 +13,11 @@ class Opencode(LLMBase):
 
     async def _run(
         self,
+        env: Env,
         prompt: str,
         yolo: bool,
         *,
         cwd: Path,
-        config,
     ) -> Optional[str]:
         """Runs the Opencode LLM."""
         if self.model is None:
@@ -30,13 +30,13 @@ class Opencode(LLMBase):
             print(f"Opencode CLI (custom version) not found at {opencode_path}. Please run 'mise run build-opencode'.")
             return None
         command = [str(opencode_path), "run", "--print", "--model", self.model, prompt]
-        result = await run(
+        result = await env.run(
             command,
             "Calling Opencode",
             command_human=command[:-1] + ["<prompt>"],
             directory=cwd,
             status_message="Calling Opencode",
-            run_timeout_seconds=config.llm_timeout_seconds,
+            run_timeout_seconds=env.config.llm_timeout_seconds,
         )
         if result.success:
             response = result.stdout.strip()

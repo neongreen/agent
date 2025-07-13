@@ -9,22 +9,13 @@ from typing import Optional
 import trio
 from eliot import start_action
 
-from ok.log import LLMOutputType, log
+from ok.env import Env, RunResult
+from ok.log import LLMOutputType
 from ok.ui import update_status
 
 
-@dataclass
-class RunResult:
-    """Represents the result of a shell command execution."""
-
-    exit_code: int
-    stdout: str
-    stderr: str
-    success: bool
-    error: Optional[str] = None
-
-
-async def run(
+async def real_run(
+    env: Env,
     command: str | list[str],
     description=None,
     command_human: Optional[list[str]] = None,
@@ -69,7 +60,7 @@ async def run(
 
         abs_directory = abspath(str(directory))
 
-        log(
+        env.log(
             f"Running command: {command_display} in {abs_directory}",
             message_human=(description + "\n\n" if description else "")
             + f"Running command: `{command_human_display}` in `{abs_directory}`",
@@ -94,7 +85,7 @@ async def run(
         returncode = result_obj.returncode
 
         if returncode != 0:
-            log(
+            env.log(
                 f"Command {command_display} failed with exit code {returncode}\nStdout: {stdout}\nStderr: {stderr}",
                 message_human=(
                     "\n\n".join(
@@ -124,7 +115,7 @@ async def run(
         return result
 
     except Exception as e:
-        log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
+        env.log(f"Error running command: {e}", message_type=LLMOutputType.TOOL_ERROR)
         result = RunResult(
             exit_code=-1,
             stdout="",

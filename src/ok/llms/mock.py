@@ -7,6 +7,7 @@ from typing import Optional
 
 import trio
 
+from ok.env import Env
 from ok.llms.base import LLMBase
 
 
@@ -35,11 +36,11 @@ class MockLLM(LLMBase):
 
     async def _run(
         self,
+        env: Env,
         prompt: str,
         yolo: bool,
         *,
         cwd: Path,
-        config,
     ) -> Optional[str]:
         """
         Runs the LLM with the given prompt.

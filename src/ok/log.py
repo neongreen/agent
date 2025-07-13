@@ -112,7 +112,7 @@ def __print_formatted_message(message: str, message_type: LLMOutputType):
         print_to_main(Panel(Text.from_markup(message)))
 
 
-def log(
+def real_log(
     message: str,
     message_type: LLMOutputType,
     message_human: str | None = None,

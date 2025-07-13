@@ -3,11 +3,11 @@
 from pathlib import Path
 from typing import assert_never
 
-from ok.config import ConfigModel
 from ok.constants import STATE_FILE, TaskState
+from ok.env import Env
 from ok.git_utils import resolve_commit_specifier, setup_task_branch
 from ok.llms.base import LLMBase
-from ok.log import LLMOutputType, log
+from ok.log import LLMOutputType
 from ok.state_manager import read_state
 from ok.task_implementation import Done, TaskVerdict, implementation_phase
 from ok.ui import set_phase, update_status
@@ -16,13 +16,13 @@ from ok.util.eliot import log_call
 
 @log_call(include_args=["task", "task_num", "base_rev", "cwd"])
 async def process_task(
+    env: Env,
     task: str,
     task_num: int,
     *,
     base_rev: str,
     cwd: Path,
     llm: LLMBase,
-    config: ConfigModel,
 ) -> Done:
     """
     Processes a single task through its planning and implementation phases.
@@ -37,26 +37,24 @@ async def process_task(
         Implementation status.
     """
     set_phase(f"Task {task_num}")
-    log((f"Processing task {task_num}: {task}"), message_type=LLMOutputType.STATUS)
+    env.log(f"Processing task {task_num}: {task}", message_type=LLMOutputType.STATUS)
 
     task_id = f"task_{task_num}"
     state = read_state()
 
-    log((f"Attempting to set up task branch for task {task_num}"), message_type=LLMOutputType.STATUS)
+    env.log(f"Attempting to set up task branch for task {task_num}", message_type=LLMOutputType.STATUS)
 
-    resolved_base_commit_sha = await resolve_commit_specifier(base_rev, cwd=cwd, config=config)
+    resolved_base_commit_sha = await resolve_commit_specifier(env, base_rev, cwd=cwd)
     if not resolved_base_commit_sha:
-        log(f"Failed to resolve base specifier: {base_rev}", message_type=LLMOutputType.TOOL_ERROR)
+        env.log(f"Failed to resolve base specifier: {base_rev}", message_type=LLMOutputType.TOOL_ERROR)
         result = Done(
             verdict="failed",
             status=f"Failed to resolve base specifier: {base_rev}",
         )
 
     # Set up branch
-    elif not await setup_task_branch(
-        task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd, llm=llm, config=config
-    ):
-        log("Failed to set up task branch", message_type=LLMOutputType.TOOL_ERROR)
+    elif not await setup_task_branch(env, task, task_num, base_rev=resolved_base_commit_sha, cwd=cwd, llm=llm):
+        env.log("Failed to set up task branch", message_type=LLMOutputType.TOOL_ERROR)
         result = Done(
             verdict="failed",
             status="Failed to set up task branch",
@@ -64,11 +62,11 @@ async def process_task(
 
     else:
         result = await implementation_phase(
+            env=env,
             task=task,
             base_commit=resolved_base_commit_sha,
             cwd=cwd,
             llm=llm,
-            config=config,
         )
 
     # Planning phase
@@ -94,16 +92,16 @@ async def process_task(
     match result.verdict:
         case TaskVerdict.COMPLETE:
             state[task_id] = TaskState.DONE
-            log((f"Task {task_num} completed successfully"), message_type=LLMOutputType.STATUS)
+            env.log(f"Task {task_num} completed successfully", message_type=LLMOutputType.STATUS)
         case TaskVerdict.CONTINUE:
             state[task_id] = TaskState.IMPLEMENT
-            log(f"Task {task_num} not completed, but some work was done.", message_type=LLMOutputType.STATUS)
+            env.log(f"Task {task_num} not completed, but some work was done.", message_type=LLMOutputType.STATUS)
         case "failed":
             state[task_id] = TaskState.ABORT
-            log(f"Task {task_num} failed: {result.status}", message_type=LLMOutputType.ERROR)
+            env.log(f"Task {task_num} failed: {result.status}", message_type=LLMOutputType.ERROR)
         case "interrupted":
             state[task_id] = TaskState.ABORT
-            log(f"Task {task_num} interrupted: {result.status}", message_type=LLMOutputType.ERROR)
+            env.log(f"Task {task_num} interrupted: {result.status}", message_type=LLMOutputType.ERROR)
         case _:
             assert_never(result.verdict)
 
@@ -112,10 +110,10 @@ async def process_task(
     try:
         if STATE_FILE.exists():
             STATE_FILE.unlink()
-            log(("Agent state file removed."), message_type=LLMOutputType.STATUS)
+            env.log("Agent state file removed.", message_type=LLMOutputType.STATUS)
             update_status("Agent state file removed.")
     except OSError as e:
-        log(f"Error removing agent state file: {e}", message_type=LLMOutputType.ERROR)
+        env.log(f"Error removing agent state file: {e}", message_type=LLMOutputType.ERROR)
         update_status("Error removing agent state file.", style="red")
 
     return result

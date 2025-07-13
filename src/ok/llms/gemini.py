@@ -3,8 +3,8 @@
 from pathlib import Path
 from typing import Optional
 
+from ok.env import Env
 from ok.llms.base import LLMBase
-from ok.utils import run
 
 
 class Gemini(LLMBase):
@@ -12,23 +12,23 @@ class Gemini(LLMBase):
 
     async def _run(
         self,
+        env: Env,
         prompt: str,
         yolo: bool,
         *,
         cwd: Path,
-        config,
     ) -> Optional[str]:
         """Runs the Gemini LLM."""
         gemini_model = self.model or "gemini-2.5-flash"
         command = ["gemini", "-m", gemini_model, *(["--yolo"] if yolo else []), "-p", prompt]
 
-        result = await run(
+        result = await env.run(
             command,
             "Calling Gemini",
             command_human=command[:-1] + ["<prompt>"],
             directory=cwd,
             status_message="Calling Gemini",
-            run_timeout_seconds=config.llm_timeout_seconds,
+            run_timeout_seconds=env.config.llm_timeout_seconds,
         )
         if result.success:
             response = result.stdout.strip()

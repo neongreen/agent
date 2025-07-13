@@ -44,3 +44,8 @@ include = ["src", "tests", "scripts"]
 
 [tool.autoimport]
 disable_move_to_top = true
+
+[tool.autoimport.common_statements]
+"Env" = "from ok.env import Env"
+"ConfigModel" = "from ok.config import ConfigModel"
+"dataclass" = "from dataclasses import dataclass"

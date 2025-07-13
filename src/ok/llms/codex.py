@@ -6,19 +6,20 @@ from pathlib import Path
 from typing import Optional
 
 from ok.constants import OK_TEMP_DIR
+from ok.env import Env
 from ok.llms.base import LLMBase
-from ok.utils import run
 
 
 class Codex(LLMBase):
     """Codex LLM provider."""
 
-    async def _run(self, prompt: str, yolo: bool, *, cwd: Path, config) -> Optional[str]:
+    async def _run(self, env: Env, prompt: str, yolo: bool, *, cwd: Path) -> Optional[str]:
         """Runs the Codex LLM."""
-        return await self._run_codex(prompt, yolo, model=self.model, cwd=cwd, config=config)
+        return await self._run_codex(env, prompt, yolo, model=self.model, cwd=cwd)
 
     async def _run_codex(
         self,
+        env: Env,
         prompt: str,
         yolo: bool,
         *,
@@ -26,7 +27,6 @@ class Codex(LLMBase):
         model: Optional[str] = None,
         provider_url: Optional[str] = None,
         provider_env_key: Optional[str] = None,
-        config=None,
     ) -> Optional[str]:
         with tempfile.NamedTemporaryFile("r", prefix="ok-codex-output", dir=OK_TEMP_DIR, delete=True) as temp_file:
             temp_file_path = os.path.join(OK_TEMP_DIR, temp_file.name)
@@ -48,12 +48,12 @@ class Codex(LLMBase):
                 f"--output-last-message={temp_file_path}",
                 prompt,
             ]
-            result = await run(
+            result = await env.run(
                 command,
                 "Calling Codex",
                 command_human=command[:-1] + ["<prompt>"],
                 directory=cwd,
-                run_timeout_seconds=config.llm_timeout_seconds if config else 60,
+                run_timeout_seconds=env.config.llm_timeout_seconds,
             )
             if result.success:
                 response = temp_file.read().strip()

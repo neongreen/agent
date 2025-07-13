@@ -10,7 +10,7 @@ import shutil
 import signal
 import tempfile
 from pathlib import Path
-from typing import assert_never
+from typing import Optional, assert_never
 
 import eliot
 import rich
@@ -19,19 +19,53 @@ import trio
 from ok import git_utils
 from ok.config import ConfigModel, get_settings
 from ok.constants import OK_TEMP_DIR
+from ok.env import Env, RunResult
 from ok.llm import get_llm
 from ok.llms.mock import MockLLM
-from ok.log import LLMOutputType, console, get_log_file_path, log
+from ok.log import LLMOutputType, console, get_log_file_path, init_logging, real_log
 from ok.state_manager import write_state
 from ok.task_orchestrator import process_task
 from ok.task_result import TaskResult, display_task_summary
 from ok.ui import get_ui_manager, set_phase
+from ok.utils import real_run
 
 
-_llm_instance = None
+class RealEnv(Env):
+    """
+    A real environment class that extends Env for actual task processing.
+    """
+
+    def __init__(self, config: ConfigModel) -> None:
+        self.config = config
+        init_logging()
+
+    def log(self, message: str, message_type: LLMOutputType, message_human: str | None = None) -> None:
+        real_log(message, message_type, message_human=message_human)
+
+    async def run(
+        self,
+        command: str | list[str],
+        description=None,
+        command_human: Optional[list[str]] = None,
+        status_message: Optional[str] = None,
+        *,
+        directory: Path,
+        shell: bool = False,
+        run_timeout_seconds: int,
+    ) -> RunResult:
+        return await real_run(
+            env=self,
+            command=command,
+            description=description,
+            command_human=command_human,
+            status_message=status_message,
+            directory=directory,
+            shell=shell,
+            run_timeout_seconds=run_timeout_seconds,
+        )
 
 
-async def work() -> None:
+async def work(nursery: trio.Nursery) -> None:
     """
     This is almost the entry point for the agent.
     The actual entry point is `main()`, which calls `_main()`, which calls `work()`.
@@ -42,7 +76,6 @@ async def work() -> None:
     Parses command-line arguments, sets up the environment, and initiates
     the agentic loop for task processing.
     """
-    global _llm_instance
 
     # Populate OkSettings from parsed args and config file
     settings = get_settings()
@@ -57,16 +90,28 @@ async def work() -> None:
         exit(0)
 
     with get_ui_manager():
-        log(
+        env = RealEnv(config=config)
+        del settings
+
+        env.log(
             f"Configuration loaded:\n```json\n{config.model_dump_json(indent=2)}\n```",
             LLMOutputType.STATUS,
         )
 
         # This is the only place where get_llm() should be called.
         if config.llm.engine == "mock":
-            _llm_instance = MockLLM(model=config.llm.model, mock_delay=config.mock_cfg.delay)
+            llm_instance = MockLLM(model=config.llm.model, mock_delay=config.mock_cfg.delay)
         else:
-            _llm_instance = get_llm(engine=config.llm.engine, model=config.llm.model)
+            llm_instance = get_llm(engine=config.llm.engine, model=config.llm.model)
+
+        # Handles SIGINT signals to gracefully shut down the agent.
+        with trio.open_signal_receiver(signal.SIGINT) as signal_chan:
+            async for _ in signal_chan:
+                pid = llm_instance.terminate_llm_process(env)
+                if pid:
+                    print(f"LLM process with PID {pid} killed.")
+                nursery.cancel_scope.cancel()
+                return
 
         task_results: list[TaskResult] = []
 
@@ -79,7 +124,7 @@ async def work() -> None:
 
             # Ensure the session directory exists.
             # TODO: this will break if we do tasks in parallel.
-            log(f"Creating session directory at {OK_TEMP_DIR}", message_type=LLMOutputType.DEBUG)
+            env.log(f"Creating session directory at {OK_TEMP_DIR}", message_type=LLMOutputType.DEBUG)
             if OK_TEMP_DIR.exists():
                 shutil.rmtree(OK_TEMP_DIR, ignore_errors=True)
             OK_TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -89,7 +134,7 @@ async def work() -> None:
             # if not STATE_FILE.exists():
             write_state({})
 
-            log(f"Repo directory: {cwd}", LLMOutputType.STATUS)
+            env.log(f"Repo directory: {cwd}", LLMOutputType.STATUS)
 
             set_phase("Agent initialized")
 
@@ -98,7 +143,7 @@ async def work() -> None:
                 task_number=i,
                 task=prompt,
             ):
-                log(f"Processing task {i}/{len(config.tasks)}: '{prompt}'", LLMOutputType.STATUS)
+                env.log(f"Processing task {i}/{len(config.tasks)}: '{prompt}'", LLMOutputType.STATUS)
                 work_dir: Path | None = None
                 using_worktree: bool = False
                 task_status = "Failed"
@@ -109,23 +154,23 @@ async def work() -> None:
                     if no_worktree:
                         # If no worktree is specified, use the effective_cwd directly
                         work_dir = cwd
-                        log(
+                        env.log(
                             f"Worktrees disabled, using working directory for the task: {work_dir}",
                             LLMOutputType.STATUS,
                         )
                     else:
                         # Create a new worktree for each task
                         work_dir = Path(tempfile.mkdtemp(prefix=f"ok_task_{i}_"))
-                        await git_utils.add_worktree(work_dir, rev=base, cwd=cwd, config=config)
+                        await git_utils.add_worktree(env, work_dir, rev=base, cwd=cwd)
                         using_worktree = True
 
                     os.chdir(work_dir)
-                    await process_task(prompt, i, base_rev=base, cwd=work_dir, llm=_llm_instance, config=config)
+                    await process_task(env, task=prompt, task_num=i, base_rev=base, cwd=work_dir, llm=llm_instance)
                     task_status = "Success"
-                    last_commit_hash = await git_utils.get_current_commit_hash(cwd=work_dir, config=config)
+                    last_commit_hash = await git_utils.get_current_commit_hash(env, cwd=work_dir)
                 except Exception as e:
                     task_error = str(e)
-                    log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
+                    env.log(f"Error processing task {i}: {e}", LLMOutputType.TOOL_ERROR)
                 finally:
                     task_results.append(
                         TaskResult(
@@ -140,30 +185,18 @@ async def work() -> None:
                         try:
                             # Change back to the original directory before removing worktree
                             os.chdir(cwd)
-                            await git_utils.remove_worktree(work_dir, cwd=cwd, config=config)
+                            await git_utils.remove_worktree(env, work_dir, cwd=cwd)
                         except Exception as e:
-                            log(
+                            env.log(
                                 f"Error cleaning up temporary worktree {work_dir}: {e}",
                                 LLMOutputType.TOOL_ERROR,
                             )
 
-        log("Agentic loop completed", LLMOutputType.STATUS)
+        env.log("Agentic loop completed", LLMOutputType.STATUS)
         set_phase("Agentic loop completed")
         display_task_summary(task_results)
         log_file_path = get_log_file_path()
         console.print(f"Session log file: {log_file_path}\n\n", style="bold green")
-
-
-async def _signal_handler(nursery: trio.Nursery) -> None:
-    """Handles SIGINT signals to gracefully shut down the agent."""
-    with trio.open_signal_receiver(signal.SIGINT) as signal_chan:
-        async for _ in signal_chan:
-            if _llm_instance:
-                pid = _llm_instance.terminate_llm_process()
-                if pid:
-                    print(f"LLM process with PID {pid} killed.")
-            nursery.cancel_scope.cancel()
-            return
 
 
 async def _main() -> None | SystemExit:
@@ -176,8 +209,7 @@ async def _main() -> None | SystemExit:
     ):
         async with trio.open_nursery() as nursery:
             try:
-                nursery.start_soon(_signal_handler, nursery)
-                await work()
+                await work(nursery)
             except SystemExit as e:
                 return e
             finally:
