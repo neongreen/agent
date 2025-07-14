@@ -3,12 +3,21 @@
 # Partial config, see full documentation in the README.md
 
 post-implementation-hook-command = """
-  MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run format
-  MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run generate-schema
+  export MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml
+  mise run format
+  mise run generate-schema
 """
 
 post-implementation-check-command = """
-  MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml mise run --jobs=1 check:ai
+  # There must be uncommitted changes after the implementation step.
+  if [ -z "$(git status --porcelain)" ]; then
+    echo "No changes after the implementation step. Please make sure your step results in a git diff."
+    exit 1
+  fi
+
+  # Run linters and tests
+  export MISE_TRUSTED_CONFIG_PATHS=$(pwd)/mise.toml
+  mise run --jobs=1 check:ai
 """
 
 [plan]

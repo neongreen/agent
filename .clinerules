@@ -20,6 +20,10 @@
 
   Don't include big object arguments like `env`.
 
+## Markdown rules
+
+- When writing Markdown files, put each sentence on a new line, and don't make sentences longer than 120 characters.
+
 ## Useful info
 
 - You can run `mise ok --help` to see all CLI options.

@@ -6,6 +6,8 @@
 
 ## v0-next
 
+## v0-2025.07.14
+
 Added:
 
 - All config options are now available as CLI flags, and vice versa.
@@ -29,6 +31,18 @@ Internal:
 - `[COPILOT+EMILY]` Refactored everything to use `Env` instead of mocking `run` and `log`.
 - `[OK+EMILY]` Removed some user-facing debug output.
 - Switched to dprint for formatting.
+
+AI failures:
+
+- 🔴 OK flash: asked it to document non-obvious things (Ctrl+C, Pydantic).
+  It failed, and for Ctrl+C it was actually wrong about `SystemExit`.
+
+- 🔴 OK flash: asked it to create an integration test showing that running naked `ok` outputs help.
+  It failed and only committed a `.txt` file showing that it *doesn't* output help.
+  (Which is true, but the AI should've fixed it.)
+
+- 🔴 OK flash: asked to add hard timeouts for tests.
+  It mucked around for a while. I gave up and added a very simple `pytest-timeout` one-line integration.
 
 ## v0-2025.07.12
 
@@ -55,7 +69,8 @@ Fixed:
 - `[CLINE]` Don't complain when there are no changes to commit.
 - Worked around gemini-cli outputting "Loaded cached credentials." in the response.
 - Asking LLMs to output the verdict in the last line of their response - maybe it will improve verdict detection.
-- The summary table works now.
+- ~~The summary table works now.~~
+  - (2025.07.14) Actually no, it still doesn't.
 
 Internal:
 
