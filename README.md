@@ -1,3 +1,5 @@
+⚠️ **WARNING**: This agent will run arbitrary commands specified in a `.ok.toml` file in the target repository. Only run it on repositories you trust and branches you trust.
+
 # ok
 
 ## Description
