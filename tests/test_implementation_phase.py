@@ -11,14 +11,14 @@ from ok.env import Env, RunResult
 
 llm_mock = unittest.mock.Mock()
 run_mock = unittest.mock.Mock()
-update_status_mock = unittest.mock.Mock()
-set_phase_mock = unittest.mock.Mock()
 log_mock = unittest.mock.Mock()
 
 
 class MockEnv(Env):
     def __init__(self):
         self.config = ConfigModel(run_timeout_seconds=5, llm_timeout_seconds=5)
+        self.update_status = unittest.mock.Mock()
+        self.set_phase = unittest.mock.Mock()
 
     def log(self, message: str, message_type=None, message_human: str | None = None) -> None:
         pass
@@ -53,9 +53,7 @@ def env() -> MockEnv:
 
 
 @patch("ok.llms.base.LLMBase", llm_mock)
-@patch("ok.ui.update_status", update_status_mock)
-@patch("ok.ui.set_phase", set_phase_mock)
-async def test_implementation_phase_with_refinement(env: Env) -> None:
+async def test_implementation_phase_with_refinement(env: MockEnv) -> None:
     """
     Test the implementation phase when the completion judge returns feedback, triggering planner refinement.
     """
@@ -113,12 +111,12 @@ async def test_implementation_phase_with_refinement(env: Env) -> None:
     assert len(plan_prompts) == 2, f"Expected 2 planning prompts, got {len(plan_prompts)}"
     # The final result should still be a Done object (could be CONTINUE or COMPLETE depending on further logic)
     assert hasattr(result, "verdict")
+    env.set_phase.assert_called()
+    env.update_status.assert_called()
 
 
 @patch("ok.llms.base.LLMBase", llm_mock)
-@patch("ok.ui.update_status", update_status_mock)
-@patch("ok.ui.set_phase", set_phase_mock)
-async def test_implementation_phase(env: Env) -> None:
+async def test_implementation_phase(env: MockEnv) -> None:
     from ok.task_implementation import Done, Settings, TaskVerdict, implementation_phase
     from ok.utils import RunResult
 
@@ -173,12 +171,12 @@ async def test_implementation_phase(env: Env) -> None:
     # Assert the final result
     assert result == Done(verdict=TaskVerdict.COMPLETE, status="Looks good\nCOMPLETE COMPLETE COMPLETE")
 
+    env.set_phase.assert_called()
+    env.update_status.assert_called()
+
     # # Check that `run` was called for git operations
     # assert any("git add" in call.args[0] for call in mock_run.call_args_list)
     # assert any("git commit" in call.args[0] for call in mock_run.call_args_list)
-
-    # # Verify that status updates were made
-    # mock_update_status.assert_called()
 
     # # Verify that log messages were printed
     # mock_log.assert_called()

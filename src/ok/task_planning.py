@@ -11,7 +11,6 @@ from ok.env import Env
 from ok.llm import check_verdict
 from ok.llms.base import LLMBase
 from ok.log import LLMOutputType, format_as_markdown_blockquote
-from ok.ui import set_phase, update_status
 from ok.util.eliot import log_call
 
 
@@ -35,7 +34,7 @@ async def planning_phase(
     Returns:
         The approved plan as a string, or None if planning failed.
     """
-    set_phase("Planning")
+    env.set_phase("Planning")
     env.log(f"Starting planning phase for task: {task}", message_type=LLMOutputType.STATUS)
 
     max_planning_rounds = 5
@@ -46,7 +45,7 @@ async def planning_phase(
     prev_review = previous_review
 
     for round_num in range(1, max_planning_rounds + 1):
-        set_phase("Planning", f"{round_num}/{max_planning_rounds}")
+        env.set_phase("Planning", f"{round_num}/{max_planning_rounds}")
         env.log((f"Planning round {round_num}"), message_type=LLMOutputType.STATUS)
 
         # Ask Gemini to create/revise plan
@@ -71,7 +70,7 @@ async def planning_phase(
         if env.config.plan.planner_extra_prompt:
             plan_prompt += f"\n\n{env.config.plan.planner_extra_prompt}"
 
-        update_status("Getting a plan")
+        env.update_status("Getting a plan")
         raw_plan = await llm.run(
             env,
             plan_prompt,
@@ -81,7 +80,7 @@ async def planning_phase(
         )
         current_plan = format_as_markdown_blockquote(raw_plan) if raw_plan else None
         if not current_plan:
-            update_status("Failed to get a plan.", style="red")
+            env.update_status("Failed to get a plan.", style="red")
             env.log("Failed to get a plan", message_type=LLMOutputType.ERROR)
             return None
 
@@ -102,7 +101,7 @@ async def planning_phase(
         if env.config.plan.judge_extra_prompt:
             review_prompt += f"\n\n{env.config.plan.judge_extra_prompt}"
 
-        update_status("Reviewing plan")
+        env.update_status("Reviewing plan")
 
         raw_review = await llm.run(
             env,
@@ -115,18 +114,18 @@ async def planning_phase(
         current_verdict = check_verdict(PlanVerdict, raw_review or "")
 
         if not current_review:
-            update_status("Failed to get a plan evaluation.", style="red")
+            env.update_status("Failed to get a plan evaluation.", style="red")
             env.log("LLM provided no output", message_type=LLMOutputType.ERROR)
 
         elif not current_verdict:
-            update_status("Failed to get a plan verdict.", style="red")
+            env.update_status("Failed to get a plan verdict.", style="red")
             env.log(
                 f"Couldn't determine the verdict from the plan evaluation. Evaluation was:\n\n{current_review}",
                 message_type=LLMOutputType.ERROR,
             )
 
         elif current_verdict == PlanVerdict.APPROVED:
-            update_status(f"Approved in round {round_num}.")
+            env.update_status(f"Approved in round {round_num}.")
             env.log((f"Plan approved in round {round_num}"), message_type=LLMOutputType.STATUS)
             env.log(current_plan, message_type=LLMOutputType.PLAN)
 
@@ -140,7 +139,7 @@ async def planning_phase(
             return plan
 
         elif current_verdict == PlanVerdict.REJECTED:
-            update_status(f"Plan rejected in round {round_num}.")
+            env.update_status(f"Plan rejected in round {round_num}.")
             env.log(f"Plan rejected in round {round_num}", message_type=LLMOutputType.STATUS)
             prev_plan = current_plan  # Store for next round's prompt
             prev_review = current_review  # Store for next round's prompt
@@ -149,7 +148,7 @@ async def planning_phase(
             assert_never(current_verdict)
 
     env.log(f"Planning failed after {max_planning_rounds} rounds", message_type=LLMOutputType.ERROR)
-    update_status("Planning failed.", style="red")
+    env.update_status("Planning failed.", style="red")
     return None
 
 

@@ -2,18 +2,12 @@ import os
 from datetime import datetime
 from enum import StrEnum, auto
 from pathlib import Path
+from typing import Callable
 
 import eliot
 import eliot.json
 from eliot import FileDestination, register_exception_extractor
-from rich.console import Console
-from rich.errors import MarkupError
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.text import Text
-
 from ok.constants import OK_STATE_BASE_DIR
-from ok.ui import print_to_main
 
 
 class LLMOutputType(StrEnum):
@@ -38,9 +32,6 @@ class LLMOutputType(StrEnum):
     """Output from a tool execution."""
     TOOL_ERROR = auto()
     """Error from a tool execution."""
-
-
-console = Console()
 
 
 def log_json_encoder(obj):
@@ -80,45 +71,10 @@ def get_log_file_path() -> Path | None:
     return _log_file_path
 
 
-def __print_formatted_message(message: str, message_type: LLMOutputType):
-    """
-    Prints a formatted message to the console based on its type.
-    """
-    try:
-        if message_type == LLMOutputType.STATUS:
-            print_to_main(Panel(Markdown(message), title="Status", title_align="left", border_style="magenta"))
-
-        elif message_type == LLMOutputType.PLAN:
-            print_to_main(Panel(Markdown(message), title="Proposed plan", title_align="left", border_style="green"))
-        elif message_type == LLMOutputType.EVALUATION:
-            print_to_main(
-                Panel(Markdown(message), title="Reviewer evaluation", title_align="left", border_style="yellow")
-            )
-        elif message_type == LLMOutputType.TOOL_EXECUTION:
-            print_to_main(Panel(Markdown(message), title="Tool execution", title_align="left", border_style="cyan"))
-        elif message_type == LLMOutputType.TOOL_OUTPUT:
-            print_to_main(Panel(Markdown(message), title="Tool output", title_align="left", border_style="white"))
-        elif message_type == LLMOutputType.TOOL_ERROR:
-            print_to_main(Panel(Markdown(message), title="Tool error", title_align="left", border_style="red"))
-        elif message_type == LLMOutputType.ERROR:
-            print_to_main(Panel(Markdown(message), title="Error", title_align="left", border_style="red"))
-        elif message_type == LLMOutputType.PROMPT:
-            print_to_main(Panel(Markdown(message), title="Prompt", title_align="left", border_style="bright_blue"))
-        elif message_type == LLMOutputType.LLM_RESPONSE:
-            print_to_main(
-                Panel(Markdown(message), title="LLM response", title_align="left", border_style="bright_magenta")
-            )
-        else:
-            print_to_main(message)
-    except MarkupError:
-        print_to_main(Panel(Text.from_markup(message)))
-
-
 def real_log(
     message: str,
     message_type: LLMOutputType,
     message_human: str | None = None,
-    quiet=None,
 ) -> None:
     """
     Simple logging function that respects quiet mode.
@@ -132,10 +88,6 @@ def real_log(
     """
 
     init_logging()
-
-    if not quiet:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        __print_formatted_message(now + ": " + (message_human or message), message_type)
 
     eliot.log_message(f"log.{message_type}", str=message, **({"human": message_human} if message_human else {}))
 

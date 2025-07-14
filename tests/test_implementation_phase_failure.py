@@ -11,6 +11,8 @@ from ok.env import Env, RunResult
 class MockEnv(Env):
     def __init__(self):
         self.config = ConfigModel(run_timeout_seconds=5, llm_timeout_seconds=5)
+        self.update_status = unittest.mock.Mock()
+        self.set_phase = unittest.mock.Mock()
 
     def log(self, message: str, message_type=None, message_human: str | None = None) -> None:
         pass
@@ -45,15 +47,11 @@ def env() -> MockEnv:
 
 llm_mock = unittest.mock.Mock()
 run_mock = unittest.mock.Mock()
-update_status_mock = unittest.mock.Mock()
-set_phase_mock = unittest.mock.Mock()
 log_mock = unittest.mock.Mock()
 
 
 @patch("ok.llms.base.LLMBase", llm_mock)
-@patch("ok.ui.update_status", update_status_mock)
-@patch("ok.ui.set_phase", set_phase_mock)
-async def test_implementation_phase_failure(env: Env) -> None:
+async def test_implementation_phase_failure(env: MockEnv) -> None:
     """
     Tests the implementation_phase function's behavior when the LLM and run mocks simulate repeated failures at various steps.
 
@@ -115,3 +113,5 @@ async def test_implementation_phase_failure(env: Env) -> None:
 
     # Assert the final result is a failure (Done with verdict 'failed')
     assert getattr(result, "verdict", None) == "failed"
+    env.set_phase.assert_called()
+    env.update_status.assert_called()

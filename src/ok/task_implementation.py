@@ -13,7 +13,6 @@ from ok.llm import check_verdict
 from ok.llms.base import LLMBase
 from ok.log import LLMOutputType
 from ok.task_planning import planning_phase
-from ok.ui import set_phase, update_status
 from ok.util.eliot import log_call
 from ok.utils import format_tool_code_output
 
@@ -366,7 +365,7 @@ async def _handle_StartingAttempt(settings: Settings, state: StartingAttempt) ->
     if settings.config.implement.extra_prompt:
         impl_prompt += f"\n\n{settings.config.implement.extra_prompt}"
 
-    update_status("Implementing a step")
+    settings.env.update_status("Implementing a step")
 
     attempt_summary = await settings.llm.run(
         settings.env, impl_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.LLM_RESPONSE
@@ -457,7 +456,7 @@ async def _evaluate_step(
     if settings.config.implement.judge_extra_prompt:
         eval_prompt += f"\n\n{settings.config.implement.judge_extra_prompt}"
 
-    update_status("Evaluating step")
+    settings.env.update_status("Evaluating step")
     evaluation = await settings.llm.run(
         settings.env, eval_prompt, yolo=True, cwd=settings.cwd, response_type=LLMOutputType.EVALUATION
     )
@@ -468,7 +467,7 @@ async def _evaluate_step(
 @log_call(include_args=[])
 async def _generate_commit_message(settings: Settings) -> str:
     """Generate and return a concise, single‑line commit message for the current step."""
-    update_status("Generating commit message")
+    settings.env.update_status("Generating commit message")
     commit_msg_prompt = (
         f"Generate a concise commit message (max 15 words) for this step: {repr(settings.task)}.\n"
         "You *may not* output Markdown, code blocks, or any other formatting.\n"
@@ -485,7 +484,7 @@ async def _generate_commit_message(settings: Settings) -> str:
 @log_call(include_args=["commit_msg"])
 async def _commit_step(settings: Settings, commit_msg: str) -> None:
     """Stage and commit the changes for this step."""
-    update_status("Committing step")
+    settings.env.update_status("Committing step")
     if await has_uncommitted_changes(settings.env, cwd=settings.cwd):
         await settings.env.run(
             ["git", "add", "."],
@@ -506,7 +505,7 @@ async def _commit_step(settings: Settings, commit_msg: str) -> None:
 @log_call(include_args=[])
 async def _evaluate_task_completion(settings: Settings) -> tuple[Optional[TaskVerdict], Optional[str]]:
     """Ask the LLM whether the overall task is finished after this step."""
-    update_status("Checking if task is complete...")
+    settings.env.update_status("Checking if task is complete...")
     completion_prompt = (
         f"Is the task {repr(settings.task)} now complete based on the work done?\n"
         "You are granted access to tools, commands, and code execution for the *sole purpose* of evaluating whether the task is done.\n"
@@ -564,7 +563,7 @@ async def _handle_JudgingStep(
 
     # 3. interpret the verdict and produce a StepPhaseResult
     if not completion_evaluation:
-        update_status("Failed to get a task completion evaluation.", style="red")
+        settings.env.update_status("Failed to get a task completion evaluation.", style="red")
         settings.env.log("LLM provided no output", message_type=LLMOutputType.ERROR)
         return StartingStep(
             plan=state.plan,
@@ -580,7 +579,7 @@ async def _handle_JudgingStep(
 
     # TODO: there should be some retry thing specifically for getting verdicts, instead of just starting another step
     elif not completion_verdict:
-        update_status("Failed to get a task completion verdict.", style="red")
+        settings.env.update_status("Failed to get a task completion verdict.", style="red")
         settings.env.log(
             f"Couldn't determine the verdict from the task completion evaluation. Evaluation was:\n\n{completion_evaluation}",
             message_type=LLMOutputType.ERROR,
@@ -599,7 +598,7 @@ async def _handle_JudgingStep(
 
     match completion_verdict:
         case TaskVerdict.COMPLETE:
-            update_status("Task marked as complete.")
+            settings.env.update_status("Task marked as complete.")
             settings.env.log("Task marked as complete", message_type=LLMOutputType.STATUS)
             return FinalizingTask(
                 plan=state.plan,
@@ -616,7 +615,7 @@ async def _handle_JudgingStep(
             )
 
         case TaskVerdict.CONTINUE:
-            update_status("Task not complete, continuing step.")
+            settings.env.update_status("Task not complete, continuing step.")
             settings.env.log("Task not complete, continuing step", message_type=LLMOutputType.STATUS)
             # If there is feedback, go to RefiningPlan
             feedback = (
@@ -689,7 +688,7 @@ async def implementation_phase(
     high‑level driver that repeatedly feeds events into the state‑machine
     until a terminal state is reached
     """
-    set_phase("Step")
+    env.set_phase("Step")
     env.log(
         f"Starting step phase for task: {task}",
         message_type=LLMOutputType.STATUS,
@@ -719,7 +718,7 @@ async def implementation_phase(
             "Interrupted by user (KeyboardInterrupt)",
             message_type=LLMOutputType.ERROR,
         )
-        update_status("Interrupted by user.", style="red")
+        settings.env.update_status("Interrupted by user.", style="red")
         # TODO: still do the final commit and everything
 
         match state:

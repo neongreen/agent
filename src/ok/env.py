@@ -1,6 +1,8 @@
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Generator, Optional, Protocol
 
 from ok.config import ConfigModel
 from ok.log import LLMOutputType
@@ -44,3 +46,16 @@ class Env(Protocol):
         # TODO: could take this from the env
         run_timeout_seconds: int,
     ) -> RunResult: ...
+
+    def _get_description(self) -> str: ...
+
+    def _init_ui(self) -> None: ...
+
+    def update_status(self, message: str, style: str = "dim") -> None: ...
+
+    def set_phase(self, phase: str, attempt_info: Optional[str] = None) -> None: ...
+
+    def _cleanup_status_bar(self) -> None: ...
+
+    @contextmanager
+    def get_ui_manager(self) -> Generator[None, None, None]: ...

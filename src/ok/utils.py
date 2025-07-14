@@ -11,7 +11,6 @@ from eliot import start_action
 
 from ok.env import Env, RunResult
 from ok.log import LLMOutputType
-from ok.ui import update_status
 
 
 async def real_run(
@@ -63,7 +62,7 @@ async def real_run(
         shell=shell,
     ) as action:
         if status_message:
-            update_status(status_message)
+            env.update_status(status_message)
 
         abs_directory = abspath(str(directory))
 

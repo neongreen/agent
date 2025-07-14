@@ -10,7 +10,6 @@ from ok.llms.base import LLMBase
 from ok.log import LLMOutputType
 from ok.state_manager import read_state
 from ok.task_implementation import Done, TaskVerdict, implementation_phase
-from ok.ui import set_phase, update_status
 from ok.util.eliot import log_call
 
 
@@ -36,7 +35,7 @@ async def process_task(
     Returns:
         Implementation status.
     """
-    set_phase(f"Task {task_num}")
+    env.set_phase(f"Task {task_num}")
     env.log(f"Processing task {task_num}: {task}", message_type=LLMOutputType.STATUS)
 
     task_id = f"task_{task_num}"
@@ -111,10 +110,10 @@ async def process_task(
         if STATE_FILE.exists():
             STATE_FILE.unlink()
             env.log("Agent state file removed.", message_type=LLMOutputType.STATUS)
-            update_status("Agent state file removed.")
+            env.update_status("Agent state file removed.")
     except OSError as e:
         env.log_debug("Caught an exception", exc=repr(e))
         env.log(f"Error removing agent state file: {e}", message_type=LLMOutputType.ERROR)
-        update_status("Error removing agent state file.", style="red")
+        env.update_status("Error removing agent state file.", style="red")
 
     return result

@@ -19,53 +19,14 @@ import ok.log
 from ok import git_utils
 from ok.config import ConfigModel, get_settings
 from ok.constants import OK_TEMP_DIR
-from ok.env import Env, RunResult
 from ok.llm import get_llm
 from ok.llms.mock import MockLLM
 from ok.log import LLMOutputType
+from ok.rich_env import RichEnv
 from ok.state_manager import write_state
 from ok.task_orchestrator import process_task
 from ok.task_result import TaskResult, display_task_summary
-from ok.ui import get_ui_manager, set_phase
-from ok.utils import real_run
-
-
-class RealEnv(Env):
-    """
-    A real environment class that extends Env for actual task processing.
-    """
-
-    def __init__(self, config: ConfigModel) -> None:
-        self.config = config
-        ok.log.init_logging()
-
-    def log(self, message: str, message_type: ok.log.LLMOutputType, message_human: str | None = None) -> None:
-        ok.log.real_log(message, message_type, message_human=message_human)
-
-    def log_debug(self, message: str, **kwargs) -> None:
-        eliot.log_message("log", message=message, **kwargs)
-
-    async def run(
-        self,
-        command: str | list[str],
-        description=None,
-        command_human: Optional[list[str]] = None,
-        status_message: Optional[str] = None,
-        *,
-        directory: Path,
-        shell: bool = False,
-        run_timeout_seconds: int,
-    ) -> RunResult:
-        return await real_run(
-            env=self,
-            command=command,
-            description=description,
-            command_human=command_human,
-            status_message=status_message,
-            directory=directory,
-            shell=shell,
-            run_timeout_seconds=run_timeout_seconds,
-        )
+from ok.ui import get_ui_manager
 
 
 async def work(nursery: trio.Nursery) -> None:
@@ -92,8 +53,8 @@ async def work(nursery: trio.Nursery) -> None:
         rich.print(f"```json\n{config.model_dump_json(indent=2)}\n```")
         exit(0)
 
-    with get_ui_manager():
-        env = RealEnv(config=config)
+    env = RichEnv(config=config)
+    with get_ui_manager(env):
         del settings
 
         env.log(
@@ -130,7 +91,7 @@ async def work(nursery: trio.Nursery) -> None:
 
             env.log(f"Repo directory: {cwd}", LLMOutputType.STATUS)
 
-            set_phase("Agent initialized")
+            env.set_phase("Agent initialized")
 
             with eliot.start_action(
                 action_type="task",
@@ -189,7 +150,7 @@ async def work(nursery: trio.Nursery) -> None:
                             )
 
         env.log("Agentic loop completed", LLMOutputType.STATUS)
-        set_phase("Agentic loop completed")
+        env.set_phase("Agentic loop completed")
         display_task_summary(task_results)
         log_file_path = ok.log.get_log_file_path()
         ok.log.console.print(f"Session log file: {log_file_path}\n\n", style="bold green")
