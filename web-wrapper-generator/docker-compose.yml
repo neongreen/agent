@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  web-wrapper-generator:
+    build: .
+    container_name: lovable-wrapper-generator
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    volumes:
+      # Persist build artifacts between restarts
+      - ./builds:/app/builds
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
