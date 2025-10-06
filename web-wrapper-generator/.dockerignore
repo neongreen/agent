@@ -1,0 +1,16 @@
+# Exclude build artifacts
+web-wrapper-generator
+builds/
+templates/
+dist/
+node_modules/
+
+# Exclude version control
+.git/
+.gitignore
+
+# Exclude documentation (will be copied separately if needed)
+*.md
+
+# Exclude test files
+*_test.go
